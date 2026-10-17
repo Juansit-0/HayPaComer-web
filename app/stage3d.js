@@ -308,6 +308,7 @@ function sized(model) {
   const box = new THREE.Box3().setFromObject(model);
   model.userData.width = box.max.x - box.min.x;
   model.userData.rest = -box.min.y;
+  model.userData.height = box.max.y - box.min.y;
   return model;
 }
 
@@ -608,13 +609,16 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
   camera.position.copy(state.position);
   camera.lookAt(state.target);
 
+  let arrived = false;
   function goTo(route) {
+    if (route === state.route && arrived) return;
+    arrived = true;
     const view = VIEWS[route] ?? VIEWS.now;
     state.route = route;
     state.tween = {
       start: performance.now(),
       duration: 1300,
-      from: { position: camera.position.clone(), target: state.target.clone(), door: state.door, freezer: state.freezer },
+      from: { position: state.position.clone(), target: state.target.clone(), door: state.door, freezer: state.freezer },
       to: { position: new THREE.Vector3(...view.position), target: new THREE.Vector3(...view.target), door: view.door, freezer: view.freezer },
     };
     Object.entries(extras).forEach(([key, extra]) => {
@@ -623,11 +627,17 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     });
   }
 
+  let deferred = null;
   function placeItems(fridgeTree, inventory) {
+    if (drag.model) {
+      deferred = [fridgeTree, inventory];
+      return;
+    }
     const known = new Map([...items.children, ...doorItems.children].map((model) => [model.userData.key, model.userData.item?.trayId]));
+    [...items.children, ...doorItems.children].forEach(release);
     items.clear();
     doorItems.clear();
-    tags.forEach((element) => element.remove());
+    tags.forEach((tag) => tag.element.remove());
     tags.clear();
     let order = 0;
     slotByTray.clear();
@@ -663,7 +673,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
             element.className = `stage-tag${item.days !== null && item.days !== undefined && 1 >= item.days ? " soon" : ""}`;
             element.textContent = text;
             tagLayer.append(element);
-            tags.set(model, element);
+            tags.set(model, { element, soon: element.classList.contains("soon"), width: 0, height: 0 });
           }
           return model;
         });
@@ -694,6 +704,14 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     tagLayer.append(element);
     return element;
   });
+
+  function release(model) {
+    model.traverse((child) => {
+      if (!child.isMesh || child.userData.outline) return;
+      child.geometry.dispose();
+      child.material.dispose();
+    });
+  }
 
   const slotByTray = new Map();
   const landing = { trayId: null, local: new THREE.Vector3(), width: 0.08 };
@@ -817,6 +835,12 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     const { model, item, target, moved } = drag;
     glow(target, false);
     land(null);
+    queueMicrotask(() => {
+      if (!deferred || drag.model) return;
+      const [tree, list] = deferred;
+      deferred = null;
+      placeItems(tree, list);
+    });
     drag.model = null;
     drag.target = null;
     canvas.releasePointerCapture?.(event.pointerId);
@@ -894,6 +918,43 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
   }
   new ResizeObserver(resize).observe(canvas);
   resize();
+
+  const STACK = [0, -1, -2];
+  function placeTags(show) {
+    const placed = [];
+    const ordered = [...tags]
+      .map(([model, tag]) => {
+        const anchor = model.parent.localToWorld(model.position.clone().add(new THREE.Vector3(0, (model.userData.height ?? 0.1) * (model.userData.fit ?? 1) + 0.012, 0)));
+        const spot = anchor.project(camera);
+        return { model, tag, x: ((spot.x + 1) / 2) * canvas.clientWidth, y: ((1 - spot.y) / 2) * canvas.clientHeight };
+      })
+      .sort((a, b) => b.tag.soon - a.tag.soon || b.model.position.z - a.model.position.z || a.x - b.x);
+    ordered.forEach(({ model, tag, x, y }) => {
+      const { element } = tag;
+      if (!show || !model.visible || model === drag.model) {
+        element.style.visibility = "hidden";
+        return;
+      }
+      if (!tag.width) {
+        tag.width = element.offsetWidth;
+        tag.height = element.offsetHeight;
+      }
+      const half = tag.width / 2 + 3;
+      const step = tag.height + 4;
+      const free = (shift) => !placed.some((other) => step > Math.abs(other.y - (y + shift * step)) && half + other.half > Math.abs(other.x - x));
+      const level = tag.level !== undefined && free(tag.level) ? tag.level : STACK.find(free);
+      tag.level = level;
+      if (level === undefined) {
+        element.style.visibility = "hidden";
+        return;
+      }
+      const top = y + level * step;
+      placed.push({ x, y: top, half });
+      element.style.visibility = "";
+      element.classList.toggle("lifted", level !== 0);
+      element.style.transform = `translate(${x.toFixed(1)}px, ${top.toFixed(1)}px) translate(-50%, -100%)`;
+    });
+  }
 
   const clock = new THREE.Clock();
   function frame(now) {
@@ -990,9 +1051,8 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
       model.rotation.z = model.userData.rz + (reduced ? 0 : Math.sin(now / 90) * 0.04 * model.userData.wobble);
     });
 
-    const showTags = (state.route === "fridge" && open > 0.8) || state.route === "numbers";
-    tagLayer.style.opacity = showTags ? 1 : 0;
-    tags.forEach((element) => (element.style.visibility = state.route === "fridge" ? "" : "hidden"));
+    const fridgeTags = state.route === "fridge" && open > 0.8 && !state.tween;
+    tagLayer.style.opacity = fridgeTags || state.route === "numbers" ? 1 : 0;
     ringTags.forEach((element, index) => {
       element.style.visibility = state.route === "numbers" && element.textContent ? "" : "hidden";
       if (state.route !== "numbers") return;
@@ -1000,20 +1060,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
       const spot = arc.localToWorld(new THREE.Vector3(arc.geometry.parameters.radius, 0, 0)).project(camera);
       element.style.transform = `translate(${((spot.x + 1) / 2) * canvas.clientWidth - 14}px, ${((1 - spot.y) / 2) * canvas.clientHeight}px) translate(-100%, -50%)`;
     });
-    if (showTags) {
-      const placed = [];
-      [...tags].sort(([, a], [, b]) => b.classList.contains("soon") - a.classList.contains("soon")).forEach(([model, element]) => {
-        const top = new THREE.Box3().setFromObject(model);
-        const spot = new THREE.Vector3((top.min.x + top.max.x) / 2, top.max.y + 0.012, (top.min.z + top.max.z) / 2).project(camera);
-        const x = ((spot.x + 1) / 2) * canvas.clientWidth;
-        const y = ((1 - spot.y) / 2) * canvas.clientHeight;
-        const half = element.offsetWidth / 2 + 4;
-        const clash = placed.some((other) => 24 > Math.abs(other.y - y) && half + other.half > Math.abs(other.x - x));
-        element.hidden = clash;
-        if (!clash) placed.push({ x, y, half });
-        element.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
-      });
-    }
+    placeTags(fridgeTags);
 
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
