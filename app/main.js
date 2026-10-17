@@ -33,7 +33,7 @@ let household = null;
 let stageHousehold = null;
 
 function current() {
-  const route = location.hash.replace("#/", "");
+  const route = location.hash.replace("#/", "").split("/")[0];
   return views[route] ? route : "now";
 }
 

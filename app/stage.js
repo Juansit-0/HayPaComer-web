@@ -104,6 +104,7 @@ function fill(fridge, inventory, twin, week) {
     const items = tray ? inventory.filter((item) => item.trayId === tray.id) : [];
     slot.innerHTML = `${foods(items)}${tray && slot.classList.contains("shelf") ? `<span class="shelf-grams">${grams(tray.grams)}</span>` : ""}`;
     slot.dataset.tray = tray?.id ?? "";
+    if (tray && slot.tagName === "A") slot.setAttribute("href", `#/fridge/${tray.id}`);
     slot.setAttribute("aria-label", `${t("nav.fridge")}${tray ? `: ${grams(tray.grams)}` : ""}`);
   });
   root.querySelector("[data-celsius]").textContent =

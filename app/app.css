@@ -1097,3 +1097,34 @@ html:has(.loader:not(.gone)) { overflow: hidden; }
   .dish-card, .dish-card.skel { animation: none; }
   .dish-card:hover .dish-photo img { transform: none; }
 }
+
+/* Fridge: the stage is the map, the column lists what is on the chosen shelf */
+.fridge-hero { grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: var(--space-l); }
+.fridge-hero h1, .fridge-hero .lead, .fridge-hero .twin { grid-column: 1; }
+.fridge-hero .hero-figure { grid-column: 2; grid-row: 1 / span 3; margin: 0; font: 700 clamp(56px, 7vw, 120px)/0.85 var(--font-body); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.fridge-hero .twin { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.fridge-hero .status { padding: 6px 12px; border-radius: var(--radius-full); background: color-mix(in oklab, var(--color-white) 18%, transparent); color: inherit; }
+.fridge-hero .status::before { background: currentColor; }
+.shelf-chips { display: flex; gap: var(--space-xs); overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.shelf-chips a { flex: none; display: inline-flex; align-items: baseline; gap: var(--space-xs); min-height: 48px; padding: 12px 18px; border-radius: var(--radius-full); background: var(--color-surface); color: var(--color-text); text-decoration: none; font-weight: 600; transition: background-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard); }
+.shelf-chips a .data { color: var(--color-text-weak); font-weight: 700; }
+.shelf-chips a:hover { background: var(--color-step); }
+.shelf-chips a[aria-current="true"] { background: var(--chapter); color: var(--chapter-ink); }
+.shelf-chips a[aria-current="true"] .data { color: inherit; }
+.shelf-tile { background: transparent; padding: 0; }
+.shelf-tile > header h2 { font: 400 clamp(32px, 3.4vw, 48px)/1 var(--font-display); text-transform: uppercase; }
+.food-cards { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-s); }
+.food-card { border: 0; background: var(--color-surface); border-radius: var(--radius-20); padding: var(--space-m); gap: var(--space-xs); transition: transform var(--duration-base) var(--ease-emphasized); }
+.food-card:hover { transform: translateY(-2px); }
+.food-card-top { display: flex; justify-content: space-between; align-items: flex-start; min-height: 52px; }
+.food-card-top .food { scale: 1.5; transform-origin: left top; }
+.food-card .days { padding: 4px 10px; border-radius: var(--radius-full); background: var(--color-step); font-weight: 700; font-size: var(--size-small); }
+.food-card .days.attention { background: var(--color-tomate); color: var(--color-arroz); }
+.food-card .value { font: 700 var(--size-figure)/1 var(--font-body); letter-spacing: -0.03em; }
+@media (max-width: 760px) {
+  .fridge-hero { grid-template-columns: minmax(0, 1fr); }
+  .fridge-hero .hero-figure { grid-column: 1; grid-row: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .food-card:hover { transform: none; }
+}

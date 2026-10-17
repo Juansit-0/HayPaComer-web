@@ -1,9 +1,13 @@
 import { api, freshAccess } from "./api.js";
 import { foodName, formatDay, formatNumber, placeName, plural, t } from "./i18n.js";
+import { shapeClass } from "./stage.js";
 import {
+  busy,
+  daysLeft,
   esc,
   expiryText,
   formData,
+  whenText,
   grams,
   numberField,
   openSheet,
@@ -39,35 +43,34 @@ function twinLine(twin) {
         : `<span class="status">${t("fridge.door-closed")}</span>`;
   const cold =
     twin.celsius === null || twin.celsius === undefined
-      ? `<span class="hint">${t("fridge.no-temperature")}</span>`
-      : `<span class="data">${formatNumber(twin.celsius, 1)} °C</span>`;
+      ? `<span class="status quiet">${t("fridge.no-temperature")}</span>`
+      : `<span class="status"><span class="data">${formatNumber(twin.celsius, 1)} °C</span></span>`;
   return `<div class="twin" data-twin="${esc(twin.fridgeId)}">${door}${cold}</div>`;
 }
 
-function cabinet(fridge, twin) {
-  return `<section class="tile w-4" aria-label="${esc(placeName(fridge.name))}">
-    <header><h2>${esc(placeName(fridge.name))}</h2>${twinLine(twin)}</header>
-    <div class="cabinet" role="group" aria-label="${esc(placeName(fridge.name))}">${fridge.children
-      .map(
-        (zone) => `<div class="zone">
-          <div class="zone-head"><span>${esc(placeName(zone.name))}</span><span class="data">${grams(zone.grams)}</span></div>
-          ${zone.children
-            .map(
-              (tray) => `<button class="shelf" type="button" data-tray="${esc(tray.id)}" aria-pressed="${tray.id === selectedTray}">
-                <span>${esc(placeName(tray.name))}</span>
-                <span class="shelf-meta"><span class="data">${grams(tray.grams)}</span><span class="badge" aria-label="${esc(plural("fridge.items", tray.items))}">${tray.items}</span></span>
-              </button>`,
-            )
-            .join("")}
-        </div>`,
-      )
-      .join("")}</div>
-  </section>`;
+function shelfChips(fridges) {
+  return `<nav class="shelf-chips" aria-label="${esc(t("nav.fridge"))}">${fridges
+    .flatMap((fridge) =>
+      fridge.children.flatMap((zone) =>
+        zone.children.map(
+          (tray) => `<a href="#/fridge/${esc(tray.id)}" data-tray="${esc(tray.id)}" ${tray.id === selectedTray ? 'aria-current="true"' : ""}>
+            <span>${esc(placeName(zone.name))}: ${esc(placeName(tray.name))}</span>
+            <span class="data">${grams(tray.grams)}</span>
+          </a>`,
+        ),
+      ),
+    )
+    .join("")}</nav>`;
 }
 
 function foodCard(item) {
   const hidden = item.name === "Private food";
+  const days = daysLeft(item.expiresOn);
   return `<li class="food-card">
+    <div class="food-card-top">
+      <i class="${shapeClass(item.name)}" aria-hidden="true"></i>
+      ${days === null || hidden ? "" : `<span class="days ${days <= 1 ? "attention" : ""}">${esc(whenText(item.expiresOn))}</span>`}
+    </div>
     <span class="value">${grams(item.grams)}</span>
     <span class="item-name">${esc(foodName(item.name))}</span>
     <div class="item-meta">${statusPill(item.statuses)}<span class="hint">${
@@ -88,7 +91,7 @@ function foodCard(item) {
 }
 
 function shelfTile(tray, items) {
-  return `<section class="tile w-8" aria-labelledby="tray-title">
+  return `<section class="tile w-12 shelf-tile" aria-labelledby="tray-title">
     <header>
       <div>
         <h2 id="tray-title">${esc(placeName(tray.name))}</h2>
@@ -323,6 +326,8 @@ export async function renderFridge(main, household) {
   }
 
   const trays = trayOptions(fridges);
+  const fromHash = location.hash.split("/")[2];
+  if (fromHash) selectedTray = fromHash;
   if (!trays.some((tray) => tray.id === selectedTray)) selectedTray = trays[0]?.id ?? null;
   const tray = fridges
     .flatMap((fridge) => fridge.children.flatMap((zone) => zone.children))
@@ -330,12 +335,14 @@ export async function renderFridge(main, household) {
   const total = fridges.reduce((sum, fridge) => sum + Number(fridge.grams), 0);
 
   main.innerHTML = `
-    <header>
+    <header class="fridge-hero">
       <h1>${t("fridge.title")}</h1>
-      <p class="lead">${t("fridge.lead", { grams: `<span class="data">${grams(total)}</span>` })}</p>
+      <p class="hero-figure"><span class="data">${grams(total)}</span></p>
+      <p class="lead">${t("fridge.lead", { grams: grams(total) })}</p>
+      ${twins.map(twinLine).join("")}
     </header>
+    ${shelfChips(fridges)}
     <div class="bento fridge-bento">
-      ${fridges.map((fridge, index) => cabinet(fridge, twins[index])).join("")}
       ${tray ? shelfTile(tray, inventory.filter((item) => item.trayId === tray.id)) : ""}
     </div>`;
 
@@ -356,19 +363,13 @@ export async function renderFridge(main, household) {
   };
   window.addEventListener("hpc:live", onLive);
 
-  main.querySelectorAll("[data-tray]").forEach((button) =>
-    button.addEventListener("click", () => {
-      selectedTray = button.dataset.tray;
-      renderFridge(main, household);
-    }),
-  );
 
   main.querySelectorAll("[data-item]").forEach((form) =>
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const action = event.submitter?.value ?? "consume";
       const item = inventory.find((entry) => entry.id === form.dataset.item);
-      try {
+      const done = busy(event.submitter ?? form.querySelector("button"), async () => {
         if (action === "discard") {
           await api(`${base}/items/${item.id}/discard`, { method: "POST" });
           toast(t("fridge.toast-discarded", { food: foodName(item.name) }));
@@ -385,6 +386,9 @@ export async function renderFridge(main, household) {
           await api(`${base}/items/${item.id}/consume`, { method: "POST", body: { grams: amount } });
           toast(t("fridge.toast-used", { grams: grams(amount), food: foodName(item.name) }));
         }
+      });
+      try {
+        await done;
         renderFridge(main, household);
       } catch (error) {
         showError(form, error);
