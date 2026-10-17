@@ -120,7 +120,7 @@ function trayOptions(fridges) {
   );
 }
 
-function addFoodBody(catalog, trays, trayId) {
+function addFoodBody(catalog, trays, trayId, chosen = null) {
   const groups = new Map();
   catalog.forEach((food) => {
     const list = groups.get(food.category) ?? [];
@@ -132,6 +132,8 @@ function addFoodBody(catalog, trays, trayId) {
       <legend>${t("add.step.food")}</legend>
       <label for="add-search" class="visually-hidden">${t("add.search")}</label>
       <input id="add-search" type="search" data-food-search autocomplete="off" placeholder="${esc(t("add.search"))}">
+      <button type="button" class="learn" data-learn hidden></button>
+      <p class="hint" data-learn-status aria-live="polite"></p>
       <div class="food-groups" data-food-groups>${[...groups.entries()]
         .sort(([left], [right]) => CATEGORY_ORDER.indexOf(left) - CATEGORY_ORDER.indexOf(right))
         .map(
@@ -139,7 +141,7 @@ function addFoodBody(catalog, trays, trayId) {
             <h3>${t(`category.${category}`)}</h3>
             <div class="chips">${foods
               .map(
-                (food) => `<label class="chip" data-chip="${esc(`${food.name} ${foodName(food.name)}`.toLowerCase())}"><input type="radio" name="food" value="${esc(food.name)}" required><span>${esc(foodName(food.name))}</span></label>`,
+                (food) => `<label class="chip" data-chip="${esc(`${food.name} ${foodName(food.name)}`.toLowerCase())}"><input type="radio" name="food" value="${esc(food.name)}" required ${food.name === chosen ? "checked" : ""}><span>${esc(foodName(food.name))}</span></label>`,
               )
               .join("")}</div>
           </div>`,
@@ -210,6 +212,41 @@ function wireAddFood(dialog, base, trays, onDone) {
     form.querySelectorAll("[data-group]").forEach((group) => {
       group.hidden = [...group.querySelectorAll("[data-chip]")].every((chip) => chip.hidden);
     });
+    const none = [...form.querySelectorAll("[data-chip]")].every((chip) => chip.hidden);
+    learn.hidden = !query || !none;
+    learn.textContent = t("add.learn", { food: search.value.trim() });
+  });
+
+  const learn = form.querySelector("[data-learn]");
+  const learnStatus = form.querySelector("[data-learn-status]");
+  async function teach() {
+    const name = search.value.trim();
+    if (!name) return;
+    learn.disabled = true;
+    learnStatus.textContent = t("add.learning", { food: name });
+    try {
+      const food = await api(`${base}/foods`, { method: "POST", body: { name } });
+      const groups = form.querySelector("[data-food-groups]");
+      groups.insertAdjacentHTML(
+        "afterbegin",
+        `<div class="food-group" data-group><div class="chips"><label class="chip" data-chip="${esc(food.name.toLowerCase())}"><input type="radio" name="food" value="${esc(food.name)}" required checked><span>${esc(foodName(food.name))}</span></label></div></div>`,
+      );
+      search.value = "";
+      search.dispatchEvent(new Event("input"));
+      learnStatus.textContent = t("add.learned", { food: foodName(food.name) });
+      await refresh();
+    } catch (error) {
+      learnStatus.textContent = error.message;
+    } finally {
+      learn.disabled = false;
+    }
+  }
+  learn.addEventListener("click", teach);
+  search.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (!learn.hidden) teach();
+    }
   });
 
   const mode = () => form.querySelector("[name=expiryMode]:checked").value;
@@ -293,6 +330,17 @@ function wireAddFood(dialog, base, trays, onDone) {
     } catch (error) {
       showError(form, error);
     }
+  });
+}
+
+export async function openAddFood(household, { food = null, trayId = null, onDone } = {}) {
+  const base = `/households/${household.id}`;
+  const [catalog, fridges] = await Promise.all([api("/foods?q=").catch(() => []), api(`${base}/fridges`)]);
+  const trays = trayOptions(fridges);
+  if (food && !catalog.some((entry) => entry.name === food)) catalog.unshift({ name: food, category: "OTHER" });
+  openSheet(t("fridge.add-title"), addFoodBody(catalog, trays, trayId ?? trays[0]?.id, food), (dialog) => {
+    wireAddFood(dialog, base, trays, (chosenTray) => onDone?.(chosenTray));
+    dialog.querySelector("[name=food]:checked")?.dispatchEvent(new Event("change", { bubbles: true }));
   });
 }
 

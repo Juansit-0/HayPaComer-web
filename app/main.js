@@ -146,6 +146,10 @@ window.addEventListener("hpc:live", (event) => {
   else refreshStageSoon();
 });
 
+window.addEventListener("hpc:inventory-changed", () => {
+  if (["now", "fridge"].includes(current()) && !document.querySelector("dialog[open]")) render();
+});
+
 window.addEventListener("hpc:session-changed", (event) => {
   if (event.detail && household) return;
   disconnectLive();
