@@ -38,6 +38,10 @@ export function foodName(name) {
   return texts[`food.${String(name).trim().toLowerCase()}`] ?? name;
 }
 
+export function recipeName(name) {
+  return texts[`recipe.${String(name ?? "").trim().toLowerCase()}`] ?? name;
+}
+
 export function placeName(name) {
   return texts[`place.${String(name ?? "").trim().toLowerCase()}`] ?? name;
 }

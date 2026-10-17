@@ -42,9 +42,12 @@ let root = null;
 let household = null;
 let pending = null;
 
+export function shapeClass(name) {
+  return `food f-${(SHAPES[name] ?? "otro").split(" ").join(" f-")}`;
+}
+
 function food(item) {
-  const shape = SHAPES[item.name] ?? "otro";
-  return `<i class="food f-${shape.split(" ").join(" f-")}" title="${esc(`${foodName(item.name)}, ${grams(item.grams)}`)}"></i>`;
+  return `<i class="${shapeClass(item.name)}" title="${esc(`${foodName(item.name)}, ${grams(item.grams)}`)}"></i>`;
 }
 
 function foods(items) {
