@@ -15,7 +15,7 @@ const VIEWS = {
   fridge: { position: [0.2, 0.78, 1.32], target: [0, 0.58, 0], door: DOOR_OPEN, freezer: 0 },
   market: { position: [0.42, 1.48, 1.02], target: [0.1, 1.42, 0.34], door: -0.5, freezer: 0 },
   numbers: { position: [0.55, 1.62, 1.45], target: [0, 1.42, 0.25], door: -0.4, freezer: -1.7 },
-  chef: { position: [0.75, 2.25, 1.05], target: [0, 1.76, 0], door: -0.3, freezer: 0 },
+  chef: { position: [0.62, 0.92, 1.45], target: [0, 0.62, 0], door: DOOR_OPEN, freezer: 0 },
   settings: { position: [0.2, 1.06, 0.82], target: [0, 1.02, -0.2], door: DOOR_OPEN, freezer: 0 },
 };
 
@@ -329,6 +329,7 @@ function labelTexture(text, background, color) {
 const VAPOR = 18;
 const WHITE = new THREE.Color("#fdfdfb");
 const ALARM = new THREE.Color("#d2492f");
+const GLOW = new THREE.Color("#f3c443");
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function frostTexture() {
@@ -594,6 +595,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     lit: false,
     litAt: 0,
     hoverModel: null,
+    highlight: new Set(),
   };
   camera.position.copy(state.position);
   camera.lookAt(state.target);
@@ -664,8 +666,20 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     });
   }
 
-  function setRings(shares) {
+  const ringTags = [0, 1, 2].map((index) => {
+    const element = document.createElement("span");
+    element.className = `stage-tag ring-tag ring-${index}`;
+    tagLayer.append(element);
+    return element;
+  });
+
+  function setRings(shares, labels = []) {
     state.ringShares = shares;
+    ringTags.forEach((element, index) => (element.textContent = labels[index] ?? ""));
+  }
+
+  function highlight(names) {
+    state.highlight = new Set(names.map((name) => name.toLowerCase()));
   }
 
   function setStatus(twin) {
@@ -896,12 +910,26 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
       const hovered = state.hoverModel === model;
       model.userData.wobble = THREE.MathUtils.damp(model.userData.wobble ?? 0, hovered ? 1 : 0, 8, delta);
       model.scale.setScalar(Math.max(0.001, base * (1 + model.userData.wobble * 0.06)));
+      const lit = state.highlight.has(String(model.userData.item?.name ?? "").toLowerCase());
+      if (lit || model.userData.lit) {
+        const strength = lit ? 0.22 + Math.sin(now / 320) * 0.1 : 0;
+        model.traverse((child) => child.isMesh && child.material.emissive?.copy(GLOW).multiplyScalar(strength));
+        model.userData.lit = lit;
+      }
       model.userData.rz ??= model.rotation.z;
       model.rotation.z = model.userData.rz + (reduced ? 0 : Math.sin(now / 90) * 0.04 * model.userData.wobble);
     });
 
-    const showTags = state.route === "fridge" && open > 0.8;
+    const showTags = (state.route === "fridge" && open > 0.8) || state.route === "numbers";
     tagLayer.style.opacity = showTags ? 1 : 0;
+    tags.forEach((element) => (element.style.visibility = state.route === "fridge" ? "" : "hidden"));
+    ringTags.forEach((element, index) => {
+      element.style.visibility = state.route === "numbers" && element.textContent ? "" : "hidden";
+      if (state.route !== "numbers") return;
+      const arc = extras.numbers.userData.arcs[index];
+      const spot = arc.localToWorld(new THREE.Vector3(arc.geometry.parameters.radius, 0, 0)).project(camera);
+      element.style.transform = `translate(${((spot.x + 1) / 2) * canvas.clientWidth - 14}px, ${((1 - spot.y) / 2) * canvas.clientHeight}px) translate(-100%, -50%)`;
+    });
     if (showTags) {
       const placed = [];
       [...tags].sort(([, a], [, b]) => b.classList.contains("soon") - a.classList.contains("soon")).forEach(([model, element]) => {
@@ -927,6 +955,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     placeItems,
     setRings,
     setStatus,
+    highlight,
     pick,
     camera,
     scene,

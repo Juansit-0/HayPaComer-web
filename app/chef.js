@@ -1,9 +1,13 @@
 import { api } from "./api.js";
-import { currentLocale, locales, recipeName, t } from "./i18n.js";
-import { esc, toast } from "./ui.js";
+import { currentLocale, foodName, locales, plural, recipeName, t } from "./i18n.js";
+import { candidate, dishCard, kitchenRecipes } from "./now.js";
+import { highlightFoods, shapeClass } from "./stage.js";
+import { daysLeft, esc, grams, toast, whenText } from "./ui.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
-const state = { conversationId: null, messages: [], lang: null, handsFree: false, recognition: null };
+const state = { conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null };
+const TOOLS = ["query_inventory", "view_expiries", "view_market_list", "view_cold_chain", "view_weekly_plan", "recall_memory", "review_budget", "investigate_cold", "waste_patterns"];
+const SOON_DAYS = 2;
 
 function voiceLanguage() {
   return state.lang ?? (currentLocale().startsWith("es") ? "es-CO" : currentLocale().startsWith("en") ? "en-US" : defaultLanguage());
@@ -15,20 +19,57 @@ function spoken(answer) {
   return answer.replace(/^Offline answer based on measured data:\s*/i, "").replace(/\b[a-z_]+: /g, "");
 }
 
+function formatted(text) {
+  return esc(text).replace(/\*\*(.+?)\*\*|\n/g, (match, bold) => (bold ? `<b>${bold}</b>` : "<br>"));
+}
+
+function checked(evidence) {
+  const tools = [...new Set(evidence.map((item) => item.tool))];
+  return tools.map((tool) => (TOOLS.includes(tool) ? t(`chef.tool.${tool}`) : tool)).join(", ");
+}
+
 function message(entry) {
   if (entry.role === "user") return `<li class="said"><span class="who">${t("chef.you")}</span><p>${esc(entry.text)}</p></li>`;
   const runs = (entry.runs || []).map((run) => (SPECIALISTS[run.specialist] ? t(SPECIALISTS[run.specialist]) : run.specialist)).join(", ");
   return `<li class="answer">
     <span class="who">${esc(runs || t("chef.kitchen"))}</span>
-    <p>${esc(entry.text).replace(/\n/g, "<br>")}</p>
+    <p>${formatted(entry.text)}</p>
+    ${entry.dishes?.length ? `<div class="chef-dishes">${entry.dishes.map(dishCard).join("")}</div>` : ""}
     ${
       entry.evidence?.length
-        ? `<details><summary>${t("chef.evidence")}</summary><ul>${entry.evidence
-            .map((item) => `<li><span class="data">${esc(item.tool)}</span> ${esc(item.content)}</li>`)
+        ? `<details class="evidence"><summary>${esc(t("chef.checked", { what: checked(entry.evidence) }))}</summary><ul>${entry.evidence
+            .map((item) => `<li>${esc(item.content)}</li>`)
             .join("")}</ul></details>`
         : ""
     }
   </li>`;
+}
+
+function mentioned(text, inventory) {
+  const said = text.toLowerCase();
+  return inventory.filter((item) => said.includes(foodName(item.name).toLowerCase()) || said.includes(item.name.toLowerCase())).map((item) => item.name);
+}
+
+function sees(inventory) {
+  const usable = inventory.filter((item) => item.usable);
+  const soon = usable.filter((item) => item.days !== null && SOON_DAYS >= item.days);
+  return `<section class="chef-sees" aria-labelledby="sees-title">
+    <h2 id="sees-title">${t("chef.sees.title")}</h2>
+    <p class="lead">${usable.length ? `${plural("chef.sees.foods", usable.length)} ${soon.length ? plural("chef.sees.soon", soon.length) : t("chef.sees.calm")}` : t("chef.sees.empty")}</p>
+    <ul class="sees-list">${usable
+      .slice(0, 6)
+      .map(
+        (item) => `<li class="${item.days !== null && SOON_DAYS >= item.days ? "soon" : ""}"><span class="food ${shapeClass(item.name)}" aria-hidden="true"></span><span class="item-name">${esc(foodName(item.name))}</span><span class="data">${grams(item.grams)}</span>${
+          item.expiresOn ? `<span class="sees-when">${esc(whenText(item.expiresOn))}</span>` : ""
+        }</li>`,
+      )
+      .join("")}</ul>
+  </section>`;
+}
+
+function prompts(inventory) {
+  const first = inventory.find((item) => item.usable && item.days !== null && SOON_DAYS >= item.days);
+  return [first ? t("chef.prompt.use", { food: foodName(first.name).toLowerCase() }) : t("chef.prompt.first"), t("chef.prompt.dinner"), t("chef.prompt.buy")];
 }
 
 function stepCard(session) {
@@ -62,10 +103,14 @@ function confirmations(list) {
 
 export async function renderChef(main, household) {
   const base = `/households/${household.id}`;
-  const [session, pending] = await Promise.all([
+  const [session, pending, listed] = await Promise.all([
     api(`${base}/cooking-sessions/active`).catch(() => null),
     api("/agent/confirmations").catch(() => []),
+    api(`${base}/inventory`).catch(() => []),
   ]);
+  const inventory = listed
+    .map((item) => ({ ...item, days: daysLeft(item.expiresOn) }))
+    .sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity));
 
   const side = stepCard(session) + confirmations(pending);
   main.innerHTML = `
@@ -74,13 +119,14 @@ export async function renderChef(main, household) {
       <p class="lead">${t("chef.lead")}</p>
     </header>
     ${side ? `<div class="chef-side">${side}</div>` : ""}
+    ${sees(inventory)}
     <section class="chef-tile" aria-labelledby="chef-title">
         <ol class="chat" aria-live="polite" data-chat>${state.messages.map(message).join("")}</ol>
         ${
           state.messages.length
             ? ""
-            : `<div class="prompts">${["chef.prompt.tonight", "chef.prompt.first", "chef.prompt.buy"]
-                .map((key) => `<button type="button" class="chip-button" data-prompt="${esc(t(key))}">${t(key)}</button>`)
+            : `<div class="prompts">${prompts(inventory)
+                .map((text) => `<button type="button" class="chip-button" data-prompt="${esc(text)}">${esc(text)}</button>`)
                 .join("")}</div>`
         }
         <form class="ask" data-ask>
@@ -88,7 +134,9 @@ export async function renderChef(main, household) {
           <button class="round" type="button" data-mic aria-pressed="false" aria-label="${esc(t("chef.speak"))}" ${voiceSupported ? "" : "disabled"}>${t("chef.speak")}</button>
           <button class="primary round" type="submit">${t("chef.ask")}</button>
         </form>
-        <div class="row-form voice-options">
+        <details class="voice-options">
+          <summary>${t("chef.voice")}</summary>
+          <div class="row-form">
           <label class="check"><input type="checkbox" data-hands-free ${state.handsFree ? "checked" : ""} ${voiceSupported ? "" : "disabled"}> ${t("chef.hands-free")}</label>
           <label>${t("chef.voice-language")}<select data-lang>${locales()
             .map((option) => {
@@ -96,8 +144,9 @@ export async function renderChef(main, household) {
               return `<option value="${esc(value)}" ${voiceLanguage() === value ? "selected" : ""}>${esc(option.name)}</option>`;
             })
             .join("")}</select></label>
-        </div>
-        ${voiceSupported ? "" : `<p class="hint">${t("chef.no-voice")}</p>`}
+          </div>
+          ${voiceSupported ? "" : `<p class="hint">${t("chef.no-voice")}</p>`}
+        </details>
     </section>`;
 
   const form = main.querySelector("[data-ask]");
@@ -121,6 +170,18 @@ export async function renderChef(main, household) {
     return true;
   }
 
+  async function dishesWith(foods) {
+    try {
+      state.dishes ??= await kitchenRecipes(base).then((recipes) =>
+        recipes.length ? api(`${base}/suggestions`, { method: "POST", body: { servings: 2, candidates: recipes.slice(0, 50).map(candidate) } }).then((result) => result.suggestions) : [],
+      );
+    } catch {
+      return [];
+    }
+    const wanted = foods.map((food) => food.toLowerCase());
+    return state.dishes.filter((dish) => dish.evaluation.requirements.some((requirement) => wanted.includes(requirement.food.toLowerCase()))).slice(0, 2);
+  }
+
   async function ask(text) {
     const command = commandOf(text);
     if (command && (await cook(command))) return;
@@ -135,7 +196,10 @@ export async function renderChef(main, household) {
         body: { message: text, conversationId: state.conversationId },
       });
       state.conversationId = reply.conversationId;
-      state.messages.push({ role: "assistant", text: reply.answer, runs: reply.runs, evidence: reply.evidence });
+      const foods = mentioned(reply.answer, inventory);
+      const cooking = reply.runs?.some((run) => run.specialist === "chef");
+      const dishes = cooking && foods.length ? await dishesWith(foods) : [];
+      state.messages.push({ role: "assistant", text: reply.answer, runs: reply.runs, evidence: reply.evidence, foods, dishes });
       if (state.handsFree || mic.getAttribute("aria-pressed") === "true") speak(spoken(reply.answer), voiceLanguage());
     } catch (error) {
       state.messages.push({ role: "assistant", text: error.message, runs: [] });
@@ -182,7 +246,9 @@ export async function renderChef(main, household) {
     state.lang = event.target.value;
   });
 
-  main.querySelectorAll("[data-cook]").forEach((button) => button.addEventListener("click", () => cook(button.dataset.cook)));
+  main.querySelectorAll(".cooking [data-cook]").forEach((button) => button.addEventListener("click", () => cook(button.dataset.cook)));
+  main.querySelectorAll(".dish-card [data-cook]").forEach((button) => button.addEventListener("click", () => ask(t("chef.how-to", { recipe: recipeName(button.dataset.cook) }))));
+  highlightFoods(state.messages.findLast((entry) => entry.role === "assistant")?.foods ?? []);
 
   main.querySelectorAll("[data-approve]").forEach((button) =>
     button.addEventListener("click", async () => {

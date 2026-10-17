@@ -286,10 +286,15 @@ export function mountStage(element) {
   }
 }
 
+export function highlightFoods(names) {
+  three?.highlight(names);
+}
+
 export function showRoute(route) {
   if (!root) return;
   lastRoute = route;
   three?.goTo(route);
+  if (route !== "chef") three?.highlight([]);
   root.dataset.route = route;
   root.querySelectorAll("[data-part]").forEach((part) => {
     if (part.dataset.part === route) part.setAttribute("aria-current", "page");
@@ -328,6 +333,9 @@ export async function refreshStage(chosen) {
       moved > 0
         ? [Number(week.consumedGrams) / moved, Number(week.rescuedGrams) / Math.max(1, Number(week.consumedGrams)), Number(week.discardedGrams) / moved]
         : [0, 0, 0],
+      ["eaten", "rescued", "wasted"].map((ring, index) =>
+        t(`numbers.ring.${ring}-short`, { grams: grams([week?.consumedGrams, week?.rescuedGrams, week?.discardedGrams][index] ?? 0) }),
+      ),
     );
   }
 }

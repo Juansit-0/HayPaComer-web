@@ -1373,3 +1373,32 @@ a.button:active { transform: scale(0.97); }
 /* Paper grain over the illustrated 3D fridge */
 .stage.has-three::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.07; mix-blend-mode: multiply; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
 @media (max-width: 1023px) { .stage.has-three::after { display: none; } }
+
+/* Chef: what the chef sees in the fridge, questions built from it, dishes inside answers */
+.chef-sees { display: grid; gap: var(--space-s); padding: var(--space-m); border-radius: 28px; background: var(--color-white); }
+.chef-sees h2 { font-size: var(--size-small); font-weight: 700; color: var(--color-cobre); }
+.chef-sees .lead { margin: 0; font-size: var(--size-h4); color: var(--color-tinta); }
+.sees-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.sees-list li { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 14px 4px 8px; border-radius: var(--radius-full); background: var(--color-surface); }
+.sees-list .food { scale: 0.7; }
+.sees-list .data { font-weight: 700; }
+.sees-when { font-size: var(--size-small); color: var(--color-text-weak); }
+.sees-list .soon { background: color-mix(in oklab, var(--color-tomate) 12%, var(--color-white)); }
+.sees-list .soon .sees-when { color: var(--color-tomate); font-weight: 700; }
+.chat .answer b { font-weight: 700; }
+.chef-tile .chat:empty { display: none; }
+.chef-dishes { display: grid; gap: var(--space-s); margin-top: var(--space-xs); }
+.chef-dishes .dish-card { grid-template-columns: 104px minmax(0, 1fr); align-items: center; padding: var(--space-s); border-radius: var(--radius-20); background: var(--color-white); }
+.chef-dishes .dish-photo img, .chef-dishes .dish-plate { aspect-ratio: 1; }
+.chef-dishes .dish-photo figcaption { display: none; }
+.chef-dishes .dish-body { display: grid; gap: 4px; justify-items: start; }
+.chef-dishes .dish-card h3 { font-size: var(--size-h4); }
+.chef-dishes .dish-foods { margin: 0; font-size: var(--size-small); }
+.chat .evidence summary { cursor: pointer; }
+.voice-options summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.voice-options .row-form { align-items: center; }
+
+.ring-tag::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; vertical-align: 1px; }
+.ring-tag.ring-0::before { background: var(--color-cilantro); }
+.ring-tag.ring-1::before { background: var(--color-papa); }
+.ring-tag.ring-2::before { background: var(--color-tomate); }

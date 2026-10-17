@@ -14,7 +14,7 @@ const sentence = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1).replace(/ C$/, " °C");
 };
 
-function candidate(recipe) {
+export function candidate(recipe) {
   return {
     name: recipe.name,
     servings: recipe.servings,
@@ -34,7 +34,7 @@ function candidate(recipe) {
 
 const list = (foods) => foods.map((food) => esc(foodName(food))).join(", ");
 
-function dishCard(dish, index) {
+export function dishCard(dish, index) {
   const requirements = dish.evaluation.requirements;
   const used = requirements.filter((requirement) => requirement.verdict === "ENOUGH" && Number(requirement.availableGrams) > 0);
   const swaps = requirements.filter((requirement) => requirement.substitute);
@@ -85,16 +85,19 @@ function todayCard(item) {
   </li>`;
 }
 
+export async function kitchenRecipes(base) {
+  const [saved, templates] = await Promise.all([api(`${base}/recipes`), api("/recipe-templates").catch(() => [])]);
+  const known = new Set(saved.map((recipe) => recipe.name.trim().toLowerCase()));
+  return [...saved, ...templates.filter((recipe) => !known.has(recipe.name.trim().toLowerCase()))];
+}
+
 export async function renderNow(main, household) {
   const base = `/households/${household.id}`;
-  const [snapshot, inventory, saved, templates] = await Promise.all([
+  const [snapshot, inventory, recipes] = await Promise.all([
     api(`${base}/kitchen`),
     api(`${base}/inventory?rescueFirst=true`),
-    api(`${base}/recipes`),
-    api("/recipe-templates").catch(() => []),
+    kitchenRecipes(base),
   ]);
-  const known = new Set(saved.map((recipe) => recipe.name.trim().toLowerCase()));
-  const recipes = [...saved, ...templates.filter((recipe) => !known.has(recipe.name.trim().toLowerCase()))];
   const urgent = inventory.filter((item) => item.usable && item.statuses.some((status) => URGENT.includes(status)));
 
   main.innerHTML = `
