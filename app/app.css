@@ -1170,3 +1170,36 @@ html:has(.loader:not(.gone)) { overflow: hidden; }
 }
 .budget-tile .kpi .value { font-size: clamp(28px, 2.6vw, 44px); }
 .budget-head .kpi { min-width: 0; }
+
+/* Chef: a real conversation, a round composer, and the guided step as a poster */
+.chef-tile { display: grid; gap: var(--space-m); }
+.chat { gap: var(--space-s); }
+.chat > li { max-width: min(78%, 620px); padding: var(--space-s) var(--space-m); border-radius: 22px; animation: rise var(--duration-base) var(--ease-emphasized) both; }
+.chat .said { justify-self: end; background: var(--color-tinta); color: var(--color-arroz); border-bottom-right-radius: 6px; }
+.chat .said .who { color: color-mix(in oklab, var(--color-arroz) 70%, transparent); }
+.chat .answer { justify-self: start; border: 0; background: var(--color-surface); border-bottom-left-radius: 6px; }
+.chat .answer .who { font-weight: 700; color: var(--color-cobre); }
+.chat .chat-empty { max-width: none; padding: 0; }
+.chat .typing { display: inline-flex; gap: 6px; padding: 18px 22px; }
+.chat .typing span { width: 8px; height: 8px; border-radius: 50%; background: var(--color-piedra); animation: typing 1s var(--ease-standard) infinite; }
+.chat .typing span:nth-child(2) { animation-delay: 150ms; }
+.chat .typing span:nth-child(3) { animation-delay: 300ms; }
+@keyframes typing { 50% { transform: translateY(-5px); opacity: 0.5; } }
+.ask { position: sticky; bottom: var(--space-s); display: flex; align-items: center; gap: var(--space-xs); padding: 8px; border-radius: var(--radius-full); background: var(--color-white); box-shadow: var(--shadow-raised); }
+.ask .grow { flex: 1 1 auto; }
+.ask input { border: 0; min-height: 48px; background: transparent; font-size: var(--size-h4); }
+.ask input:focus-visible { outline: none; }
+.ask:focus-within { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+button.round { min-height: 48px; padding: 0 20px; }
+.chef-side { display: grid; gap: var(--space-s); }
+.cooking { background: var(--color-tinta); color: var(--color-arroz); }
+.cooking .cooking-step { font: 400 clamp(36px, 4vw, 64px)/0.9 var(--font-display); text-transform: uppercase; color: var(--color-papa); margin: 0; }
+.cooking .item-name { font-size: var(--size-h4); }
+.cooking .step-text { font-size: clamp(22px, 2.2vw, 32px); line-height: 1.25; }
+.cooking .hint, .cooking .status { color: color-mix(in oklab, var(--color-arroz) 75%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  .chat > li, .chat .typing span { animation: none; }
+}
+.prompts { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.chip-button { min-height: 48px; border-radius: var(--radius-full); background: var(--color-surface); font-weight: 600; }
+.chip-button:hover { background: var(--color-step); }

@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { currentLocale, locales, t } from "./i18n.js";
+import { currentLocale, locales, recipeName, t } from "./i18n.js";
 import { esc, toast } from "./ui.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
@@ -34,8 +34,9 @@ function message(entry) {
 function stepCard(session) {
   if (!session) return "";
   const step = session.step;
-  return `<article class="tile cooking" aria-label="${esc(t("chef.cooking", { recipe: session.recipe }))}">
-    <div class="item-meta"><span class="item-name">${esc(session.recipe)}</span><span class="status quiet">${t("chef.step-of", { step: session.currentStep, total: session.totalSteps })}</span><span class="status">${esc(t(`chef.phase.${session.phase}`))}</span></div>
+  return `<article class="tile cooking" aria-label="${esc(t("chef.cooking", { recipe: recipeName(session.recipe) }))}">
+    <p class="cooking-step">${t("chef.step-of", { step: session.currentStep, total: session.totalSteps })}</p>
+    <div class="item-meta"><span class="item-name">${esc(recipeName(session.recipe))}</span><span class="status">${esc(t(`chef.phase.${session.phase}`))}</span></div>
     <p class="step-text">${step ? esc(step.instruction) : t("chef.all-done")}</p>
     <div class="row-form">
       <button class="primary" type="button" data-cook="next">${t("chef.next")}</button>
@@ -72,13 +73,20 @@ export async function renderChef(main, household) {
       <h1 id="chef-title">${t("chef.title")}</h1>
       <p class="lead">${t("chef.lead")}</p>
     </header>
-    <div class="bento">
-      <section class="tile ${side ? "w-8" : "w-12"} chef-tile" aria-labelledby="chef-title">
-        <ol class="chat" aria-live="polite">${state.messages.map(message).join("") || `<li class="hint">${t("chef.empty")}</li>`}</ol>
+    ${side ? `<div class="chef-side">${side}</div>` : ""}
+    <section class="chef-tile" aria-labelledby="chef-title">
+        <ol class="chat" aria-live="polite" data-chat>${state.messages.map(message).join("")}</ol>
+        ${
+          state.messages.length
+            ? ""
+            : `<div class="prompts">${["chef.prompt.tonight", "chef.prompt.first", "chef.prompt.buy"]
+                .map((key) => `<button type="button" class="chip-button" data-prompt="${esc(t(key))}">${t(key)}</button>`)
+                .join("")}</div>`
+        }
         <form class="ask" data-ask>
-          <label class="grow">${t("chef.question")}<input name="message" autocomplete="off" maxlength="1000" required placeholder="${esc(t("chef.question-example"))}"></label>
-          <button class="primary" type="submit">${t("chef.ask")}</button>
-          <button type="button" data-mic aria-pressed="false" ${voiceSupported ? "" : "disabled"}>${t("chef.speak")}</button>
+          <label class="grow"><span class="visually-hidden">${t("chef.question")}</span><input name="message" autocomplete="off" maxlength="1000" required placeholder="${esc(t("chef.question-example"))}"></label>
+          <button class="round" type="button" data-mic aria-pressed="false" aria-label="${esc(t("chef.speak"))}" ${voiceSupported ? "" : "disabled"}>${t("chef.speak")}</button>
+          <button class="primary round" type="submit">${t("chef.ask")}</button>
         </form>
         <div class="row-form voice-options">
           <label class="check"><input type="checkbox" data-hands-free ${state.handsFree ? "checked" : ""} ${voiceSupported ? "" : "disabled"}> ${t("chef.hands-free")}</label>
@@ -90,9 +98,7 @@ export async function renderChef(main, household) {
             .join("")}</select></label>
         </div>
         ${voiceSupported ? "" : `<p class="hint">${t("chef.no-voice")}</p>`}
-      </section>
-      ${side ? `<div class="w-4 stack">${side}</div>` : ""}
-    </div>`;
+    </section>`;
 
   const form = main.querySelector("[data-ask]");
   const input = form.querySelector("[name=message]");
@@ -120,6 +126,9 @@ export async function renderChef(main, household) {
     if (command && (await cook(command))) return;
     state.messages.push({ role: "user", text });
     input.value = "";
+    const chat = main.querySelector("[data-chat]");
+    chat.innerHTML = `${state.messages.map(message).join("")}<li class="answer typing" aria-label="${esc(t("chef.thinking"))}"><span></span><span></span><span></span></li>`;
+    chat.lastElementChild.scrollIntoView({ block: "nearest", behavior: "smooth" });
     try {
       const reply = await api(`${base}/agent/chat`, {
         method: "POST",
@@ -133,6 +142,8 @@ export async function renderChef(main, household) {
     }
     await renderChef(main, household);
   }
+
+  main.querySelectorAll("[data-prompt]").forEach((button) => button.addEventListener("click", () => ask(button.dataset.prompt)));
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -192,6 +203,16 @@ export async function renderChef(main, household) {
       renderChef(main, household);
     }),
   );
+
+  main.querySelector("[data-chat]").lastElementChild?.scrollIntoView({ block: "nearest" });
+  let wanted = null;
+  try {
+    wanted = sessionStorage.getItem("hpc.chef.cook");
+    sessionStorage.removeItem("hpc.chef.cook");
+  } catch {
+    wanted = null;
+  }
+  if (wanted) ask(t("chef.how-to", { recipe: recipeName(wanted) }));
 
   if (state.handsFree && !state.recognition) startListening(true);
   if (!speechSupported) state.handsFree = false;
