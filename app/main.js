@@ -62,9 +62,23 @@ function progress(value) {
   loader.style.setProperty("--p", value);
 }
 
+const still = matchMedia("(prefers-reduced-motion: reduce)");
+
 function paint(update) {
-  if (!document.startViewTransition || !loader.classList.contains("gone")) return update();
-  document.startViewTransition(update).ready.catch(() => null);
+  if (!loader.classList.contains("gone")) return Promise.resolve(update());
+  if (stageBox.classList.contains("has-three") && !stageBox.hidden) {
+    const column = document.querySelector(".column");
+    if (still.matches) return Promise.resolve(update());
+    return column.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateX(-28px)" }], { duration: 160, easing: "cubic-bezier(.4,0,1,1)", fill: "forwards" }).finished.then(() => {
+      update();
+      column.animate([{ opacity: 0, transform: "translateX(-56px)" }, { opacity: 1, transform: "none" }], { duration: 460, easing: "cubic-bezier(.2,.8,.2,1)", fill: "none" });
+      column.getAnimations().filter((animation) => animation.effect.getComputedTiming().fill === "forwards").forEach((animation) => animation.cancel());
+    });
+  }
+  if (!document.startViewTransition) return Promise.resolve(update());
+  const transition = document.startViewTransition(update);
+  transition.ready.catch(() => null);
+  return transition.updateCallbackDone.catch(() => null);
 }
 
 function enter() {
@@ -76,7 +90,10 @@ function enter() {
   setTimeout(() => main.removeAttribute("data-enter"), 1400);
 }
 
+let renders = 0;
+
 async function render() {
+  const ticket = ++renders;
   if (!session.signedIn) {
     tabs.hidden = true;
     stageBox.hidden = true;
@@ -111,15 +128,17 @@ async function render() {
   document.documentElement.dataset.chapter = route;
   showRoute(route);
   main.setAttribute("aria-busy", "true");
-  paint(() => {
+  await paint(() => {
     main.innerHTML = skeleton(route, t(`nav.${route}`));
   });
+  if (ticket !== renders) return;
   document.querySelectorAll(".tabs a, [data-settings-link]").forEach((link) => {
     if (link.dataset.tab === route) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
   try {
     await views[route](main, household);
+    if (ticket !== renders) return;
     enter();
     refreshInbox();
     refreshStatus();

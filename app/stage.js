@@ -47,6 +47,7 @@ let pending = null;
 let currentFridge = null;
 let zones = null;
 let leader = null;
+let placedSignature = null;
 let focusRequest = null;
 
 export function shapeClass(name) {
@@ -412,7 +413,11 @@ export async function refreshStage(chosen) {
   if (scene) {
     const week = metrics?.total;
     const moved = Number(week?.consumedGrams ?? 0) + Number(week?.discardedGrams ?? 0);
-    scene.placeItems(fridge, inventory);
+    const signature = JSON.stringify([fridge?.id, inventory.map((item) => [item.id, item.grams, item.trayId, item.days, item.usable])]);
+    if (signature !== placedSignature) {
+      placedSignature = signature;
+      scene.placeItems(fridge, inventory);
+    }
     scene.setStatus(twin);
     scene.setRings(
       moved > 0

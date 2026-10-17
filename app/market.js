@@ -148,7 +148,10 @@ export async function renderMarket(main, household) {
                   </div>`,
                 )
                 .join("")
-            : `<p class="hint">${t("market.empty")}</p>`
+            : `<figure class="market-empty">
+                <img src="/brand/photos/tomate-de-arbol.jpg" alt="" loading="lazy" width="900" height="1125">
+                <figcaption><span>${t("market.empty")}</span><small>${esc(t("photo.credit", { credit: "michael clarke stuff, CC BY-SA 2.0" }))}</small></figcaption>
+              </figure>`
         }
       </section>
       <div class="w-5 stack">

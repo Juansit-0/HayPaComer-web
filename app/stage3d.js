@@ -527,10 +527,10 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     now: (() => {
       const plate = group(
         mesh(lathe([[0, 0], [0.16, 0], [0.2, 0.02], [0.21, 0.03], [0, 0.03]], 48), paint("#ffffff", { roughness: 0.25, clearcoat: 1 })),
-        ...[["Tomato", -0.06, 0.02], ["Egg", 0.04, -0.05], ["Avocado", 0.05, 0.06]].map(([name, x, z]) => {
+        ...[["Tomato", -0.07, 0.03], ["Avocado", 0.05, -0.04], ["Cheese", 0.06, 0.07]].map(([name, x, z]) => {
           const food = foodModel(name);
           food.position.set(x, 0.03, z);
-          food.scale.setScalar(1.4);
+          food.scale.setScalar(1.15);
           return food;
         }),
       );
@@ -566,17 +566,6 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       });
       rings.position.set(0.05, 1.42, 0.42);
       return rings;
-    })(),
-    chef: (() => {
-      const page = group(
-        mesh(new THREE.BoxGeometry(0.24, 0.004, 0.3), paint("#fffdf6", { roughness: 0.9 })),
-        mesh(new THREE.BoxGeometry(0.16, 0.002, 0.012), paint("#121212"), (m) => m.position.set(-0.02, 0.004, -0.08)),
-        mesh(new THREE.BoxGeometry(0.12, 0.002, 0.012), paint("#121212"), (m) => m.position.set(-0.04, 0.004, -0.04)),
-        mesh(new THREE.BoxGeometry(0.14, 0.002, 0.012), paint("#121212"), (m) => m.position.set(-0.03, 0.004, 0)),
-      );
-      page.position.set(0.18, H + 0.12, 0.08);
-      page.rotation.set(-0.5, -0.3, 0);
-      return page;
     })(),
   };
   Object.values(extras).forEach((extra) => {
@@ -679,21 +668,36 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
         });
       const left = door ? 0.08 : -W / 2 + T + 0.05;
       slotByTray.set(slot.tray.id, { group: door ? doorItems : items, left, room, y: door ? slot.y - 0.03 : slot.y, z: rows[0] });
-      const needed = models.reduce((sum, model) => sum + model.userData.width + GAP, 0);
-      const fit = Math.min(1, (room * rows.length) / Math.max(needed, 0.001));
-      let row = 0;
-      let x = 0;
-      models.forEach((model) => {
-        const width = model.userData.width * fit;
-        if (x + width > room && rows.length - 1 > row) {
-          row += 1;
-          x = 0;
+      const headroom = door ? 0.26 : slot.zone === "DRAWER" ? 0.17 : (slot.index === 0 ? FRIDGE_TOP : SHELVES[slot.index - 1]) - SHELVES[slot.index] - 0.04;
+      const scaleOf = (model, fit) => Math.min(fit, headroom / Math.max(model.userData.height, 0.001));
+      const pack = (fit) => {
+        const placed = [];
+        let row = 0;
+        let x = 0;
+        for (const model of models) {
+          const scale = scaleOf(model, fit);
+          const width = model.userData.width * scale;
+          if (x + width > room) {
+            if (row === rows.length - 1) return null;
+            row += 1;
+            x = 0;
+          }
+          placed.push({ model, scale, x: x + width / 2, row });
+          x += width + GAP * scale;
         }
-        model.userData.fit = fit;
-        model.position.set(left + x + width / 2, (door ? slot.y - 0.03 : slot.y) + model.userData.rest * fit, rows[row]);
+        return placed;
+      };
+      let fit = 1;
+      let layout = pack(fit);
+      while (!layout) {
+        fit *= 0.9;
+        layout = pack(fit);
+      }
+      layout.forEach(({ model, scale, x, row }) => {
+        model.userData.fit = scale;
+        model.position.set(left + x, (door ? slot.y - 0.03 : slot.y) + model.userData.rest * scale, rows[row]);
         model.userData.home = model.position.clone();
         (door ? doorItems : items).add(model);
-        x += width + GAP * fit;
       });
     });
   }
@@ -958,7 +962,8 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       .sort((a, b) => b.tag.soon - a.tag.soon || b.model.position.z - a.model.position.z || a.x - b.x);
     ordered.forEach(({ model, tag, x, y }) => {
       const { element } = tag;
-      if (!show || !model.visible || model === drag.model) {
+      const wanted = tag.soon || model === state.hoverModel || (state.focusId && model.userData.key === state.focusId);
+      if (!show || !wanted || !model.visible || model === drag.model) {
         element.style.visibility = "hidden";
         return;
       }
