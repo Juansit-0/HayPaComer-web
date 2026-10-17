@@ -72,6 +72,7 @@ async function render() {
   connectLive(household.id);
   document.querySelector("[data-household]").innerHTML = householdLabel(household);
   const route = current();
+  document.documentElement.dataset.chapter = route;
   document.querySelectorAll(".tabs a, [data-settings-link]").forEach((link) => {
     if (link.dataset.tab === route) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
