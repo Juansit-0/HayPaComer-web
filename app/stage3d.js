@@ -304,9 +304,16 @@ const BY_CATEGORY = {
   PREPARED: () => FOODS.Soup(),
 };
 
+function sized(model) {
+  const box = new THREE.Box3().setFromObject(model);
+  model.userData.width = box.max.x - box.min.x;
+  model.userData.rest = -box.min.y;
+  return model;
+}
+
 export function foodModel(name, category, grams) {
   const model = DETAILED[name] ? DETAILED[name](grams) : (FOODS[name] ?? BY_CATEGORY[category] ?? BY_CATEGORY.VEGETABLE)();
-  return outline(model);
+  return outline(group(model));
 }
 
 function labelTexture(text, background, color) {
@@ -327,6 +334,7 @@ function labelTexture(text, background, color) {
 }
 
 const VAPOR = 18;
+const GAP = 0.025;
 const WHITE = new THREE.Color("#fdfdfb");
 const ALARM = new THREE.Color("#d2492f");
 const GLOW = new THREE.Color("#f3c443");
@@ -616,12 +624,13 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
   }
 
   function placeItems(fridgeTree, inventory) {
-    const known = new Set([...items.children, ...doorItems.children].map((model) => model.userData.key));
+    const known = new Map([...items.children, ...doorItems.children].map((model) => [model.userData.key, model.userData.item?.trayId]));
     items.clear();
     doorItems.clear();
     tags.forEach((element) => element.remove());
     tags.clear();
     let order = 0;
+    slotByTray.clear();
     const zones = fridgeTree?.children ?? [];
     const traysOf = (kind) => zones.filter((zone) => (zone.kind ?? "SHELF") === kind).flatMap((zone) => zone.children);
     const slots = [
@@ -633,36 +642,49 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
       slot.slab.userData.trayId = slot.tray?.id ?? null;
       slot.slab.traverse((child) => (child.userData.trayId = slot.tray?.id ?? null));
       if (!slot.tray) return;
-      let x = slot.zone === "DOOR" ? 0.08 : -W / 2 + T + 0.06;
-      inventory
+      const door = slot.zone === "DOOR";
+      const room = door ? W - 0.16 : W - 2 * T - 0.1;
+      const rows = door ? [-0.05] : slot.zone === "DRAWER" ? [0.05, -0.1] : [0.08, -0.14];
+      const models = inventory
         .filter((item) => item.trayId === slot.tray.id)
-        .slice(0, 8)
-        .forEach((item) => {
+        .slice(0, 12)
+        .map((item) => {
           const model = foodModel(item.name, item.category, item.grams);
-          const width = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).x;
           model.traverse((child) => {
             child.userData.item = item;
             child.userData.part = "fridge";
           });
           model.userData.key = item.id;
-          model.userData.born = known.has(item.id) ? 0 : performance.now() + order++ * 70;
+          model.userData.born = known.get(item.id) === item.trayId ? 0 : performance.now() + order++ * 70;
+          sized(model);
           const text = describe?.(item);
           if (text) {
             const element = document.createElement("span");
-            element.className = `stage-tag${item.days !== null && item.days !== undefined && item.days <= 1 ? " soon" : ""}`;
+            element.className = `stage-tag${item.days !== null && item.days !== undefined && 1 >= item.days ? " soon" : ""}`;
             element.textContent = text;
             tagLayer.append(element);
             tags.set(model, element);
           }
-          if (slot.zone === "DOOR") {
-            model.position.set(x + width / 2, slot.y - 0.03, -0.05);
-            doorItems.add(model);
-          } else {
-            model.position.set(x + width / 2, slot.y, slot.zone === "DRAWER" ? 0 : -0.02);
-            items.add(model);
-          }
-          x += width + 0.03;
+          return model;
         });
+      const left = door ? 0.08 : -W / 2 + T + 0.05;
+      slotByTray.set(slot.tray.id, { group: door ? doorItems : items, left, room, y: door ? slot.y - 0.03 : slot.y, z: rows[0] });
+      const needed = models.reduce((sum, model) => sum + model.userData.width + GAP, 0);
+      const fit = Math.min(1, (room * rows.length) / Math.max(needed, 0.001));
+      let row = 0;
+      let x = 0;
+      models.forEach((model) => {
+        const width = model.userData.width * fit;
+        if (x + width > room && rows.length - 1 > row) {
+          row += 1;
+          x = 0;
+        }
+        model.userData.fit = fit;
+        model.position.set(left + x + width / 2, (door ? slot.y - 0.03 : slot.y) + model.userData.rest * fit, rows[row]);
+        model.userData.home = model.position.clone();
+        (door ? doorItems : items).add(model);
+        x += width + GAP * fit;
+      });
     });
   }
 
@@ -672,6 +694,27 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     tagLayer.append(element);
     return element;
   });
+
+  const slotByTray = new Map();
+  const landing = { trayId: null, local: new THREE.Vector3(), width: 0.08 };
+
+  function land(target, point, width) {
+    const slot = target?.kind === "tray" ? slotByTray.get(target.trayId) : null;
+    landing.trayId = slot ? target.trayId : null;
+    if (!slot) return null;
+    const local = slot.group.worldToLocal(point.clone());
+    const half = Math.min(width / 2, slot.room / 2);
+    landing.local.set(THREE.MathUtils.clamp(local.x, slot.left + half, slot.left + slot.room - half), slot.y, slot.z);
+    landing.width = width;
+    return slot.group.localToWorld(landing.local.clone());
+  }
+
+  function pushFor(model) {
+    if (!landing.trayId || model.userData.item?.trayId !== landing.trayId || model.userData.home.z !== landing.local.z) return 0;
+    const dx = model.userData.home.x - landing.local.x;
+    const overlap = (model.userData.width * (model.userData.fit ?? 1) + landing.width) / 2 + GAP - Math.abs(dx);
+    return overlap > 0 ? Math.sign(dx || 1) * overlap : 0;
+  }
 
   function setRings(shares, labels = []) {
     state.ringShares = shares;
@@ -710,7 +753,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     if (part === "use" || part === "discard") return { kind: part, object: part === "use" ? pot : bin };
     let object = hit.object;
     while (object && !object.userData.trayId && object.parent) object = object.parent;
-    return object?.userData.trayId ? { kind: "tray", trayId: object.userData.trayId, object } : null;
+    return object?.userData.trayId ? { kind: "tray", trayId: object.userData.trayId, object, point: hit.point } : null;
   };
 
   const glow = (target, on) => {
@@ -745,11 +788,14 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
       state.tilt.set(0, 0);
       state.pointer.set(((event.clientX - box.left) / box.width) * 2 - 1, -((event.clientY - box.top) / box.height) * 2 + 1);
       raycaster.setFromCamera(state.pointer, camera);
-      if (raycaster.ray.intersectPlane(drag.plane, point)) {
+      const target = dropTargetAt(event.clientX, event.clientY);
+      const spot = target ? land(target, target.point, drag.model.userData.width * (drag.model.userData.fit ?? 1)) : (land(null), null);
+      if (spot) {
+        drag.model.position.copy(drag.model.parent.worldToLocal(spot.add(new THREE.Vector3(0, drag.model.userData.rest * (drag.model.userData.fit ?? 1) + 0.015, 0))));
+      } else if (raycaster.ray.intersectPlane(drag.plane, point)) {
         drag.model.parent.worldToLocal(point);
         drag.model.position.copy(point).add(new THREE.Vector3(0, 0.02, 0));
       }
-      const target = dropTargetAt(event.clientX, event.clientY);
       if (target?.object !== drag.target?.object) {
         glow(drag.target, false);
         glow(target, true);
@@ -770,6 +816,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     if (!drag.model) return;
     const { model, item, target, moved } = drag;
     glow(target, false);
+    land(null);
     drag.model = null;
     drag.target = null;
     canvas.releasePointerCapture?.(event.pointerId);
@@ -808,13 +855,32 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
   }
 
   let shown = null;
-  function showTarget(x, y) {
+  const previews = new Map();
+  function showTarget(x, y, name, grams) {
     const target = x === null ? null : trayAt(x, y);
     if (target?.object !== shown?.object) {
       glow(shown, false);
       glow(target, true);
     }
     shown = target;
+    previews.forEach((model) => (model.visible = false));
+    if (name && target) {
+      if (!previews.has(name)) {
+        const model = foodModel(name, undefined, grams);
+        sized(model);
+        scene.add(model);
+        previews.set(name, model);
+      }
+      const model = previews.get(name);
+      const spot = land(target, target.point, model.userData.width);
+      if (spot) {
+        model.position.copy(spot).add(new THREE.Vector3(0, model.userData.rest, 0));
+        model.quaternion.copy(slotByTray.get(target.trayId).group.getWorldQuaternion(new THREE.Quaternion()));
+        model.visible = true;
+      }
+    } else {
+      land(null);
+    }
     return target?.trayId ?? null;
   }
 
@@ -909,7 +975,11 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
       const base = model.userData.born === 0 || age >= 1 || reduced ? 1 : 0 >= age ? 0.001 : spring(age);
       const hovered = state.hoverModel === model;
       model.userData.wobble = THREE.MathUtils.damp(model.userData.wobble ?? 0, hovered ? 1 : 0, 8, delta);
-      model.scale.setScalar(Math.max(0.001, base * (1 + model.userData.wobble * 0.06)));
+      model.scale.setScalar(Math.max(0.001, base * (model.userData.fit ?? 1) * (1 + model.userData.wobble * 0.06)));
+      if (model !== drag.model && model.userData.home) {
+        model.userData.push = THREE.MathUtils.damp(model.userData.push ?? 0, pushFor(model), 12, delta);
+        model.position.x = model.userData.home.x + model.userData.push;
+      }
       const lit = state.highlight.has(String(model.userData.item?.name ?? "").toLowerCase());
       if (lit || model.userData.lit) {
         const strength = lit ? 0.22 + Math.sin(now / 320) * 0.1 : 0;

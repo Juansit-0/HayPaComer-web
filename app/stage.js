@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { foodName, formatNumber, t } from "./i18n.js";
-import { busy, daysLeft, esc, grams, numberField, openSheet, showError, toast, whenText, wireSteppers } from "./ui.js";
+import { daysLeft, esc, grams, openSheet, toast, whenText } from "./ui.js";
 
 const SHAPES = {
   Arepa: "arepa",
@@ -44,6 +44,7 @@ let threeReady = null;
 let lastRoute = "now";
 let household = null;
 let pending = null;
+let currentFridge = null;
 
 export function shapeClass(name) {
   return `food f-${(SHAPES[name] ?? "otro").split(" ").join(" f-")}`;
@@ -133,47 +134,70 @@ function changed() {
   window.dispatchEvent(new CustomEvent("hpc:inventory-changed"));
 }
 
+// shortcut: a typical pack per food so a drop needs no typing, the user adjusts later on the Fridge screen
+const PACK_GRAMS = { Tomato: 500, Egg: 360, Milk: 1000, "Chicken breast": 500, Potato: 1000, Carrot: 500, Avocado: 400, Cheese: 250, Yogurt: 150, Banana: 600 };
+const SHARES = [1, 0.5, 0.25];
+
+async function undoable(task, message) {
+  const base = `/households/${household.id}`;
+  try {
+    await task();
+    toast(message, {
+      label: t("stage.undo"),
+      run: async () => {
+        await api(`${base}/inventory/undo`, { method: "POST" }).catch((error) => toast(error.message));
+        changed();
+      },
+    });
+  } catch (error) {
+    toast(error.message);
+  }
+  changed();
+}
+
+async function quickAdd(food, trayId) {
+  const fridge = currentFridge;
+  if (!fridge || !trayId) return;
+  const amount = PACK_GRAMS[food] ?? 250;
+  await undoable(
+    () => api(`/households/${household.id}/items`, { method: "POST", body: { fridgeId: fridge.id, trayId, food, grams: amount, opened: false, expiresOn: null, expirySource: null } }),
+    t("fridge.toast-added", { grams: grams(amount), food: foodName(food) }),
+  );
+}
+
 async function act(drop) {
   const base = `/households/${household.id}`;
   const food = foodName(drop.item.name);
   if (drop.kind === "move") {
-    try {
-      await api(`${base}/items/${drop.item.id}/move`, { method: "POST", body: { trayId: drop.trayId } });
-      toast(t("stage.moved", { food }));
-    } catch (error) {
-      toast(error.message);
-    }
-    changed();
+    await undoable(() => api(`${base}/items/${drop.item.id}/move`, { method: "POST", body: { trayId: drop.trayId } }), t("stage.moved", { food }));
     return;
   }
-  const using = drop.kind === "use";
+  if (drop.kind === "discard") {
+    await undoable(() => api(`${base}/items/${drop.item.id}/discard`, { method: "POST" }), t("fridge.toast-discarded", { food }));
+    return;
+  }
+  const total = Number(drop.item.grams);
   const dialog = openSheet(
-    using ? t("stage.use-title", { food }) : t("stage.discard-title", { food }),
-    `<form class="stack" data-drop-form>
-      ${
-        using
-          ? numberField({ name: "grams", label: t("now.grams-used"), unit: "g", value: Math.round(drop.item.grams), min: 1, bigStep: 50 })
-          : `<p>${esc(t("stage.discard-lead", { food, grams: grams(drop.item.grams) }))}</p>`
-      }
-      <button class="primary" type="submit">${using ? t("now.mark-used") : t("fridge.discard")}</button>
-    </form>`,
-    (sheet) => wireSteppers(sheet),
+    t("stage.use-title", { food }),
+    `<div class="use-shares" data-shares>${SHARES.map(
+      (share) => `<button type="button" class="use-share" data-grams="${Math.max(1, Math.round(total * share))}">
+        <span class="use-share-name">${t(`stage.share.${share * 100}`)}</span><span class="data">${grams(Math.max(1, Math.round(total * share)))}</span>
+      </button>`,
+    ).join("")}</div>`,
   );
-  dialog.addEventListener("close", changed, { once: true });
-  dialog.querySelector("[data-drop-form]").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    try {
-      await busy(event.submitter, () =>
-        using
-          ? api(`${base}/items/${drop.item.id}/consume`, { method: "POST", body: { grams: Number(new FormData(event.target).get("grams")) } })
-          : api(`${base}/items/${drop.item.id}/discard`, { method: "POST" }),
-      );
-      toast(using ? t("now.toast-used", { grams: grams(new FormData(event.target).get("grams")), food }) : t("fridge.toast-discarded", { food }));
+  let used = false;
+  dialog.addEventListener("close", () => used || changed(), { once: true });
+  dialog.querySelectorAll("[data-grams]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      used = true;
+      const amount = Number(button.dataset.grams);
       dialog.close();
-    } catch (error) {
-      showError(event.target, error);
-    }
-  });
+      await undoable(
+        () => api(`${base}/items/${drop.item.id}/consume`, { method: "POST", body: { grams: amount } }),
+        t("now.toast-used", { grams: grams(amount), food }),
+      );
+    }),
+  );
 }
 
 function palette(stageBox, canvas) {
@@ -193,9 +217,13 @@ function palette(stageBox, canvas) {
     ghost = chip.cloneNode(true);
     ghost.classList.add("palette-ghost");
     document.body.append(ghost);
+    const start = { x: event.clientX, y: event.clientY };
+    let dragged = false;
     const move = (moving) => {
+      dragged ||= Math.hypot(moving.clientX - start.x, moving.clientY - start.y) > 6;
+      const over = three.showTarget(moving.clientX, moving.clientY, chip.dataset.food, PACK_GRAMS[chip.dataset.food]);
       ghost.style.translate = `${moving.clientX - 30}px ${moving.clientY - 24}px`;
-      three.showTarget(moving.clientX, moving.clientY);
+      ghost.classList.toggle("landing", Boolean(over));
     };
     move(event);
     chip.addEventListener("pointermove", move);
@@ -203,11 +231,12 @@ function palette(stageBox, canvas) {
       "pointerup",
       (up) => {
         chip.removeEventListener("pointermove", move);
-        const trayId = three.showTarget(up.clientX, up.clientY);
+        const trayId = three.showTarget(up.clientX, up.clientY, chip.dataset.food, PACK_GRAMS[chip.dataset.food]);
         three.showTarget(null, null);
         ghost.remove();
         ghost = null;
-        import("./fridge.js").then(({ openAddFood }) => openAddFood(household, { food: chip.dataset.food, trayId, onDone: changed }));
+        if (dragged) quickAdd(chip.dataset.food, trayId);
+        else import("./fridge.js").then(({ openAddFood }) => openAddFood(household, { food: chip.dataset.food, onDone: changed }));
       },
       { once: true },
     );
@@ -321,6 +350,7 @@ export async function refreshStage(chosen) {
   const categories = new Map(catalog.map((food) => [food.name.toLowerCase(), food.category]));
   const inventory = listed.map((item) => ({ ...item, category: categories.get(item.name.toLowerCase()), days: daysLeft(item.expiresOn) }));
   const fridge = fridges[0];
+  currentFridge = fridge;
   const twin = fridge ? await api(`${base}/fridges/${fridge.id}/twin`).catch(() => null) : null;
   fill(fridge, inventory, twin, metrics?.total);
   const scene = await threeReady;

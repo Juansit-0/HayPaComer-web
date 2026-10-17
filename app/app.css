@@ -1437,3 +1437,14 @@ a.button:active { transform: scale(0.97); }
   .ring { grid-template-columns: 96px 1fr; justify-items: start; text-align: start; align-items: center; }
 }
 @media (prefers-reduced-motion: reduce) { .ring-fill { animation: none; } }
+
+/* Drag and drop with fewer steps: undo in the toast, one-tap amounts, the 3D preview replaces the chip */
+.toast { z-index: 100; max-width: calc(100vw - 32px); }
+.toast.has-action { display: flex; align-items: center; gap: var(--space-s); pointer-events: auto; }
+.toast.has-action:not(.visible) { pointer-events: none; }
+.toast button { min-height: 40px; padding: 0 16px; border: 0; border-radius: var(--radius-full); background: var(--color-papa); color: var(--color-tinta); font-weight: 700; cursor: pointer; }
+.use-shares { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-s); }
+.use-share { display: grid; gap: 4px; justify-items: center; min-height: 96px; padding: var(--space-s); border-radius: 22px; background: var(--color-surface); border: 2px solid transparent; font-weight: 600; }
+.use-share:hover, .use-share:focus-visible { border-color: var(--color-cobre); }
+.use-share .data { font-size: var(--size-h3); font-weight: 800; }
+.palette-ghost.landing { opacity: 0.25; }

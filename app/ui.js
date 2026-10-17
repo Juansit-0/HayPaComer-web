@@ -57,12 +57,23 @@ export function statusPill(statuses = []) {
   return `<span class="status ${tone}">${t(label)}</span>`;
 }
 
-export function toast(message) {
+export function toast(message, action) {
   const element = document.querySelector("[data-toast]");
   element.textContent = message;
+  if (action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = action.label;
+    button.addEventListener("click", () => {
+      element.classList.remove("visible");
+      action.run();
+    }, { once: true });
+    element.append(button);
+  }
+  element.classList.toggle("has-action", Boolean(action));
   element.classList.add("visible");
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => element.classList.remove("visible"), 3200);
+  toast.timer = setTimeout(() => element.classList.remove("visible"), action ? 6000 : 3200);
 }
 
 export function formData(form) {
