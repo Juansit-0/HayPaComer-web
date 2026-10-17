@@ -1,4 +1,4 @@
-import { api, session } from "./api.js";
+import { api, passwordProof, session } from "./api.js";
 import { currentLocale, t } from "./i18n.js";
 import { esc, formData, showError } from "./ui.js";
 
@@ -37,9 +37,12 @@ export function renderSignIn(main, onDone, initial = "signin") {
           }
           <label>${t("auth.email")}<input name="email" type="email" autocomplete="email" required></label>
           <label>${creating ? t("auth.password-new") : t("auth.password")}
-            <input name="password" type="password" autocomplete="${
-              creating ? "new-password" : "current-password"
-            }" required minlength="${creating ? 10 : 1}">
+            <span class="password-field">
+              <input name="password" type="password" autocomplete="${
+                creating ? "new-password" : "current-password"
+              }" required minlength="${creating ? 10 : 1}">
+              <button class="ghost" type="button" data-reveal aria-pressed="false">${t("auth.show-password")}</button>
+            </span>
           </label>
           <button class="primary" type="submit">${creating ? t("auth.create") : t("auth.signin")}</button>
         </form>
@@ -47,6 +50,13 @@ export function renderSignIn(main, onDone, initial = "signin") {
           creating ? t("auth.have-account") : t("auth.create-account")
         }</button>
       </section>`);
+    main.querySelector("[data-reveal]").addEventListener("click", (event) => {
+      const input = main.querySelector("[name=password]");
+      const shown = input.type === "text";
+      input.type = shown ? "password" : "text";
+      event.currentTarget.setAttribute("aria-pressed", String(!shown));
+      event.currentTarget.textContent = shown ? t("auth.show-password") : t("auth.hide-password");
+    });
     main.querySelector("[data-switch]").addEventListener("click", () => {
       mode = creating ? "signin" : "register";
       draw();
@@ -58,15 +68,19 @@ export function renderSignIn(main, onDone, initial = "signin") {
       button.disabled = true;
       button.setAttribute("aria-busy", "true");
       try {
+        const proof = await passwordProof(values.email, values.password);
         if (creating) {
-          await api("/auth/register", { method: "POST", body: values, auth: false });
-        }
-        session.store(
-          await api("/auth/login", {
+          await api("/auth/register", {
             method: "POST",
-            body: { email: values.email, password: values.password },
+            body: { email: values.email, displayName: values.displayName, passwordProof: proof },
             auth: false,
-          }),
+          });
+        }
+        const login = (body) => api("/auth/login", { method: "POST", body: { email: values.email, ...body }, auth: false });
+        session.store(
+          await login({ passwordProof: proof }).catch((error) =>
+            error.status === 401 ? login({ password: values.password }) : Promise.reject(error),
+          ),
         );
         await api("/me/locale", { method: "PUT", body: { locale: currentLocale() } }).catch(() => null);
         onDone();
