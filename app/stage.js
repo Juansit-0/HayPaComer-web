@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { foodName, formatNumber, t } from "./i18n.js";
-import { esc, grams } from "./ui.js";
+import { busy, esc, grams, numberField, openSheet, showError, toast, wireSteppers } from "./ui.js";
 
 const SHAPES = {
   Arepa: "arepa",
@@ -39,6 +39,9 @@ const PARTS = [
 const MAX_FOODS = 5;
 
 let root = null;
+let three = null;
+let threeReady = null;
+let lastRoute = "now";
 let household = null;
 let pending = null;
 
@@ -114,9 +117,154 @@ function fill(fridge, inventory, twin, week) {
   root.querySelector(".fridge").classList.toggle("door-alarm", Boolean(twin?.doorOpen));
 }
 
+function wantsThree() {
+  if (!matchMedia("(min-width: 1024px)").matches || matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+  try {
+    return Boolean(document.createElement("canvas").getContext("webgl2"));
+  } catch {
+    return false;
+  }
+}
+
+const PALETTE = ["Tomato", "Egg", "Milk", "Chicken breast", "Potato", "Carrot", "Avocado", "Cheese", "Yogurt", "Banana"];
+
+function changed() {
+  refreshStage();
+  window.dispatchEvent(new CustomEvent("hpc:inventory-changed"));
+}
+
+async function act(drop) {
+  const base = `/households/${household.id}`;
+  const food = foodName(drop.item.name);
+  if (drop.kind === "move") {
+    try {
+      await api(`${base}/items/${drop.item.id}/move`, { method: "POST", body: { trayId: drop.trayId } });
+      toast(t("stage.moved", { food }));
+    } catch (error) {
+      toast(error.message);
+    }
+    changed();
+    return;
+  }
+  const using = drop.kind === "use";
+  const dialog = openSheet(
+    using ? t("stage.use-title", { food }) : t("stage.discard-title", { food }),
+    `<form class="stack" data-drop-form>
+      ${
+        using
+          ? numberField({ name: "grams", label: t("now.grams-used"), unit: "g", value: Math.round(drop.item.grams), min: 1, bigStep: 50 })
+          : `<p>${esc(t("stage.discard-lead", { food, grams: grams(drop.item.grams) }))}</p>`
+      }
+      <button class="primary" type="submit">${using ? t("now.mark-used") : t("fridge.discard")}</button>
+    </form>`,
+    (sheet) => wireSteppers(sheet),
+  );
+  dialog.addEventListener("close", changed, { once: true });
+  dialog.querySelector("[data-drop-form]").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await busy(event.submitter, () =>
+        using
+          ? api(`${base}/items/${drop.item.id}/consume`, { method: "POST", body: { grams: Number(new FormData(event.target).get("grams")) } })
+          : api(`${base}/items/${drop.item.id}/discard`, { method: "POST" }),
+      );
+      toast(using ? t("now.toast-used", { grams: grams(new FormData(event.target).get("grams")), food }) : t("fridge.toast-discarded", { food }));
+      dialog.close();
+    } catch (error) {
+      showError(event.target, error);
+    }
+  });
+}
+
+function palette(stageBox, canvas) {
+  const tray = document.createElement("div");
+  tray.className = "stage-palette";
+  tray.innerHTML = `<p class="hint">${t("stage.palette")}</p>
+    <div class="palette-chips">${PALETTE.map((name) => `<button type="button" class="palette-chip" data-food="${esc(name)}"><i class="${shapeClass(name)}" aria-hidden="true"></i>${esc(foodName(name))}</button>`).join("")}
+      <form class="palette-other" data-other><label class="visually-hidden" for="palette-other">${t("stage.other")}</label><input id="palette-other" name="name" maxlength="60" autocomplete="off" placeholder="${esc(t("stage.other"))}"></form>
+    </div>`;
+  canvas.after(tray);
+  let ghost = null;
+  tray.addEventListener("pointerdown", (event) => {
+    const chip = event.target.closest("[data-food]");
+    if (!chip || !three) return;
+    event.preventDefault();
+    chip.setPointerCapture(event.pointerId);
+    ghost = chip.cloneNode(true);
+    ghost.classList.add("palette-ghost");
+    document.body.append(ghost);
+    const move = (moving) => {
+      ghost.style.translate = `${moving.clientX - 30}px ${moving.clientY - 24}px`;
+      three.showTarget(moving.clientX, moving.clientY);
+    };
+    move(event);
+    chip.addEventListener("pointermove", move);
+    chip.addEventListener(
+      "pointerup",
+      (up) => {
+        chip.removeEventListener("pointermove", move);
+        const trayId = three.showTarget(up.clientX, up.clientY);
+        three.showTarget(null, null);
+        ghost.remove();
+        ghost = null;
+        import("./fridge.js").then(({ openAddFood }) => openAddFood(household, { food: chip.dataset.food, trayId, onDone: changed }));
+      },
+      { once: true },
+    );
+  });
+  tray.querySelector("[data-other]").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = event.target.elements.name;
+    const name = input.value.trim();
+    if (!name) return;
+    input.disabled = true;
+    try {
+      const food = await api(`/households/${household.id}/foods`, { method: "POST", body: { name } });
+      input.value = "";
+      tray.querySelector(".palette-chips").insertAdjacentHTML(
+        "afterbegin",
+        `<button type="button" class="palette-chip" data-food="${esc(food.name)}"><i class="${shapeClass(food.name)}" aria-hidden="true"></i>${esc(foodName(food.name))}</button>`,
+      );
+      toast(t("add.learned", { food: foodName(food.name) }));
+    } catch (error) {
+      toast(error.message);
+    } finally {
+      input.disabled = false;
+    }
+  });
+}
+
+function mountThree(element) {
+  const canvas = document.createElement("canvas");
+  canvas.className = "stage-canvas";
+  canvas.setAttribute("aria-hidden", "true");
+  element.after(canvas);
+  element.closest(".stage").classList.add("has-three");
+  threeReady = import("./stage3d.js")
+    .then(({ createFridgeScene }) => {
+      three = createFridgeScene(canvas, {
+        labels: { market: t("nav.market") },
+        onDrop: act,
+        onPart: (part, data) => {
+          if (part === "fridge" && data.trayId) location.hash = `#/fridge/${data.trayId}`;
+          else location.hash = `#/${part}`;
+        },
+      });
+      three.goTo(lastRoute);
+      palette(element.closest(".stage"), canvas);
+      return three;
+    })
+    .catch(() => {
+      canvas.remove();
+      element.closest(".stage").classList.remove("has-three");
+      return null;
+    });
+}
+
 export function mountStage(element) {
   root = element;
   root.innerHTML = markup();
+  if (wantsThree()) mountThree(element);
   const resize = () => {
     const box = root.getBoundingClientRect();
     root.style.setProperty("--fit", Math.max(0.5, Math.min(box.width / 480, (box.height - 60) / 560, 1.5)).toFixed(3));
@@ -139,6 +287,8 @@ export function mountStage(element) {
 
 export function showRoute(route) {
   if (!root) return;
+  lastRoute = route;
+  three?.goTo(route);
   root.dataset.route = route;
   root.querySelectorAll("[data-part]").forEach((part) => {
     if (part.dataset.part === route) part.setAttribute("aria-current", "page");
@@ -156,14 +306,28 @@ export async function refreshStage(chosen) {
   const from = new Date(to);
   from.setDate(from.getDate() - 6);
   const day = (date) => date.toLocaleDateString("en-CA");
-  const [fridges, inventory, metrics] = await Promise.all([
+  const [fridges, listed, metrics, catalog] = await Promise.all([
     api(`${base}/fridges`).catch(() => []),
     api(`${base}/inventory`).catch(() => []),
     api(`${base}/analytics?from=${day(from)}&to=${day(to)}`).catch(() => null),
+    api("/foods?q=").catch(() => []),
   ]);
+  const categories = new Map(catalog.map((food) => [food.name.toLowerCase(), food.category]));
+  const inventory = listed.map((item) => ({ ...item, category: categories.get(item.name.toLowerCase()) }));
   const fridge = fridges[0];
   const twin = fridge ? await api(`${base}/fridges/${fridge.id}/twin`).catch(() => null) : null;
   fill(fridge, inventory, twin, metrics?.total);
+  const scene = await threeReady;
+  if (scene) {
+    const week = metrics?.total;
+    const moved = Number(week?.consumedGrams ?? 0) + Number(week?.discardedGrams ?? 0);
+    scene.placeItems(fridge, inventory);
+    scene.setRings(
+      moved > 0
+        ? [Number(week.consumedGrams) / moved, Number(week.rescuedGrams) / Math.max(1, Number(week.consumedGrams)), Number(week.discardedGrams) / moved]
+        : [0, 0, 0],
+    );
+  }
 }
 
 export function refreshStageSoon() {
