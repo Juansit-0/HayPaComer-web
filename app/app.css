@@ -1402,3 +1402,38 @@ a.button:active { transform: scale(0.97); }
 .ring-tag.ring-0::before { background: var(--color-cilantro); }
 .ring-tag.ring-1::before { background: var(--color-papa); }
 .ring-tag.ring-2::before { background: var(--color-tomate); }
+/* Numbers: money first, three named rings, two facts, more tucked away */
+.numbers-head .segmented { border-color: color-mix(in oklab, currentColor 45%, transparent); }
+.numbers-head .segmented button { color: inherit; opacity: 0.85; font-weight: 600; }
+.numbers-head .segmented button + button { border-left-color: color-mix(in oklab, currentColor 45%, transparent); }
+.numbers-head .segmented button[aria-pressed="true"] { opacity: 1; background: var(--color-white); color: var(--color-tinta); box-shadow: none; }
+.numbers-hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); justify-items: start; }
+@media (min-width: 900px) { .numbers-hero { grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--space-l); } .numbers-hero .button { grid-column: 1 / -1; } }
+.numbers-money { margin: 0; font-family: var(--font-display); font-size: clamp(56px, 9vw, 112px); line-height: 0.95; text-transform: uppercase; color: var(--color-cilantro); font-variant-numeric: tabular-nums; }
+.numbers-line { margin: 0; max-width: 34ch; font-size: var(--size-h4); }
+.numbers-rings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-m); }
+.ring { margin: 0; display: grid; gap: var(--space-s); justify-items: center; text-align: center; padding: var(--space-m) var(--space-s); border-radius: 28px; background: var(--color-white); }
+.ring svg { width: min(140px, 100%); transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 12; stroke-linecap: round; }
+.ring-track { stroke: var(--color-surface); }
+.ring-eaten .ring-fill { stroke: var(--color-cilantro); }
+.ring-rescued .ring-fill { stroke: var(--color-papa); }
+.ring-wasted .ring-fill { stroke: var(--color-tomate); }
+.ring-fill { animation: ring-fill 1100ms var(--ease-emphasized) both; }
+@keyframes ring-fill { from { stroke-dasharray: 0 264; } }
+.ring figcaption { display: grid; gap: 2px; }
+.ring-name { font-weight: 700; }
+.ring-grams { font-size: var(--size-h3); font-weight: 800; }
+.ring-hint { font-size: var(--size-small); color: var(--color-text-weak); }
+.numbers-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-m); }
+.fact { display: grid; gap: var(--space-xs); padding: var(--space-m); border-radius: 28px; background: var(--color-white); }
+.fact h2 { font-size: var(--size-small); font-weight: 700; color: var(--color-text-weak); }
+.fact-value { margin: 0; font-size: var(--size-h3); font-weight: 700; }
+.numbers-more { padding: var(--space-m); border-radius: 28px; background: var(--color-white); }
+.numbers-more summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.numbers-more section { display: grid; gap: var(--space-s); margin-top: var(--space-s); }
+@media (max-width: 640px) {
+  .numbers-rings { grid-template-columns: none; }
+  .ring { grid-template-columns: 96px 1fr; justify-items: start; text-align: start; align-items: center; }
+}
+@media (prefers-reduced-motion: reduce) { .ring-fill { animation: none; } }

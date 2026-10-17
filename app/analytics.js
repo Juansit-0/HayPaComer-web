@@ -1,6 +1,6 @@
 import { api, freshAccess } from "./api.js";
 import { foodName, formatDay, formatMoney, formatNumber, t } from "./i18n.js";
-import { esc, foodOptions, formData, grams, kpi, moneyField, moneyValue, showError, toast, wireFoodSearch, wireSteppers } from "./ui.js";
+import { esc, foodOptions, formData, grams, moneyField, moneyValue, showError, toast, wireFoodSearch, wireSteppers } from "./ui.js";
 
 const PERIODS = [7, 30, 90];
 let chosenDays = 30;
@@ -100,6 +100,21 @@ function foods(list) {
     .join("")}</ul>`;
 }
 
+function ring({ key, grams: amount, rate }) {
+  const length = 2 * Math.PI * 42;
+  return `<figure class="ring ring-${key}">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="ring-track" cx="50" cy="50" r="42"/>
+      <circle class="ring-fill" cx="50" cy="50" r="42" stroke-dasharray="${(Math.min(1, rate) * length).toFixed(1)} ${length.toFixed(1)}"/>
+    </svg>
+    <figcaption>
+      <span class="ring-name">${t(`numbers.ring.${key}`)}</span>
+      <span class="ring-grams data">${grams(amount)}</span>
+      <span class="ring-hint">${t(`numbers.ring.${key}-hint`, { rate: percent(rate) })}</span>
+    </figcaption>
+  </figure>`;
+}
+
 async function download(base, format, from, to) {
   const response = await fetch(`/api/v1${base}/analytics/report?format=${format}&from=${from}&to=${to}`, {
     headers: { Authorization: `Bearer ${await freshAccess()}` },
@@ -129,6 +144,16 @@ export async function renderAnalytics(main, household) {
   const total = metrics.total;
   const moved = Number(total.consumedGrams) + Number(total.discardedGrams);
 
+  const share = (part, whole) => (Number(whole) > 0 ? Number(part) / Number(whole) : 0);
+  const rings = [
+    { key: "eaten", grams: total.consumedGrams, rate: share(total.consumedGrams, moved) },
+    { key: "rescued", grams: total.rescuedGrams, rate: share(total.rescuedGrams, total.consumedGrams) },
+    { key: "wasted", grams: total.discardedGrams, rate: share(total.discardedGrams, moved) },
+  ];
+  const wasted = [...metrics.foods].sort((a, b) => Number(b.tally.discardedGrams) - Number(a.tally.discardedGrams))[0];
+  const rescuer = [...metrics.members].sort((a, b) => Number(b.tally.rescuedGrams) - Number(a.tally.rescuedGrams))[0];
+  const foodLabel = (food) => (food.foodKey === "unknown" ? t("numbers.unknown-food") : esc(foodName(food.foodKey)));
+
   main.innerHTML = `
     <header class="numbers-head">
       <div>
@@ -139,32 +164,60 @@ export async function renderAnalytics(main, household) {
         (days) => `<button type="button" data-days="${days}" aria-pressed="${days === chosenDays}">${t("numbers.days", { n: days })}</button>`,
       ).join("")}</div>
     </header>
-    <div class="bento">
-      ${
-        moved === 0
-          ? `<section class="tile w-12"><h2>${t("numbers.empty-title")}</h2><p>${t("numbers.empty-lead")}</p></section>`
-          : `<section class="tile w-8" aria-label="${esc(t("numbers.rescued"))}">
-              ${kpi(grams(total.rescuedGrams), t("numbers.rescued"), "positive")}
-              ${chart(metrics.days)}
-            </section>
-            <section class="tile w-4" aria-label="${esc(t("numbers.saved"))}">
-              ${kpi(money(metrics.moneySaved, metrics.currency), t("numbers.saved"), "positive")}
-              ${kpi(grams(total.consumedGrams), t("numbers.eaten"))}
-              ${kpi(grams(total.discardedGrams), t("numbers.wasted", { rate: percent(total.wasteRate) }), Number(total.discardedGrams) ? "attention" : "")}
-              ${kpi(money(metrics.moneyWasted, metrics.currency), t("numbers.lost"), Number(metrics.moneyWasted) ? "attention" : "")}
-            </section>`
-      }
-      ${
-        metrics.members.length
-          ? `<section class="tile w-6" aria-labelledby="ranking-title"><h2 id="ranking-title">${t("numbers.ranking")}</h2>${ranking(metrics.members)}</section>`
-          : ""
-      }
-      ${
-        metrics.foods.length
-          ? `<section class="tile w-6" aria-labelledby="foods-title"><h2 id="foods-title">${t("numbers.foods")}</h2>${foods(metrics.foods)}</section>`
-          : ""
-      }
-      <section class="tile w-12" aria-labelledby="prices-title">
+
+    <section class="numbers-hero" aria-label="${esc(t("numbers.saved"))}">
+      <p class="numbers-money">${esc(money(metrics.moneySaved, metrics.currency))}</p>
+      <p class="numbers-line">${
+        moved === 0 ? t("numbers.empty-lead") : t("numbers.hero-line", { grams: `<b>${grams(total.rescuedGrams)}</b>` })
+      }</p>
+      ${moved === 0 ? `<a class="button primary" href="#/fridge">${t("numbers.empty-link")}</a>` : ""}
+    </section>
+
+    <section class="numbers-rings" aria-label="${esc(t("numbers.period"))}">
+      ${rings.map(ring).join("")}
+    </section>
+
+    ${
+      moved === 0
+        ? ""
+        : `<section class="numbers-facts">
+            <article class="fact">
+              <h2>${t("numbers.most-wasted")}</h2>
+              ${
+                wasted && Number(wasted.tally.discardedGrams)
+                  ? `<p class="fact-value">${foodLabel(wasted)} <span class="data">${grams(wasted.tally.discardedGrams)}</span></p>`
+                  : `<p class="fact-value">${t("numbers.nothing-wasted")}</p>`
+              }
+              ${Number(metrics.moneyWasted) ? `<p class="hint">${t("numbers.money-lost", { money: esc(money(metrics.moneyWasted, metrics.currency)) })}</p>` : ""}
+            </article>
+            ${
+              rescuer
+                ? `<article class="fact">
+                    <h2>${t("numbers.top-rescuer")}</h2>
+                    <p class="fact-value">${esc(rescuer.name)}${rescuer.userId === me ? ` <span class="status quiet">${t("numbers.you")}</span>` : ""} <span class="data">${grams(rescuer.tally.rescuedGrams)}</span></p>
+                  </article>`
+                : ""
+            }
+          </section>
+          <section class="tile" aria-labelledby="daily-title">
+            <h2 id="daily-title">${t("numbers.daily")}</h2>
+            ${chart(metrics.days)}
+          </section>
+          ${
+            metrics.members.length > 1
+              ? `<section class="tile" aria-labelledby="ranking-title"><h2 id="ranking-title">${t("numbers.ranking")}</h2>${ranking(metrics.members)}</section>`
+              : ""
+          }
+          ${
+            metrics.foods.length
+              ? `<section class="tile" aria-labelledby="foods-title"><h2 id="foods-title">${t("numbers.foods")}</h2>${foods(metrics.foods)}</section>`
+              : ""
+          }`
+    }
+
+    <details class="numbers-more">
+      <summary>${t("numbers.more")}</summary>
+      <section aria-labelledby="prices-title">
         <h2 id="prices-title">${t("numbers.prices")}</h2>
         <p class="hint">${
           metrics.unpriced.length
@@ -182,7 +235,7 @@ export async function renderAnalytics(main, household) {
           <button type="button" data-download="csv">${t("numbers.download-csv")}</button>
         </div>
       </section>
-    </div>`;
+    </details>`;
   wireSteppers(main);
 
   main.querySelectorAll("[data-days]").forEach((button) =>
