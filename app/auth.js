@@ -2,11 +2,24 @@ import { api, session } from "./api.js";
 import { currentLocale, t } from "./i18n.js";
 import { esc, formData, showError } from "./ui.js";
 
+function poster(content) {
+  return `<section class="auth-split">
+    <div class="auth-poster">
+      <p class="auth-question" aria-hidden="true">${t("now.question")}</p>
+      <figure class="auth-photo">
+        <img src="/brand/photos/potrerillo.jpg" alt="" width="1200" height="900">
+        <figcaption>${esc(t("photo.credit", { credit: "El Potrerillo, Pasto. Υ.Γ., CC BY-SA 4.0" }))}</figcaption>
+      </figure>
+    </div>
+    ${content}
+  </section>`;
+}
+
 export function renderSignIn(main, onDone) {
   let mode = "signin";
   const draw = () => {
     const creating = mode === "register";
-    main.innerHTML = `
+    main.innerHTML = poster(`
       <section class="auth stack" aria-labelledby="auth-title">
         <div>
           <h1 id="auth-title">${creating ? t("auth.create-title") : t("auth.signin-title")}</h1>
@@ -33,7 +46,7 @@ export function renderSignIn(main, onDone) {
         <button class="ghost" type="button" data-switch>${
           creating ? t("auth.have-account") : t("auth.create-account")
         }</button>
-      </section>`;
+      </section>`);
     main.querySelector("[data-switch]").addEventListener("click", () => {
       mode = creating ? "signin" : "register";
       draw();
@@ -41,6 +54,9 @@ export function renderSignIn(main, onDone) {
     main.querySelector("form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const values = formData(event.target);
+      const button = event.target.querySelector("button[type=submit]");
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
       try {
         if (creating) {
           await api("/auth/register", { method: "POST", body: values, auth: false });
@@ -56,6 +72,9 @@ export function renderSignIn(main, onDone) {
         onDone();
       } catch (error) {
         showError(event.target, error);
+      } finally {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
       }
     });
   };
@@ -71,7 +90,7 @@ export async function chooseHousehold(main, onDone) {
     onDone(households.find((household) => household.id === session.household));
     return;
   }
-  main.innerHTML = `
+  main.innerHTML = poster(`
     <section class="auth stack" aria-labelledby="home-title">
       <div>
         <h1 id="home-title">${t("home.title")}</h1>
@@ -82,7 +101,7 @@ export async function chooseHousehold(main, onDone) {
         <label>${t("home.currency")}<input name="currency" required value="COP" maxlength="3" class="grams"></label>
         <button class="primary" type="submit">${t("home.create")}</button>
       </form>
-    </section>`;
+    </section>`);
   main.querySelector("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const values = formData(event.target);
