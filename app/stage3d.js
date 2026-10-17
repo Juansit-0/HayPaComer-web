@@ -60,7 +60,8 @@ function paint(color, options = {}) {
 
 const ink = new THREE.ShaderMaterial({
   uniforms: { thickness: { value: 0.0045 }, color: { value: new THREE.Color("#121212") } },
-  vertexShader: "uniform float thickness; void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * thickness, 1.0); }",
+  vertexShader:
+    "uniform float thickness; void main() { float wobble = 0.82 + 0.22 * (sin(position.x * 71.0) + sin(position.y * 83.0 + 1.3) + sin(position.z * 67.0 + 2.1)) / 3.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * thickness * wobble, 1.0); }",
   fragmentShader: "uniform vec3 color; void main() { gl_FragColor = vec4(color, 1.0); }",
   side: THREE.BackSide,
 });
@@ -113,6 +114,79 @@ function bottle(color) {
   );
 }
 
+function cluster(make, count, spacing) {
+  const result = new THREE.Group();
+  for (let index = 0; index < count; index++) {
+    const piece = make(index);
+    const row = index % 3;
+    const layer = Math.floor(index / 3);
+    piece.position.x += (row - (Math.min(count, 3) - 1) / 2) * spacing;
+    piece.position.z += layer * spacing * 0.8 - 0.01;
+    piece.rotation.y += (hash(index, count, spacing) - 0.5) * 1.2;
+    result.add(piece);
+  }
+  return result;
+}
+
+const count = (grams, each, max) => Math.max(1, Math.min(max, Math.round(Number(grams || each) / each)));
+
+function egg() {
+  return mesh(lathe([[0, 0], [0.018, 0.004], [0.022, 0.018], [0.02, 0.04], [0.012, 0.056], [0, 0.06]]), paint("#f4ead8"));
+}
+
+const DETAILED = {
+  Egg: (grams) => {
+    const eggs = count(grams, 55, 6);
+    const carton = group(
+      mesh(new RoundedBoxGeometry(0.17, 0.03, 0.11, 2, 0.006), paint("#d9d2c3"), (m) => (m.position.y = 0.015)),
+      ...Array.from({ length: 6 }, (_, index) =>
+        mesh(new THREE.CylinderGeometry(0.02, 0.016, 0.012, 16), paint("#c9c1b0"), (m) => m.position.set(((index % 3) - 1) * 0.052, 0.034, (Math.floor(index / 3) - 0.5) * 0.05)),
+      ),
+    );
+    for (let index = 0; eggs > index; index++) {
+      const piece = egg();
+      piece.position.set(((index % 3) - 1) * 0.052, 0.032, (Math.floor(index / 3) - 0.5) * 0.05);
+      carton.add(piece);
+    }
+    return carton;
+  },
+  Tomato: (grams) => cluster(() => FOODS.Tomato(), count(grams, 120, 4), 0.07),
+  Potato: (grams) => cluster(() => FOODS.Potato(), count(grams, 180, 3), 0.075),
+  Carrot: (grams) => cluster(() => FOODS.Carrot(), count(grams, 70, 3), 0.035),
+  Onion: (grams) => cluster(() => FOODS.Onion(), count(grams, 150, 3), 0.07),
+  Avocado: (grams) => cluster(() => FOODS.Avocado(), count(grams, 200, 2), 0.07),
+  Banana: (grams) => {
+    const bunch = new THREE.Group();
+    const bananas = count(grams, 120, 4);
+    for (let index = 0; index < bananas; index++) {
+      const piece = FOODS.Banana();
+      piece.rotation.y = (index - (bananas - 1) / 2) * 0.28;
+      piece.position.y += index * 0.004;
+      bunch.add(piece);
+    }
+    bunch.add(mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.03, 8), paint("#6b5a2a"), (m) => {
+      m.rotation.z = Math.PI / 2;
+      m.position.set(-0.09, 0.03, 0);
+    }));
+    return bunch;
+  },
+  "Chicken breast": (grams) => {
+    const tray = group(
+      mesh(new RoundedBoxGeometry(0.17, 0.018, 0.11, 2, 0.005), paint("#ffffff"), (m) => (m.position.y = 0.009)),
+      mesh(new THREE.BoxGeometry(0.17, 0.002, 0.11), paint("#dfeef2", { transparent: true, opacity: 0.35 }), (m) => (m.position.y = 0.05)),
+    );
+    const pieces = count(grams, 200, 2);
+    for (let index = 0; pieces > index; index++) {
+      const breast = mesh(lumpy(new THREE.SphereGeometry(0.045, 24, 16), 0.12), paint("#efbfa0"), (m) => {
+        m.scale.set(1.2, 0.42, 0.8);
+        m.position.set((index - (pieces - 1) / 2) * 0.07, 0.03, 0);
+      });
+      tray.add(breast);
+    }
+    return tray;
+  },
+};
+
 const FOODS = {
   Tomato: () => {
     const fruit = mesh(lumpy(new THREE.SphereGeometry(0.036, 32, 24), 0.05), paint("#d0412a", { roughness: 0.25, clearcoat: 0.8, clearcoatRoughness: 0.2 }), (m) => {
@@ -123,7 +197,12 @@ const FOODS = {
     return group(fruit, calyx);
   },
   Egg: () => mesh(lathe([[0, 0], [0.018, 0.004], [0.022, 0.018], [0.02, 0.04], [0.012, 0.056], [0, 0.06]]), paint("#f4ead8", { roughness: 0.75 })),
-  Milk: () => carton("#ffffff", css("--color-mora")),
+  Milk: () => {
+    const box = carton("#ffffff", css("--color-mora"));
+    box.add(mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.012, 16), paint(css("--color-papa")), (m) => m.position.set(0.012, 0.2, 0.012)));
+    box.add(mesh(new THREE.BoxGeometry(0.073, 0.012, 0.073), paint(css("--color-cilantro")), (m) => (m.position.y = 0.11)));
+    return box;
+  },
   "Orange juice": () => carton("#f39a33", "#2f7a4a"),
   "Chicken breast": () =>
     group(
@@ -168,18 +247,34 @@ const FOODS = {
   },
   Cheese: () => {
     const wedge = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.1, 0), new THREE.Vector2(0, 0.06)]);
-    return mesh(new THREE.ExtrudeGeometry(wedge, { depth: 0.05, bevelEnabled: true, bevelSize: 0.003, bevelThickness: 0.003, bevelSegments: 2 }), paint("#f2d47a", { roughness: 0.6 }), (m) => {
+    const block = mesh(new THREE.ExtrudeGeometry(wedge, { depth: 0.05, bevelEnabled: true, bevelSize: 0.003, bevelThickness: 0.003, bevelSegments: 2 }), paint("#f2d47a"), (m) => {
       m.rotation.x = -Math.PI / 2;
       m.position.set(-0.05, 0, 0.025);
     });
+    const holes = [[-0.02, 0.012, 0.027, 0.008], [0.012, 0.02, 0.027, 0.006], [-0.032, 0.03, 0.027, 0.005]].map(([x, y, z, r]) =>
+      mesh(new THREE.CircleGeometry(r, 16), paint("#d9ae4a"), (m) => {
+        m.position.set(x, y, z);
+        m.userData.noOutline = true;
+      }),
+    );
+    return group(block, ...holes);
   },
   Butter: () => mesh(new RoundedBoxGeometry(0.1, 0.035, 0.05, 2, 0.006), paint("#f6e3a0", { roughness: 0.5 }), (m) => (m.position.y = 0.018)),
   Yogurt: () =>
     group(
       mesh(lathe([[0, 0], [0.026, 0], [0.032, 0.07], [0, 0.07]]), paint(css("--color-papa"), { roughness: 0.45 })),
+      mesh(new THREE.CylinderGeometry(0.0305, 0.028, 0.02, 28, 1, true), paint("#ffffff"), (m) => (m.position.y = 0.035)),
       mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.004, 28), paint("#d8d8d8", { metalness: 0.8, roughness: 0.3 }), (m) => (m.position.y = 0.072)),
     ),
-  Bread: () => mesh(lumpy(new RoundedBoxGeometry(0.18, 0.07, 0.09, 4, 0.03), 0.04), paint("#c98a46", { roughness: 0.8 }), (m) => (m.position.y = 0.035)),
+  Bread: () =>
+    group(
+      mesh(lumpy(new RoundedBoxGeometry(0.18, 0.07, 0.09, 4, 0.03), 0.04), paint("#c98a46"), (m) => (m.position.y = 0.035)),
+      ...[-0.05, 0, 0.05].map((x) => mesh(new THREE.BoxGeometry(0.012, 0.004, 0.06), paint("#8a5526"), (m) => {
+        m.position.set(x, 0.071, 0);
+        m.rotation.y = 0.5;
+        m.userData.noOutline = true;
+      })),
+    ),
   Rice: () => mesh(lumpy(new RoundedBoxGeometry(0.09, 0.14, 0.05, 3, 0.02), 0.03), paint("#fbfbf8", { roughness: 0.9 }), (m) => (m.position.y = 0.07)),
   Pasta: () => mesh(new RoundedBoxGeometry(0.06, 0.17, 0.04, 2, 0.004), paint(css("--color-cobre"), { roughness: 0.6 }), (m) => (m.position.y = 0.085)),
   "Black beans": () => jar("#241c1a"),
@@ -209,9 +304,8 @@ const BY_CATEGORY = {
   PREPARED: () => FOODS.Soup(),
 };
 
-export function foodModel(name, category) {
-  const make = FOODS[name] ?? BY_CATEGORY[category] ?? BY_CATEGORY.VEGETABLE;
-  const model = make();
+export function foodModel(name, category, grams) {
+  const model = DETAILED[name] ? DETAILED[name](grams) : (FOODS[name] ?? BY_CATEGORY[category] ?? BY_CATEGORY.VEGETABLE)();
   return outline(model);
 }
 
@@ -232,7 +326,46 @@ function labelTexture(text, background, color) {
   return texture;
 }
 
-export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
+const VAPOR = 18;
+const WHITE = new THREE.Color("#fdfdfb");
+const ALARM = new THREE.Color("#d2492f");
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function frostTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 128;
+  const context = canvas.getContext("2d");
+  const fade = context.createLinearGradient(0, 0, 0, 128);
+  fade.addColorStop(0, "rgba(255,255,255,0.9)");
+  fade.addColorStop(0.35, "rgba(255,255,255,0)");
+  fade.addColorStop(0.75, "rgba(255,255,255,0)");
+  fade.addColorStop(1, "rgba(255,255,255,0.7)");
+  context.fillStyle = fade;
+  context.fillRect(0, 0, 128, 128);
+  context.fillStyle = "rgba(255,255,255,0.8)";
+  for (let index = 0; index < 160; index++) {
+    const x = hash(index, 1, 2) * 128;
+    const edge = hash(index, 3, 4) < 0.5 ? hash(index, 5, 6) * 34 : 128 - hash(index, 7, 8) * 26;
+    context.fillRect(x, edge, 1.5, 1.5);
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
+function puffTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 64;
+  const context = canvas.getContext("2d");
+  const glow = context.createRadialGradient(32, 32, 0, 32, 32, 32);
+  glow.addColorStop(0, "rgba(255,255,255,1)");
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  context.fillStyle = glow;
+  context.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(canvas);
+}
+
+const spring = (k) => 1 - Math.cos(k * Math.PI * 2.5) * Math.exp(-k * 6);
+
+export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.toneMapping = THREE.NoToneMapping;
@@ -331,6 +464,25 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
   door.add(doorItems);
   doorPivot.add(door);
   fridge.add(doorPivot);
+
+  const frost = mesh(new THREE.PlaneGeometry(W - 0.04, freezerHeight - 0.04), new THREE.MeshBasicMaterial({ map: frostTexture(), transparent: true, opacity: 0, depthWrite: false }), (m) => {
+    m.position.set(W / 2, freezerHeight / 2, 0.051);
+    m.userData.noOutline = true;
+  });
+  freezerPivot.add(frost);
+
+  const vapor = new THREE.Points(
+    new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(VAPOR * 3), 3)),
+    new THREE.PointsMaterial({ map: puffTexture(), size: 0.16, transparent: true, opacity: 0, depthWrite: false, color: "#eef6f8" }),
+  );
+  const puffs = Array.from({ length: VAPOR }, (_, index) => ({ age: index / VAPOR, x: 0, z: 0 }));
+  scene.add(vapor);
+
+  const tagLayer = document.createElement("div");
+  tagLayer.className = "stage-tags";
+  tagLayer.setAttribute("aria-hidden", "true");
+  canvas.after(tagLayer);
+  const tags = new Map();
 
   const book = tag(group(
     mesh(new RoundedBoxGeometry(0.26, 0.045, 0.32, 2, 0.006), paint(css("--color-cobre"), { roughness: 0.55 }), (m) => (m.position.y = 0.022)),
@@ -437,6 +589,11 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
     pointer: new THREE.Vector2(9, 9),
     tilt: new THREE.Vector2(),
     ringShares: [0, 0, 0],
+    doorAlarm: false,
+    frost: 0,
+    lit: false,
+    litAt: 0,
+    hoverModel: null,
   };
   camera.position.copy(state.position);
   camera.lookAt(state.target);
@@ -457,8 +614,12 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
   }
 
   function placeItems(fridgeTree, inventory) {
+    const known = new Set([...items.children, ...doorItems.children].map((model) => model.userData.key));
     items.clear();
     doorItems.clear();
+    tags.forEach((element) => element.remove());
+    tags.clear();
+    let order = 0;
     const zones = fridgeTree?.children ?? [];
     const traysOf = (kind) => zones.filter((zone) => (zone.kind ?? "SHELF") === kind).flatMap((zone) => zone.children);
     const slots = [
@@ -475,12 +636,22 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
         .filter((item) => item.trayId === slot.tray.id)
         .slice(0, 8)
         .forEach((item) => {
-          const model = foodModel(item.name, item.category);
+          const model = foodModel(item.name, item.category, item.grams);
           const width = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3()).x;
           model.traverse((child) => {
             child.userData.item = item;
             child.userData.part = "fridge";
           });
+          model.userData.key = item.id;
+          model.userData.born = known.has(item.id) ? 0 : performance.now() + order++ * 70;
+          const text = describe?.(item);
+          if (text) {
+            const element = document.createElement("span");
+            element.className = `stage-tag${item.days !== null && item.days !== undefined && item.days <= 1 ? " soon" : ""}`;
+            element.textContent = text;
+            tagLayer.append(element);
+            tags.set(model, element);
+          }
           if (slot.zone === "DOOR") {
             model.position.set(x + width / 2, slot.y - 0.03, -0.05);
             doorItems.add(model);
@@ -495,6 +666,12 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
 
   function setRings(shares) {
     state.ringShares = shares;
+  }
+
+  function setStatus(twin) {
+    state.doorAlarm = Boolean(twin?.doorOpen);
+    const celsius = twin?.celsius;
+    state.frost = celsius === null || celsius === undefined ? 0 : THREE.MathUtils.clamp((5 - celsius) / 5, 0, 1) * 0.55;
   }
 
   const raycaster = new THREE.Raycaster();
@@ -569,6 +746,9 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
     }
     const hit = pick(event.clientX, event.clientY);
     state.hover = hit?.object.userData.item ? null : (hit?.object.userData.part ?? null);
+    let hovered = hit?.object.userData.item ? hit.object : null;
+    while (hovered && hovered.parent !== items && hovered.parent !== doorItems) hovered = hovered.parent;
+    state.hoverModel = hovered;
     canvas.style.cursor = hit?.object.userData.item?.usable ? "grab" : state.hover ? "pointer" : "default";
   });
 
@@ -595,6 +775,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
   canvas.addEventListener("pointerleave", () => {
     state.tilt.set(0, 0);
     state.hover = null;
+    state.hoverModel = null;
   });
   canvas.addEventListener("click", (event) => {
     if (drag.moved) {
@@ -627,6 +808,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
     const { clientWidth, clientHeight } = canvas;
     if (!clientWidth || !clientHeight) return;
     renderer.setSize(clientWidth, clientHeight, false);
+    Object.assign(tagLayer.style, { left: `${canvas.offsetLeft}px`, top: `${canvas.offsetTop}px`, width: `${clientWidth}px`, height: `${clientHeight}px` });
     camera.aspect = clientWidth / clientHeight;
     camera.updateProjectionMatrix();
   }
@@ -641,7 +823,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
       const k = ease(progress);
       state.position.lerpVectors(state.tween.from.position, state.tween.to.position, k);
       state.target.lerpVectors(state.tween.from.target, state.tween.to.target, k);
-      state.door = THREE.MathUtils.lerp(state.tween.from.door, state.tween.to.door, k);
+      state.door = THREE.MathUtils.lerp(state.tween.from.door, state.tween.to.door, reduced ? k : spring(Math.min(1, progress * 1.15)));
       state.freezer = THREE.MathUtils.lerp(state.tween.from.freezer, state.tween.to.freezer, k);
       if (progress === 1) state.tween = null;
     }
@@ -654,7 +836,6 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
     camera.lookAt(state.target);
     doorPivot.rotation.y = state.door;
     freezerPivot.rotation.y = state.freezer;
-    inside.intensity = THREE.MathUtils.clamp(-state.door / 1.2, 0, 1) * 0.6;
     Object.entries(extras).forEach(([key, extra]) => {
       const goal = extra.userData.goal ?? 0;
       const scale = THREE.MathUtils.damp(extra.scale.x, goal || 0.001, 6, delta);
@@ -686,6 +867,56 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
         });
       });
     });
+    const open = THREE.MathUtils.clamp(-state.door / 1.2, 0, 1);
+    if (open > 0.05 && !state.lit) state.litAt = now;
+    state.lit = open > 0.05;
+    const flicker = 260 > now - state.litAt && !reduced ? (Math.sin(now * 0.09) > 0 ? 1 : 0.35) : 1;
+    inside.intensity = open * 0.6 * flicker;
+
+    const doorPanel = door.children[0].material;
+    doorPanel.color.lerpColors(WHITE, ALARM, state.doorAlarm ? 0.18 + Math.sin(now / 420) * 0.06 : 0);
+    frost.material.opacity = THREE.MathUtils.damp(frost.material.opacity, state.frost, 2, delta);
+
+    const positions = vapor.geometry.attributes.position;
+    puffs.forEach((puff, index) => {
+      puff.age += delta * 0.35;
+      if (puff.age > 1) {
+        puff.age -= 1;
+        puff.x = (hash(index, now, 1) - 0.5) * (W - 0.1);
+        puff.z = D / 2 + hash(index, now, 2) * 0.06;
+      }
+      positions.setXYZ(index, puff.x, 0.12 + puff.age * 0.5, puff.z);
+    });
+    positions.needsUpdate = true;
+    vapor.material.opacity = reduced ? 0 : open * 0.12;
+
+    [...items.children, ...doorItems.children].forEach((model) => {
+      const age = (now - model.userData.born) / 520;
+      const base = model.userData.born === 0 || age >= 1 || reduced ? 1 : 0 >= age ? 0.001 : spring(age);
+      const hovered = state.hoverModel === model;
+      model.userData.wobble = THREE.MathUtils.damp(model.userData.wobble ?? 0, hovered ? 1 : 0, 8, delta);
+      model.scale.setScalar(Math.max(0.001, base * (1 + model.userData.wobble * 0.06)));
+      model.userData.rz ??= model.rotation.z;
+      model.rotation.z = model.userData.rz + (reduced ? 0 : Math.sin(now / 90) * 0.04 * model.userData.wobble);
+    });
+
+    const showTags = state.route === "fridge" && open > 0.8;
+    tagLayer.style.opacity = showTags ? 1 : 0;
+    if (showTags) {
+      const placed = [];
+      [...tags].sort(([, a], [, b]) => b.classList.contains("soon") - a.classList.contains("soon")).forEach(([model, element]) => {
+        const top = new THREE.Box3().setFromObject(model);
+        const spot = new THREE.Vector3((top.min.x + top.max.x) / 2, top.max.y + 0.012, (top.min.z + top.max.z) / 2).project(camera);
+        const x = ((spot.x + 1) / 2) * canvas.clientWidth;
+        const y = ((1 - spot.y) / 2) * canvas.clientHeight;
+        const half = element.offsetWidth / 2 + 4;
+        const clash = placed.some((other) => 24 > Math.abs(other.y - y) && half + other.half > Math.abs(other.x - x));
+        element.hidden = clash;
+        if (!clash) placed.push({ x, y, half });
+        element.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+      });
+    }
+
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
@@ -695,6 +926,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
     goTo,
     placeItems,
     setRings,
+    setStatus,
     pick,
     camera,
     scene,

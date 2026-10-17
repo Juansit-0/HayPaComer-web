@@ -1361,3 +1361,15 @@ a.button:active { transform: scale(0.97); }
 .palette-ghost { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; box-shadow: var(--shadow-raised); cursor: grabbing; }
 .palette-other input { min-height: 44px; border-radius: var(--radius-full); width: 15ch; }
 .learn { justify-self: start; }
+
+/* Grams and days floating over each food while the 3D door is open */
+.stage-tags { position: absolute; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity var(--duration-base) var(--ease-standard); }
+.stage-tag { position: absolute; left: 0; top: 0; padding: 2px 8px; border-radius: var(--radius-full); background: color-mix(in oklab, var(--color-white) 92%, transparent); color: var(--color-tinta); font: 600 12px/1.5 var(--font-body); font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-tinta) 14%, transparent); }
+.stage-tag.soon { background: #c8432a; color: var(--color-white); box-shadow: none; animation: tag-pulse 1.6s var(--ease-standard) infinite; }
+@keyframes tag-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in oklab, #c8432a 22%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .stage-tag.soon { animation: none; } }
+@media (max-width: 1023px) { .stage-tags { display: none; } }
+
+/* Paper grain over the illustrated 3D fridge */
+.stage.has-three::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.07; mix-blend-mode: multiply; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+@media (max-width: 1023px) { .stage.has-three::after { display: none; } }

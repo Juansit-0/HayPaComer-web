@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { foodName, formatNumber, t } from "./i18n.js";
-import { busy, esc, grams, numberField, openSheet, showError, toast, wireSteppers } from "./ui.js";
+import { busy, daysLeft, esc, grams, numberField, openSheet, showError, toast, whenText, wireSteppers } from "./ui.js";
 
 const SHAPES = {
   Arepa: "arepa",
@@ -244,6 +244,7 @@ function mountThree(element) {
     .then(({ createFridgeScene }) => {
       three = createFridgeScene(canvas, {
         labels: { market: t("nav.market") },
+        describe: (item) => (item.days !== null && 2 >= item.days ? `${grams(item.grams)}, ${whenText(item.expiresOn)}` : grams(item.grams)),
         onDrop: act,
         onPart: (part, data) => {
           if (part === "fridge" && data.trayId) location.hash = `#/fridge/${data.trayId}`;
@@ -313,7 +314,7 @@ export async function refreshStage(chosen) {
     api("/foods?q=").catch(() => []),
   ]);
   const categories = new Map(catalog.map((food) => [food.name.toLowerCase(), food.category]));
-  const inventory = listed.map((item) => ({ ...item, category: categories.get(item.name.toLowerCase()) }));
+  const inventory = listed.map((item) => ({ ...item, category: categories.get(item.name.toLowerCase()), days: daysLeft(item.expiresOn) }));
   const fridge = fridges[0];
   const twin = fridge ? await api(`${base}/fridges/${fridge.id}/twin`).catch(() => null) : null;
   fill(fridge, inventory, twin, metrics?.total);
@@ -322,6 +323,7 @@ export async function refreshStage(chosen) {
     const week = metrics?.total;
     const moved = Number(week?.consumedGrams ?? 0) + Number(week?.discardedGrams ?? 0);
     scene.placeItems(fridge, inventory);
+    scene.setStatus(twin);
     scene.setRings(
       moved > 0
         ? [Number(week.consumedGrams) / moved, Number(week.rescuedGrams) / Math.max(1, Number(week.consumedGrams)), Number(week.discardedGrams) / moved]
