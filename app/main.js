@@ -9,7 +9,7 @@ import { renderNow } from "./now.js";
 import { renderSettings } from "./settings.js";
 import { openInbox } from "./inbox.js";
 import { currentLocale, loadLocale, locales, plural, t, translatePage } from "./i18n.js";
-import { errorText, esc } from "./ui.js";
+import { errorText, esc, skeleton } from "./ui.js";
 
 const main = document.getElementById("main");
 const loader = document.querySelector("[data-loader]");
@@ -58,6 +58,20 @@ function progress(value) {
   loader.style.setProperty("--p", value);
 }
 
+function paint(update) {
+  if (!document.startViewTransition || !loader.classList.contains("gone")) return update();
+  document.startViewTransition(update);
+}
+
+function enter() {
+  main.setAttribute("aria-busy", "false");
+  [...main.children, ...main.querySelectorAll(".bento > *")].forEach((element, index) =>
+    element.style.setProperty("--i", Math.min(index, 8)),
+  );
+  main.setAttribute("data-enter", "");
+  setTimeout(() => main.removeAttribute("data-enter"), 1400);
+}
+
 async function render() {
   if (!session.signedIn) {
     tabs.hidden = true;
@@ -78,18 +92,23 @@ async function render() {
   document.querySelector("[data-household]").innerHTML = householdLabel(household);
   const route = current();
   document.documentElement.dataset.chapter = route;
+  main.setAttribute("aria-busy", "true");
+  paint(() => {
+    main.innerHTML = skeleton(route, t(`nav.${route}`));
+  });
   document.querySelectorAll(".tabs a, [data-settings-link]").forEach((link) => {
     if (link.dataset.tab === route) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
   try {
     await views[route](main, household);
-    main.setAttribute("aria-busy", "false");
+    enter();
     refreshInbox();
     refreshStatus();
   } catch (error) {
     main.innerHTML = `<section class="empty"><h1>${t("screen.failed")}</h1><p>${esc(errorText(error))}</p><button type="button" data-retry>${t("action.retry")}</button></section>`;
     main.querySelector("[data-retry]").addEventListener("click", render);
+    enter();
   }
 }
 

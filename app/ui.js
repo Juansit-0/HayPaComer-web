@@ -222,6 +222,26 @@ export function openSheet(title, body, onReady) {
   return dialog;
 }
 
+const SKELETONS = {
+  now: [[7, 340], [5, 340], [4], [4], [4]],
+  fridge: [[5, 520], [7, 520]],
+  market: [[5, 300], [7, 300], [12]],
+  numbers: [[12, 280], [8, 300], [4, 300]],
+  chef: [[8, 460], [4, 460]],
+  settings: [[7, 360], [5, 360], [12]],
+};
+
+export function skeleton(route, title) {
+  const tiles = (SKELETONS[route] ?? SKELETONS.now)
+    .map(
+      ([width, height], index) => `<div class="skel w-${width}" style="--i:${index};--h:${height ?? 220}px">
+        <span class="skel-line big"></span><span class="skel-line mid"></span><span class="skel-line short"></span>
+      </div>`,
+    )
+    .join("");
+  return `<header><h1>${esc(title)}</h1></header><div class="bento skeleton-screen" aria-hidden="true">${tiles}</div>`;
+}
+
 export async function busy(button, task) {
   button.disabled = true;
   button.setAttribute("aria-busy", "true");

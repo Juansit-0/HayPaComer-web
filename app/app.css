@@ -795,6 +795,28 @@ dialog.sheet[open] { animation: sheet-in var(--duration-slow) var(--ease-standar
 .inbox-item button { justify-self: start; }
 .inbox-empty { margin: 0; color: var(--color-text-weak); }
 
+.skeleton-screen > * { min-height: var(--h, 220px); }
+.loader.gone { display: none; }
+.skel {
+  background: var(--skeleton);
+  border-radius: var(--tile-radius);
+  animation: skel-pulse 1.4s var(--ease-standard) infinite;
+  animation-delay: calc(var(--i, 0) * var(--stagger));
+}
+.skel-line { display: block; height: 14px; border-radius: var(--radius-full); background: var(--color-meson-strong); }
+.skel-line.big { height: clamp(40px, 5vw, 72px); width: 45%; border-radius: var(--radius-10); }
+.skel-line.mid { width: 70%; }
+.skel-line.short { width: 35%; }
+.skel { display: grid; align-content: start; gap: var(--space-s); padding: var(--tile-padding); }
+@keyframes skel-pulse { 50% { opacity: 0.55; } }
+
+main[data-enter] > *,
+main[data-enter] .bento > * {
+  animation: rise var(--duration-slow) var(--ease-emphasized) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger));
+}
+@keyframes rise { from { opacity: 0; transform: translateY(var(--rise)); } }
+
 .loader {
   position: fixed;
   inset: 0;
@@ -834,9 +856,13 @@ dialog.sheet[open] { animation: sheet-in var(--duration-slow) var(--ease-standar
 .loader.done { transform: translateY(-100%); }
 html:has(.loader:not(.gone)) { overflow: hidden; }
 
-.loader.gone { display: none; }
+::view-transition-old(root),
+::view-transition-new(root) { animation-duration: var(--duration-base); }
+::view-transition-group(chapter) { animation-duration: var(--duration-slow); animation-timing-function: var(--ease-emphasized); }
 
 @media (prefers-reduced-motion: reduce) {
+  .skel, main[data-enter] > *, main[data-enter] .bento > * { animation: none; }
   .loader { transition: opacity 1ms; }
   .loader.done { transform: none; opacity: 0; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none; }
 }
