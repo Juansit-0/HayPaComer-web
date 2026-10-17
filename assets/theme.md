@@ -1,27 +1,28 @@
-# Copper Counter
+# Pa' comer
 
-A warm, practical kitchen-tool theme: measured honesty with appetite. Copper and sand carry the warmth; ink keeps it legible; paprika marks attention and olive marks measured success.
+Poster-scale kitchen theme from Pasto: flat chapters of Nariño produce on white rice, condensed capitals for the question "¿qué hay pa' comer?", and numbers as the largest thing on every screen.
 
 ## Color Palette
 
-- **Copper Clay**: `#b45309` - Primary; actions, brand moments, measured highlights
-- **Deep Ink**: `#292524` - Text and structure
-- **Sand**: `#faf4ea` - Backgrounds and surfaces
-- **Paprika**: `#c2410c` - Attention states (door open, expiring soon)
-- **Olive**: `#4d7c0f` - Positive measured states (fresh, enough, done)
+- **Arroz**: `#fbfbf8` - Ground
+- **Tinta**: `#121212` - Text and structure
+- **Papa amarilla**: `#f3c443` - Chapter Ahora; at-risk food
+- **Tomate de árbol**: `#c8432a` - Chapter Mercado; expired, door open
+- **Cilantro**: `#2f7a4a` - Chapter Nevera; fresh and done
+- **Mora**: `#4b1f2e` - Chapter Números; under review
+- **Cobre**: `#a8481f` - Primary action
 
 ## Typography
 
-- **Display**: Bricolage Grotesque - wordmark, headlines
-- **Body and UI**: Hanken Grotesk - paragraphs, controls, labels
-- **Data**: IBM Plex Mono - grams, dates, timers, traces
+- **Display**: Anton - wordmark, headlines, loader, uppercase
+- **Text and data**: Hanken Grotesk - reading, controls, tabular numbers
 
 ## Best Used For
 
-Home and kitchen products, food-waste tools, practical hardware brands, shared-household products, honest utility interfaces, portfolio presentations that lead with numbers.
+Food and kitchen products with real data, household apps, hardware with a companion app, landing pages that sell with one big question and one big number.
 
 ## Notes
 
-- The palette is warm analogous (copper, paprika, sand) anchored by ink, with olive as the single functional complement.
-- Never gradient copper into paprika; never place paprika and olive text adjacent without neutral space.
-- Data is always monospaced and tabular so figures align like an instrument readout.
+- One chapter colour per screen, at full strength; no tints or gradients.
+- Text on tomate, cilantro and mora is arroz; text on papa and arroz is tinta.
+- Motion explains change and disappears under reduced motion.
