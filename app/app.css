@@ -886,6 +886,9 @@ html:has(.loader:not(.gone)) { overflow: hidden; }
   .shell main { order: 4; width: 100%; }
   .stage-fridge { height: 360px; }
   .bar .live, .bar .language, .bar .household { display: none; }
+  .bar { flex-wrap: nowrap; gap: var(--space-xs); }
+  .bar .wordmark { font-size: 22px; }
+  .bar .session { font-size: 13px; }
   .bar .session { gap: 4px; }
   .stage { transition: background-color var(--duration-slow) var(--ease-standard), padding var(--duration-base) var(--ease-standard); }
   .stage-fridge { transition: height var(--duration-base) var(--ease-emphasized), opacity var(--duration-base); }
@@ -1128,3 +1131,42 @@ html:has(.loader:not(.gone)) { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .food-card:hover { transform: none; }
 }
+
+/* Market: the list is a paper notepad, the budget is a ring */
+.market-hero, .numbers-hero { grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: var(--space-l); }
+.market-hero h1, .market-hero .lead { grid-column: 1; }
+.market-hero .hero-figure { grid-column: 2; grid-row: 1 / span 2; margin: 0; display: grid; justify-items: end; gap: 4px; }
+.market-hero .hero-figure .data { font: 700 clamp(40px, 5.4vw, 88px)/0.9 var(--font-body); letter-spacing: -0.04em; color: inherit; }
+.market-hero .hero-figure span:last-child { font-weight: 600; }
+.notepad { background: var(--color-white); border-radius: 6px; padding: var(--space-l) var(--space-l) var(--space-xl); position: relative; box-shadow: inset 0 3px 0 var(--color-tomate); }
+.notepad::before { content: ""; position: absolute; top: -9px; left: 50%; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: var(--color-tomate); }
+.notepad > h2 { font: 400 clamp(28px, 3vw, 40px)/1 var(--font-display); text-transform: uppercase; }
+.notepad-title { margin-top: var(--space-m); }
+.notepad .market-group h3 { font: 700 var(--size-small)/1.3 var(--font-body); color: var(--color-tomate); text-transform: none; margin-top: var(--space-s); }
+.notepad .list > li { border-bottom: 2px solid var(--color-meson); }
+.notepad .market-row .item-name { font-size: var(--size-h4); }
+.market-row.bought .item-name { text-decoration-thickness: 3px; text-decoration-color: var(--color-tomate); }
+.check input { accent-color: var(--color-tomate); }
+.budget-head { display: flex; align-items: center; gap: var(--space-m); }
+.budget-ring { width: 112px; height: 112px; flex: none; transform: rotate(-90deg); }
+.budget-ring circle { fill: none; stroke-width: 14; }
+.budget-ring .ring-bg { stroke: var(--color-meson); }
+.budget-ring .ring { stroke-dasharray: var(--len); stroke-dashoffset: var(--to); transform-origin: 64px 64px; animation: ring-draw 900ms var(--ease-emphasized) both; }
+.budget-ring .spent { stroke: var(--color-piedra); }
+.budget-ring .planned { stroke: var(--color-cobre); }
+.budget-bar { display: none; }
+.budget-figures .key.spent { background: var(--color-piedra); }
+.budget-figures .key.planned { background: var(--color-cobre); }
+@media (max-width: 760px) {
+  .market-hero { grid-template-columns: minmax(0, 1fr); }
+  .market-hero .hero-figure { grid-column: 1; grid-row: auto; justify-items: start; }
+  .notepad { padding: var(--space-m); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .budget-ring .ring { animation: none; }
+}
+@container (max-width: 420px) {
+  .tile .row-form > .grow { flex-basis: auto; }
+}
+.budget-tile .kpi .value { font-size: clamp(28px, 2.6vw, 44px); }
+.budget-head .kpi { min-width: 0; }

@@ -41,9 +41,18 @@ function row(item, bought, line, currency) {
   </li>`;
 }
 
+function budgetRing(spent, planned, monthly) {
+  const r = 52;
+  const length = 2 * Math.PI * r;
+  const part = (value) => (monthly > 0 ? Math.min(1, Math.max(0, value / monthly)) : 0);
+  const arc = (kind, from, size) =>
+    `<circle class="ring ${kind}" cx="64" cy="64" r="${r}" style="--len:${length.toFixed(1)};--to:${(length * (1 - size)).toFixed(1)};rotate:${(from * 360).toFixed(1)}deg"/>`;
+  return `<svg class="budget-ring" viewBox="0 0 128 128" aria-hidden="true"><circle class="ring-bg" cx="64" cy="64" r="${r}"/>${arc("spent", 0, part(spent))}${arc("planned", part(spent), part(planned))}</svg>`;
+}
+
 function budgetTile(budget, currency) {
   if (!budget) {
-    return `<section class="tile w-5" aria-labelledby="budget-title">
+    return `<section class="tile" aria-labelledby="budget-title">
       <h2 id="budget-title">${t("market.budget")}</h2>
       <p class="hint">${t("market.budget-hint")}</p>
       <form class="stack" data-budget>
@@ -58,9 +67,9 @@ function budgetTile(budget, currency) {
   const remaining = Number(budget.remaining);
   const share = (value) => (monthly > 0 ? Math.min(100, Math.max(0, (value / monthly) * 100)) : 0);
   const over = budget.lines.filter((line) => line.estimatedCost !== null && !line.withinBudget);
-  return `<section class="tile w-5 budget-tile" aria-labelledby="budget-title">
+  return `<section class="tile budget-tile" aria-labelledby="budget-title">
     <h2 id="budget-title">${t("market.budget")}</h2>
-    ${kpi(formatMoney(remaining, budget.currency), t("market.left"), remaining > 0 ? "positive" : "attention")}
+    <div class="budget-head">${budgetRing(spent, planned, monthly)}${kpi(formatMoney(remaining, budget.currency), t("market.left"), remaining > 0 ? "positive" : "attention")}</div>
     <div class="budget-bar" role="img" aria-label="${esc(
       t("market.bar-label", {
         spent: formatMoney(spent, budget.currency),
@@ -113,13 +122,13 @@ export async function renderMarket(main, household) {
   const lines = new Map((budget?.lines ?? []).map((line) => [line.itemId, line]));
 
   main.innerHTML = `
-    <header>
+    <header class="market-hero">
       <h1 id="market-title">${t("market.title")}</h1>
       <p class="lead">${pending ? plural("market.pending", pending) : t("market.empty")}</p>
+      ${budget ? `<p class="hero-figure"><span class="data">${formatMoney(Number(budget.remaining), budget.currency)}</span><span>${t("market.left")}</span></p>` : ""}
     </header>
-    <div class="bento">
-      ${budgetTile(budget, currency)}
-      <section class="tile w-7" aria-labelledby="add-title">
+    <div class="bento market-bento">
+      <section class="tile w-7 notepad" aria-labelledby="add-title">
         <h2 id="add-title">${t("market.add-title")}</h2>
         <form class="row-form" data-add>
           <label class="grow">${t("field.food")}<input name="food" list="market-foods" required autocomplete="off" placeholder="${esc(t("market.food-example"))}"></label>
@@ -128,9 +137,7 @@ export async function renderMarket(main, household) {
           <button class="primary" type="submit">${t("market.add")}</button>
         </form>
         <button type="button" data-plan>${t("market.add-plan")}</button>
-      </section>
-      <section class="tile ${list.checked.length ? "w-7" : "w-12"}" aria-labelledby="aisles-title">
-        <h2 id="aisles-title">${t("market.aisles")}</h2>
+        <h2 id="aisles-title" class="notepad-title">${t("market.aisles")}</h2>
         ${
           list.pending.length
             ? list.pending
@@ -144,14 +151,17 @@ export async function renderMarket(main, household) {
             : `<p class="hint">${t("market.empty")}</p>`
         }
       </section>
+      <div class="w-5 stack">
+      ${budgetTile(budget, currency)}
       ${
         list.checked.length
-          ? `<section class="tile w-5" aria-labelledby="bought-title">
+          ? `<section class="tile" aria-labelledby="bought-title">
               <header><h2 id="bought-title">${t("market.cart")}</h2><button class="ghost" type="button" data-clear>${t("market.clear")}</button></header>
               <ul class="list">${list.checked.map((item) => row(item, true, lines.get(item.id), currency)).join("")}</ul>
             </section>`
           : ""
       }
+      </div>
     </div>`;
 
   wireSteppers(main);
