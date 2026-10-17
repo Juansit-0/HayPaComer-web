@@ -7,6 +7,7 @@ import { renderMarket } from "./market.js";
 import { connectLive, disconnectLive } from "./live.js";
 import { renderNow } from "./now.js";
 import { renderSettings } from "./settings.js";
+import { openInbox } from "./inbox.js";
 import { currentLocale, loadLocale, locales, plural, t, translatePage } from "./i18n.js";
 import { errorText, esc } from "./ui.js";
 
@@ -123,6 +124,11 @@ document.querySelector("[data-signout]").addEventListener("click", async () => {
   }
   location.hash = "#/now";
   render();
+});
+
+document.querySelector("[data-inbox]").addEventListener("click", (event) => {
+  event.preventDefault();
+  openInbox(refreshInbox);
 });
 
 const languageSelect = document.querySelector("[data-language]");
