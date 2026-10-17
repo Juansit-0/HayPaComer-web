@@ -44,14 +44,43 @@ function lathe(profile, segments = 32) {
   return new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), segments);
 }
 
+const tones = new THREE.DataTexture(new Uint8Array([150, 150, 150, 255, 215, 215, 215, 255, 255, 255, 255, 255]), 3, 1);
+tones.minFilter = THREE.NearestFilter;
+tones.magFilter = THREE.NearestFilter;
+tones.needsUpdate = true;
+
 function paint(color, options = {}) {
-  return new THREE.MeshPhysicalMaterial({ color, roughness: 0.55, ...options });
+  return new THREE.MeshToonMaterial({
+    color,
+    gradientMap: tones,
+    transparent: Boolean(options.transparent),
+    opacity: options.opacity ?? 1,
+  });
+}
+
+const ink = new THREE.ShaderMaterial({
+  uniforms: { thickness: { value: 0.0045 }, color: { value: new THREE.Color("#121212") } },
+  vertexShader: "uniform float thickness; void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * thickness, 1.0); }",
+  fragmentShader: "uniform vec3 color; void main() { gl_FragColor = vec4(color, 1.0); }",
+  side: THREE.BackSide,
+});
+
+function outline(root) {
+  const meshes = [];
+  root.traverse((child) => {
+    if (child.isMesh && !child.userData.outline && !child.userData.noOutline && !child.material.transparent && !child.material.isShaderMaterial) meshes.push(child);
+  });
+  meshes.forEach((child) => {
+    const line = new THREE.Mesh(child.geometry, ink);
+    line.userData.outline = true;
+    line.raycast = () => {};
+    child.add(line);
+  });
+  return root;
 }
 
 function mesh(geometry, material, setup) {
   const result = new THREE.Mesh(geometry, material);
-  result.castShadow = true;
-  result.receiveShadow = true;
   setup?.(result);
   return result;
 }
@@ -183,13 +212,7 @@ const BY_CATEGORY = {
 export function foodModel(name, category) {
   const make = FOODS[name] ?? BY_CATEGORY[category] ?? BY_CATEGORY.VEGETABLE;
   const model = make();
-  model.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
-    }
-  });
-  return model;
+  return outline(model);
 }
 
 function labelTexture(text, background, color) {
@@ -212,39 +235,29 @@ function labelTexture(text, background, color) {
 export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMapping = THREE.NoToneMapping;
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 30);
-  scene.add(new THREE.HemisphereLight("#ffffff", "#d9d4c4", 1.6));
-  const sun = new THREE.DirectionalLight("#ffffff", 2.2);
+  scene.add(new THREE.HemisphereLight("#ffffff", "#c9c4b4", 0.8));
+  const sun = new THREE.DirectionalLight("#ffffff", 1.1);
   sun.position.set(2.5, 4, 3);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -2;
-  sun.shadow.camera.right = 2;
-  sun.shadow.camera.top = 3;
-  sun.shadow.camera.bottom = -1;
-  sun.shadow.radius = 6;
-  sun.shadow.bias = -0.0005;
   scene.add(sun);
   const inside = new THREE.PointLight("#fff1c8", 0, 1.6, 1.5);
   inside.position.set(0, FRIDGE_TOP - 0.06, 0.05);
   scene.add(inside);
 
-  const floor = mesh(new THREE.PlaneGeometry(12, 12), new THREE.ShadowMaterial({ opacity: 0.14 }), (m) => {
+  const floor = mesh(new THREE.CircleGeometry(0.95, 48), new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.05 }), (m) => {
     m.rotation.x = -Math.PI / 2;
-    m.castShadow = false;
+    m.scale.set(0.9, 0.5, 1);
+    m.position.set(0.35, 0.001, 0.15);
   });
   scene.add(floor);
 
   const shell = paint("#fdfdfb", { roughness: 0.32, clearcoat: 0.6, clearcoatRoughness: 0.25 });
-  const liner = paint("#eef3f5", { roughness: 0.6 });
+  const liner = paint("#bcd6df");
   const steel = paint("#c9d0d3", { metalness: 0.9, roughness: 0.25 });
-  const glass = paint("#e9f5f7", { transparent: true, opacity: 0.32, roughness: 0.05, clearcoat: 1 });
+  const glass = paint("#9fc3cf");
   const fridge = new THREE.Group();
   scene.add(fridge);
   const parts = new Map();
@@ -310,7 +323,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
     mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.24, 16), steel, (m) => m.position.set(W - 0.06, doorHeight - 0.2, 0.09)),
   ), "now");
   const racks = [0.22, 0.52, 0.82].map((y) => {
-    const rack = mesh(new RoundedBoxGeometry(W - 0.12, 0.07, 0.09, 2, 0.008), glass, (m) => m.position.set(W / 2, y, -0.05));
+    const rack = mesh(new RoundedBoxGeometry(W - 0.12, 0.03, 0.09, 2, 0.006), glass, (m) => m.position.set(W / 2, y - 0.02, -0.05));
     door.add(rack);
     return { zone: "DOOR", y, rack };
   });
@@ -338,6 +351,15 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
   ), "discard");
   bin.position.set(W / 2 + 0.78, 0, 0.1);
   scene.add(pot, bin);
+  note.userData.noOutline = true;
+  [fridge, pot, bin].forEach(outline);
+  fridge.traverse((child) => {
+    if (child.isMesh && child.material.transparent && !child.userData.outline) {
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(child.geometry, 30), new THREE.LineBasicMaterial({ color: "#121212" }));
+      edges.raycast = () => {};
+      child.add(edges);
+    }
+  });
 
   const extras = {
     now: (() => {
@@ -373,7 +395,10 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
       rings.userData.arcs = [0.24, 0.17, 0.1].map((radius, index) => {
         const color = [css("--color-cilantro"), css("--color-papa"), css("--color-tomate")][index];
         rings.add(mesh(new THREE.TorusGeometry(radius, 0.022, 16, 96), paint("#e9e7e0", { roughness: 0.6 })));
-        const arc = mesh(new THREE.TorusGeometry(radius, 0.026, 16, 96, Math.PI * 1.2), paint(color, { roughness: 0.3, clearcoat: 1 }), (m) => (m.rotation.z = Math.PI / 2));
+        const arc = mesh(new THREE.TorusGeometry(radius, 0.026, 16, 96, Math.PI * 1.2), paint(color), (m) => {
+          m.rotation.z = Math.PI / 2;
+          m.userData.noOutline = true;
+        });
         rings.add(arc);
         return arc;
       });
@@ -393,6 +418,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
     })(),
   };
   Object.values(extras).forEach((extra) => {
+    outline(extra);
     extra.scale.setScalar(0.001);
     extra.visible = false;
     scene.add(extra);
@@ -628,7 +654,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels }) {
     camera.lookAt(state.target);
     doorPivot.rotation.y = state.door;
     freezerPivot.rotation.y = state.freezer;
-    inside.intensity = THREE.MathUtils.clamp(-state.door / 1.2, 0, 1) * 2.4;
+    inside.intensity = THREE.MathUtils.clamp(-state.door / 1.2, 0, 1) * 0.6;
     Object.entries(extras).forEach(([key, extra]) => {
       const goal = extra.userData.goal ?? 0;
       const scale = THREE.MathUtils.damp(extra.scale.x, goal || 0.001, 6, delta);
