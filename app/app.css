@@ -145,7 +145,6 @@ main > header:first-child {
   color: var(--chapter-ink);
   box-shadow: 0 0 0 100vmax var(--chapter);
   clip-path: inset(0 -100vmax);
-  view-transition-name: chapter;
   transition: background-color var(--duration-slow) var(--ease-standard), color var(--duration-slow) var(--ease-standard), box-shadow var(--duration-slow) var(--ease-standard);
 }
 
@@ -840,9 +839,14 @@ main[data-enter] .bento > * {
 .loader.done { transform: translateY(-100%); }
 html:has(.loader:not(.gone)) { overflow: hidden; }
 
-::view-transition-old(root),
-::view-transition-new(root) { animation-duration: var(--duration-base); }
-::view-transition-group(chapter) { animation-duration: var(--duration-slow); animation-timing-function: var(--ease-emphasized); }
+.stage { view-transition-name: stage; }
+.column { view-transition-name: column; }
+::view-transition-old(stage), ::view-transition-new(stage) { animation: none; }
+::view-transition-group(stage) { animation: none; }
+::view-transition-old(column) { animation: column-out 140ms var(--ease-standard) both; }
+::view-transition-new(column) { animation: column-in var(--duration-slow) var(--ease-emphasized) both; }
+@keyframes column-out { to { opacity: 0; } }
+@keyframes column-in { from { opacity: 0; transform: translateY(var(--rise)); } }
 
 @media (prefers-reduced-motion: reduce) {
   .skel, main[data-enter] > *, main[data-enter] .bento > * { animation: none; }
