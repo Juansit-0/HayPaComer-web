@@ -1,6 +1,6 @@
 import { api, freshAccess } from "./api.js";
 import { foodName, formatDay, formatNumber, placeName, plural, t } from "./i18n.js";
-import { shapeClass } from "./stage.js";
+import { focusFood, shapeClass, takeFocusRequest } from "./stage.js";
 import {
   busy,
   daysLeft,
@@ -66,7 +66,7 @@ function shelfChips(fridges) {
 function foodCard(item) {
   const hidden = item.name === "Private food";
   const days = daysLeft(item.expiresOn);
-  return `<li class="food-card">
+  return `<li class="food-card" data-food-id="${esc(item.id)}" tabindex="-1">
     <div class="food-card-top">
       <i class="${shapeClass(item.name)}" aria-hidden="true"></i>
       ${days === null || hidden ? "" : `<span class="days ${days <= 1 ? "attention" : ""}">${esc(whenText(item.expiresOn))}</span>`}
@@ -395,6 +395,34 @@ export async function renderFridge(main, household) {
     </div>`;
 
   const shown = main.querySelector(".fridge-bento");
+  main.querySelectorAll("[data-food-id]").forEach((card) => {
+    const on = () => focusFood(card.dataset.foodId);
+    const off = () => focusFood(null);
+    card.addEventListener("pointerenter", on);
+    card.addEventListener("pointerleave", off);
+    card.addEventListener("focusin", on);
+    card.addEventListener("focusout", off);
+  });
+  const reveal = () => {
+    const itemId = takeFocusRequest();
+    const card = itemId && main.querySelector(`[data-food-id="${CSS.escape(itemId)}"]`);
+    if (!card) return;
+    card.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    card.classList.remove("picked");
+    void card.offsetWidth;
+    card.classList.add("picked");
+    card.focus({ preventScroll: true });
+    focusFood(itemId);
+  };
+  reveal();
+  const onFocusItem = () => {
+    if (!document.body.contains(shown)) {
+      window.removeEventListener("hpc:focus-item", onFocusItem);
+      return;
+    }
+    reveal();
+  };
+  window.addEventListener("hpc:focus-item", onFocusItem);
   let pending;
   const onLive = (event) => {
     if (!document.body.contains(shown)) {

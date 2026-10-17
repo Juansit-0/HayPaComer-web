@@ -1462,3 +1462,26 @@ a.button:active { transform: scale(0.97); }
 .stage-zones .over { color: var(--color-white); }
 .stage-zones [data-zone="use"].over { background: var(--color-cilantro); }
 .stage-zones [data-zone="discard"].over { background: var(--color-tomate); }
+
+/* Fridge-first layout: on the fridge screen the 3D fridge is the interface and the column becomes its panel */
+@media (min-width: 1024px) {
+  .shell { transition: grid-template-columns var(--duration-slow) var(--ease-emphasized); }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) { grid-template-columns: minmax(0, 1fr) clamp(360px, 30vw, 440px); }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .column { box-shadow: -1px 0 0 color-mix(in oklab, var(--color-tinta) 10%, transparent); }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .column main { padding-inline: var(--space-m); }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .fridge-hero { grid-template-columns: minmax(0, 1fr); padding: var(--space-m); }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .fridge-hero h1 { font-size: clamp(40px, 4vw, 56px); }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .fridge-hero .hero-figure { grid-column: 1; grid-row: auto; font-size: clamp(48px, 4.5vw, 64px); }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .fridge-hero .lead { display: none; }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .shelf-chips { flex-wrap: wrap; }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .shelf-chips a { min-height: 40px; padding: 8px 14px; font-size: var(--size-small); }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .shelf-tile header { flex-wrap: wrap; gap: var(--space-s); }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .food-cards { grid-template-columns: minmax(0, 1fr); }
+  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .food-card .value { font-size: 40px; }
+}
+.food-card { scroll-margin: var(--space-xl); }
+.food-card:focus { outline: none; }
+.food-card:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+.food-card.picked { animation: picked 1.2s var(--ease-emphasized); }
+@keyframes picked { 0% { box-shadow: 0 0 0 0 var(--color-papa); } 25% { box-shadow: 0 0 0 6px var(--color-papa); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .food-card.picked { animation: none; box-shadow: 0 0 0 4px var(--color-papa); } }

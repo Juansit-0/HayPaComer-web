@@ -46,6 +46,7 @@ let household = null;
 let pending = null;
 let currentFridge = null;
 let zones = null;
+let focusRequest = null;
 
 export function shapeClass(name) {
   return `food f-${(SHAPES[name] ?? "otro").split(" ").join(" f-")}`;
@@ -292,7 +293,12 @@ function mountThree(element) {
           if (!on) zones?.querySelectorAll(".over").forEach((zone) => zone.classList.remove("over"));
         },
         onPart: (part, data) => {
-          if (part === "fridge" && data.trayId) location.hash = `#/fridge/${data.trayId}`;
+          if (part === "fridge" && data.itemId) focusRequest = data.itemId;
+          if (part === "fridge" && data.trayId) {
+            const target = `#/fridge/${data.trayId}`;
+            if (location.hash === target) window.dispatchEvent(new CustomEvent("hpc:focus-item"));
+            else location.hash = target;
+          }
           else location.hash = `#/${part}`;
         },
       });
@@ -336,6 +342,16 @@ export function mountStage(element) {
   }
 }
 
+export function takeFocusRequest() {
+  const itemId = focusRequest;
+  focusRequest = null;
+  return itemId;
+}
+
+export function focusFood(itemId) {
+  three?.focus(itemId);
+}
+
 export function highlightFoods(names) {
   three?.highlight(names);
 }
@@ -345,6 +361,7 @@ export function showRoute(route) {
   lastRoute = route;
   three?.goTo(route);
   if (route !== "chef") three?.highlight([]);
+  if (route !== "fridge") three?.focus(null);
   root.dataset.route = route;
   root.closest(".stage").dataset.route = route;
   root.querySelectorAll("[data-part]").forEach((part) => {

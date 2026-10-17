@@ -743,6 +743,10 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     state.highlight = new Set(names.map((name) => name.toLowerCase()));
   }
 
+  function focus(itemId) {
+    state.focusId = itemId;
+  }
+
   function setStatus(twin) {
     state.doorAlarm = Boolean(twin?.doorOpen);
     const celsius = twin?.celsius;
@@ -850,7 +854,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     drag.target = null;
     canvas.releasePointerCapture?.(event.pointerId);
     if (!moved) {
-      onPart("fridge", { trayId: item.trayId });
+      onPart("fridge", { trayId: item.trayId, itemId: item.id });
       return;
     }
     const sameTray = target?.kind === "tray" && target.trayId === item.trayId;
@@ -876,7 +880,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     const part = hit?.object.userData.part;
     const item = hit?.object.userData.item;
     if (item) {
-      if (state.route !== "fridge") onPart("fridge", { trayId: item.trayId });
+      if (state.route !== "fridge") onPart("fridge", { trayId: item.trayId, itemId: item.id });
       return;
     }
     if (part && part !== "use" && part !== "discard") onPart(part, hit.object.userData);
@@ -1050,7 +1054,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
         model.userData.push = THREE.MathUtils.damp(model.userData.push ?? 0, pushFor(model), 12, delta);
         model.position.x = model.userData.home.x + model.userData.push;
       }
-      const lit = state.highlight.has(String(model.userData.item?.name ?? "").toLowerCase());
+      const lit = state.highlight.has(String(model.userData.item?.name ?? "").toLowerCase()) || (state.focusId && model.userData.key === state.focusId);
       if (lit || model.userData.lit) {
         const strength = lit ? 0.22 + Math.sin(now / 320) * 0.1 : 0;
         model.traverse((child) => child.isMesh && child.material.emissive?.copy(GLOW).multiplyScalar(strength));
@@ -1082,6 +1086,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     setRings,
     setStatus,
     highlight,
+    focus,
     pick,
     camera,
     scene,
