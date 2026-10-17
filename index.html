@@ -19,34 +19,41 @@
     <div class="loader-shutter"></div>
   </div>
   <a class="skip" href="#main" data-i18n="nav.skip">Skip to content</a>
-  <header class="bar">
-    <a class="brand" href="#/now" data-i18n-label="nav.home">
-      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
-        <rect x="12" y="10" width="8" height="44" rx="3" fill="currentColor"/>
-        <rect x="44" y="10" width="8" height="44" rx="3" fill="currentColor"/>
-        <path d="M8 32 H56" stroke="var(--color-primary)" stroke-width="6" stroke-linecap="round"/>
-        <circle cx="32" cy="19" r="4" fill="var(--color-primary)"/>
-      </svg>
-      <span class="wordmark">HayPaComer</span>
-    </a>
-    <nav class="tabs" data-i18n-label="nav.sections" hidden>
-      <a href="#/now" data-tab="now" data-i18n="nav.now">Now</a>
-      <a href="#/fridge" data-tab="fridge" data-i18n="nav.fridge">Fridge</a>
-      <a href="#/market" data-tab="market" data-i18n="nav.market">Market</a>
-      <a href="#/numbers" data-tab="numbers" data-i18n="nav.numbers">Numbers</a>
-      <a href="#/chef" data-tab="chef" data-i18n="nav.chef">Chef</a>
-    </nav>
-    <div class="session" hidden>
-      <span class="live" data-live data-state="off" role="status" data-i18n="live.connecting">Connecting</span>
-      <a class="inbox" href="#/now" data-inbox data-i18n-label="nav.notifications"></a>
-      <a class="settings-link" href="#/settings" data-tab="settings" data-settings-link data-i18n="nav.settings">Settings</a>
-      <span class="household" data-household></span>
-      <button class="ghost" type="button" data-signout data-i18n="nav.signout">Sign out</button>
+  <div class="shell">
+    <aside class="stage" data-stage-box hidden>
+      <div class="stage-fridge" data-stage></div>
+      <nav class="tabs" data-i18n-label="nav.sections" hidden>
+        <a href="#/now" data-tab="now" data-i18n="nav.now">Now</a>
+        <a href="#/fridge" data-tab="fridge" data-i18n="nav.fridge">Fridge</a>
+        <a href="#/market" data-tab="market" data-i18n="nav.market">Market</a>
+        <a href="#/numbers" data-tab="numbers" data-i18n="nav.numbers">Numbers</a>
+        <a href="#/chef" data-tab="chef" data-i18n="nav.chef">Chef</a>
+      </nav>
+    </aside>
+    <div class="column">
+      <header class="bar">
+        <a class="brand" href="#/now" data-i18n-label="nav.home">
+          <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="12" y="10" width="8" height="44" rx="3" fill="currentColor"/>
+            <rect x="44" y="10" width="8" height="44" rx="3" fill="currentColor"/>
+            <path d="M8 32 H56" stroke="var(--color-primary)" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="32" cy="19" r="4" fill="var(--color-primary)"/>
+          </svg>
+          <span class="wordmark">HayPaComer</span>
+        </a>
+        <div class="session" hidden>
+          <span class="live" data-live data-state="off" role="status" data-i18n="live.connecting">Connecting</span>
+          <a class="inbox" href="#/now" data-inbox data-i18n-label="nav.notifications"></a>
+          <a class="settings-link" href="#/settings" data-tab="settings" data-settings-link data-i18n="nav.settings">Settings</a>
+          <span class="household" data-household></span>
+          <button class="ghost" type="button" data-signout data-i18n="nav.signout">Sign out</button>
+        </div>
+        <label class="language"><span class="visually-hidden" data-i18n="nav.language">Language</span><select data-language></select></label>
+      </header>
+      <p class="notice" role="status" data-degraded hidden></p>
+      <main id="main" tabindex="-1" aria-busy="true"></main>
     </div>
-    <label class="language"><span class="visually-hidden" data-i18n="nav.language">Language</span><select data-language></select></label>
-  </header>
-  <p class="notice" role="status" data-degraded hidden></p>
-  <main id="main" tabindex="-1" aria-busy="true"></main>
+  </div>
   <div class="toast" role="status" aria-live="polite" data-toast></div>
 </body>
 </html>

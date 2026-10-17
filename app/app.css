@@ -431,24 +431,12 @@ input.money { width: var(--number-width-money); }
 
 @media (max-width: 760px) {
   .bar { flex-wrap: wrap; padding: var(--space-xs) var(--space-s); }
-  .tabs {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    justify-content: space-around;
-    background: var(--color-bg);
-    border-top: 1px solid var(--color-border);
-    padding: 4px;
-    z-index: 5;
-  }
   .session .household { display: none; }
-  main { padding: var(--space-m) var(--space-s) 120px; }
+  main { padding: var(--space-m) var(--space-s) var(--space-xxl); }
   .fridge-layout { grid-template-columns: 1fr; }
   .use-first { grid-template-columns: 1fr; padding: var(--space-m); }
   .list > li { grid-template-columns: 1fr; }
   .item-actions { justify-content: start; }
-  .toast { bottom: 96px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -531,10 +519,6 @@ input.money { width: var(--number-width-money); }
 .step-text { font-size: var(--size-h4); margin: 0; }
 .hint { color: var(--color-text-weak); font-size: var(--size-small); margin: 0; }
 .voice-options { align-items: center; }
-@media (max-width: 760px) {
-  .tabs { gap: 0; }
-  .tabs a { flex: 1 1 0; justify-content: center; min-width: 0; padding: 0 2px; font-size: var(--size-small); }
-}
 
 .bento {
   display: grid;
@@ -865,6 +849,50 @@ html:has(.loader:not(.gone)) { overflow: hidden; }
   .loader { transition: opacity 1ms; }
   .loader.done { transform: none; opacity: 0; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none; }
+}
+
+/* Shell: the fridge stage on the left, the chapter column on the right */
+.shell { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 100vh; }
+.column { min-width: 0; overflow-x: clip; }
+.stage {
+  --tint: color-mix(in oklab, var(--chapter) 22%, var(--color-arroz));
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: var(--space-s);
+  padding: var(--space-s);
+  background: var(--tint);
+  transition: background-color var(--duration-slow) var(--ease-standard);
+}
+.stage-fridge { position: relative; display: grid; place-items: center; min-height: 0; height: 320px; perspective: 1400px; }
+.stage .tabs { flex-wrap: wrap; justify-content: center; }
+.stage .tabs a:not([aria-current="page"]) { background: color-mix(in oklab, var(--color-white) 70%, transparent); }
+
+@media (min-width: 1024px) {
+  .shell { grid-template-columns: minmax(380px, 40vw) minmax(0, 1fr); }
+  .stage { height: 100vh; padding: var(--space-l); }
+  .stage-fridge { height: auto; }
+  .column main { max-width: 920px; }
+}
+
+@media (max-width: 1023px) {
+  .shell { display: flex; flex-direction: column; }
+  .column { display: contents; }
+  .bar { order: 1; position: static; }
+  .stage { order: 2; }
+  .notice { order: 3; }
+  .shell main { order: 4; width: 100%; }
+  .stage-fridge { height: 360px; }
+  .bar .live, .bar .language, .bar .household { display: none; }
+  .bar .session { gap: 4px; }
+  .stage { transition: background-color var(--duration-slow) var(--ease-standard), padding var(--duration-base) var(--ease-standard); }
+  .stage-fridge { transition: height var(--duration-base) var(--ease-emphasized), opacity var(--duration-base); }
+  .stage.compact { padding-block: var(--space-xs); }
+  .stage.compact .stage-fridge { height: 0; opacity: 0; pointer-events: none; }
+  .stage .tabs { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
+  .stage .tabs a { flex: none; }
 }
 
 /* The fridge: flat by default, 3D on desktop. Drawn at 250 x 480 and scaled to fit. */

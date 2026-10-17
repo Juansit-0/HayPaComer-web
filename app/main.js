@@ -8,12 +8,14 @@ import { connectLive, disconnectLive } from "./live.js";
 import { renderNow } from "./now.js";
 import { renderSettings } from "./settings.js";
 import { openInbox } from "./inbox.js";
+import { mountStage, refreshStage, refreshStageSoon, showRoute } from "./stage.js";
 import { currentLocale, loadLocale, locales, plural, t, translatePage } from "./i18n.js";
 import { errorText, esc, skeleton } from "./ui.js";
 
 const main = document.getElementById("main");
 const loader = document.querySelector("[data-loader]");
 const tabs = document.querySelector(".tabs");
+const stageBox = document.querySelector("[data-stage-box]");
 const sessionBar = document.querySelector(".session");
 const views = {
   now: renderNow,
@@ -28,6 +30,7 @@ const views = {
   }),
 };
 let household = null;
+let stageHousehold = null;
 
 function current() {
   const route = location.hash.replace("#/", "");
@@ -60,7 +63,7 @@ function progress(value) {
 
 function paint(update) {
   if (!document.startViewTransition || !loader.classList.contains("gone")) return update();
-  document.startViewTransition(update);
+  document.startViewTransition(update).ready.catch(() => null);
 }
 
 function enter() {
@@ -75,6 +78,7 @@ function enter() {
 async function render() {
   if (!session.signedIn) {
     tabs.hidden = true;
+    stageBox.hidden = true;
     sessionBar.hidden = true;
     renderSignIn(main, render);
     return;
@@ -88,10 +92,19 @@ async function render() {
   }
   tabs.hidden = false;
   sessionBar.hidden = false;
+  if (stageBox.hidden) {
+    stageBox.hidden = false;
+    if (!stageHousehold) mountStage(document.querySelector("[data-stage]"));
+  }
+  if (stageHousehold !== household.id) {
+    stageHousehold = household.id;
+    refreshStage(household);
+  }
   connectLive(household.id);
   document.querySelector("[data-household]").innerHTML = householdLabel(household);
   const route = current();
   document.documentElement.dataset.chapter = route;
+  showRoute(route);
   main.setAttribute("aria-busy", "true");
   paint(() => {
     main.innerHTML = skeleton(route, t(`nav.${route}`));
@@ -125,6 +138,7 @@ window.addEventListener("hpc:live-state", (event) => {
 
 window.addEventListener("hpc:live", (event) => {
   if (event.detail.kind === "alert") refreshInbox();
+  else refreshStageSoon();
 });
 
 window.addEventListener("hpc:session-changed", (event) => {
