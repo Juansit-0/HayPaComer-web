@@ -14,6 +14,10 @@
   <script type="module" src="/app/main.js"></script>
 </head>
 <body>
+  <div class="loader" data-loader aria-hidden="true">
+    <div class="loader-word"><span>HayPaComer</span><span class="loader-fill">HayPaComer</span></div>
+    <div class="loader-shutter"></div>
+  </div>
   <a class="skip" href="#main" data-i18n="nav.skip">Skip to content</a>
   <header class="bar">
     <a class="brand" href="#/now" data-i18n-label="nav.home">
@@ -42,7 +46,7 @@
     <label class="language"><span class="visually-hidden" data-i18n="nav.language">Language</span><select data-language></select></label>
   </header>
   <p class="notice" role="status" data-degraded hidden></p>
-  <main id="main" tabindex="-1"></main>
+  <main id="main" tabindex="-1" aria-busy="true"></main>
   <div class="toast" role="status" aria-live="polite" data-toast></div>
 </body>
 </html>

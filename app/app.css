@@ -794,3 +794,49 @@ dialog.sheet[open] { animation: sheet-in var(--duration-slow) var(--ease-standar
 .inbox-item p { margin: 0; white-space: pre-line; }
 .inbox-item button { justify-self: start; }
 .inbox-empty { margin: 0; color: var(--color-text-weak); }
+
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  align-content: end;
+  padding: 0 max(16px, env(safe-area-inset-left, 0px)) max(3vw, env(safe-area-inset-bottom, 0px));
+  background: var(--color-bg);
+  overflow: hidden;
+  transition: transform var(--duration-shutter) var(--ease-emphasized) var(--duration-shutter);
+}
+.loader-word {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: 19.5vw;
+  line-height: 0.9;
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--color-meson-strong);
+}
+.loader-fill {
+  position: absolute;
+  inset: 0;
+  color: var(--color-text);
+  clip-path: inset(calc((1 - var(--p, 0)) * 100%) 0 0 0);
+  transition: clip-path var(--duration-slow) var(--ease-emphasized);
+}
+.loader-shutter {
+  position: absolute;
+  inset: 0;
+  background: var(--chapter);
+  transform: translateY(100%);
+  transition: transform var(--duration-shutter) var(--ease-emphasized);
+}
+.loader.done .loader-shutter { transform: translateY(0); }
+.loader.done { transform: translateY(-100%); }
+html:has(.loader:not(.gone)) { overflow: hidden; }
+
+.loader.gone { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .loader { transition: opacity 1ms; }
+  .loader.done { transform: none; opacity: 0; }
+}

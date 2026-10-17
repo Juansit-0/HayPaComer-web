@@ -12,6 +12,7 @@ import { currentLocale, loadLocale, locales, plural, t, translatePage } from "./
 import { errorText, esc } from "./ui.js";
 
 const main = document.getElementById("main");
+const loader = document.querySelector("[data-loader]");
 const tabs = document.querySelector(".tabs");
 const sessionBar = document.querySelector(".session");
 const views = {
@@ -53,6 +54,10 @@ async function refreshStatus() {
   notice.hidden = false;
 }
 
+function progress(value) {
+  loader.style.setProperty("--p", value);
+}
+
 async function render() {
   if (!session.signedIn) {
     tabs.hidden = true;
@@ -79,6 +84,7 @@ async function render() {
   });
   try {
     await views[route](main, household);
+    main.setAttribute("aria-busy", "false");
     refreshInbox();
     refreshStatus();
   } catch (error) {
@@ -153,6 +159,13 @@ languageSelect.addEventListener("change", async () => {
   await render();
 });
 
-await loadLocale();
+progress(0.2);
+await Promise.all([loadLocale(), document.fonts.load("1em Anton").catch(() => null)]);
+progress(0.6);
 drawLanguages();
-render();
+await render();
+progress(1);
+setTimeout(() => {
+  loader.classList.add("done");
+  setTimeout(() => loader.classList.add("gone"), 2400);
+}, 450);
