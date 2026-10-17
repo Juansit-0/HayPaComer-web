@@ -45,6 +45,7 @@ let lastRoute = "now";
 let household = null;
 let pending = null;
 let currentFridge = null;
+let zones = null;
 
 export function shapeClass(name) {
   return `food f-${(SHAPES[name] ?? "otro").split(" ").join(" f-")}`;
@@ -275,6 +276,21 @@ function mountThree(element) {
         labels: { market: t("nav.market") },
         describe: (item) => (item.days !== null && 2 >= item.days ? `${grams(item.grams)}, ${whenText(item.expiresOn)}` : grams(item.grams)),
         onDrop: act,
+        zoneAt: (x, y) => {
+          if (!zones?.classList.contains("open")) return null;
+          let found = null;
+          zones?.querySelectorAll("[data-zone]").forEach((zone) => {
+            const box = zone.getBoundingClientRect();
+            const over = x >= box.left && box.right >= x && y >= box.top && box.bottom >= y;
+            zone.classList.toggle("over", over);
+            if (over) found = zone.dataset.zone;
+          });
+          return found;
+        },
+        onDragging: (on) => {
+          zones?.classList.toggle("open", on);
+          if (!on) zones?.querySelectorAll(".over").forEach((zone) => zone.classList.remove("over"));
+        },
         onPart: (part, data) => {
           if (part === "fridge" && data.trayId) location.hash = `#/fridge/${data.trayId}`;
           else location.hash = `#/${part}`;
@@ -282,6 +298,11 @@ function mountThree(element) {
       });
       three.goTo(lastRoute);
       palette(element.closest(".stage"), canvas);
+      zones = document.createElement("div");
+      zones.className = "stage-zones";
+      zones.setAttribute("aria-hidden", "true");
+      zones.innerHTML = `<span data-zone="use">${t("fridge.use")}</span><span data-zone="discard">${t("fridge.discard")}</span>`;
+      canvas.after(zones);
       return three;
     })
     .catch(() => {
@@ -325,6 +346,7 @@ export function showRoute(route) {
   three?.goTo(route);
   if (route !== "chef") three?.highlight([]);
   root.dataset.route = route;
+  root.closest(".stage").dataset.route = route;
   root.querySelectorAll("[data-part]").forEach((part) => {
     if (part.dataset.part === route) part.setAttribute("aria-current", "page");
     else part.removeAttribute("aria-current");

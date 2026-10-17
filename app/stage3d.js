@@ -375,7 +375,7 @@ function puffTexture() {
 
 const spring = (k) => 1 - Math.cos(k * Math.PI * 2.5) * Math.exp(-k * 6);
 
-export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) {
+export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zoneAt, onDragging }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.toneMapping = THREE.NoToneMapping;
@@ -761,6 +761,8 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
   const point = new THREE.Vector3();
 
   const dropTargetAt = (x, y) => {
+    const zone = zoneAt?.(x, y);
+    if (zone) return { kind: zone, object: zone === "use" ? pot : bin };
     const box = canvas.getBoundingClientRect();
     state.pointer.set(((x - box.left) / box.width) * 2 - 1, -((y - box.top) / box.height) * 2 + 1);
     raycaster.setFromCamera(state.pointer, camera);
@@ -784,7 +786,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
   canvas.addEventListener("pointerdown", (event) => {
     const hit = pick(event.clientX, event.clientY);
     const item = hit?.object.userData.item;
-    if (!item || !item.usable) return;
+    if (!item || !item.usable || state.route !== "fridge") return;
     let model = hit.object;
     while (model.parent && model.parent !== items && model.parent !== doorItems) model = model.parent;
     drag.model = model;
@@ -802,6 +804,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     state.tilt.set((event.clientX - box.left) / box.width - 0.5, (event.clientY - box.top) / box.height - 0.5);
     if (drag.model) {
       if (!drag.moved && drag.start.distanceTo(new THREE.Vector2(event.clientX, event.clientY)) < 6) return;
+      if (!drag.moved) onDragging?.(true);
       drag.moved = true;
       state.tilt.set(0, 0);
       state.pointer.set(((event.clientX - box.left) / box.width) * 2 - 1, -((event.clientY - box.top) / box.height) * 2 + 1);
@@ -827,13 +830,15 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     let hovered = hit?.object.userData.item ? hit.object : null;
     while (hovered && hovered.parent !== items && hovered.parent !== doorItems) hovered = hovered.parent;
     state.hoverModel = hovered;
-    canvas.style.cursor = hit?.object.userData.item?.usable ? "grab" : state.hover ? "pointer" : "default";
+    const grabbable = hit?.object.userData.item?.usable && state.route === "fridge";
+    canvas.style.cursor = grabbable ? "grab" : hit?.object.userData.item || state.hover ? "pointer" : "default";
   });
 
   canvas.addEventListener("pointerup", (event) => {
     if (!drag.model) return;
     const { model, item, target, moved } = drag;
     glow(target, false);
+    if (moved) onDragging?.(false);
     land(null);
     queueMicrotask(() => {
       if (!deferred || drag.model) return;
@@ -869,7 +874,11 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe }) 
     }
     const hit = pick(event.clientX, event.clientY);
     const part = hit?.object.userData.part;
-    if (hit?.object.userData.item) return;
+    const item = hit?.object.userData.item;
+    if (item) {
+      if (state.route !== "fridge") onPart("fridge", { trayId: item.trayId });
+      return;
+    }
     if (part && part !== "use" && part !== "discard") onPart(part, hit.object.userData);
   });
 
