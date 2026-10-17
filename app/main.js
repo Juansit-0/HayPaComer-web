@@ -7,6 +7,7 @@ import { renderMarket } from "./market.js";
 import { connectLive, disconnectLive } from "./live.js";
 import { renderNow } from "./now.js";
 import { renderSettings } from "./settings.js";
+import { renderLanding } from "./landing.js";
 import { openInbox } from "./inbox.js";
 import { mountStage, refreshStage, refreshStageSoon, showRoute } from "./stage.js";
 import { currentLocale, loadLocale, locales, plural, t, translatePage } from "./i18n.js";
@@ -80,7 +81,11 @@ async function render() {
     tabs.hidden = true;
     stageBox.hidden = true;
     sessionBar.hidden = true;
-    renderSignIn(main, render);
+    const route = location.hash.replace("#/", "").split("/")[0];
+    document.documentElement.dataset.chapter = "now";
+    if (route === "signin" || route === "register") renderSignIn(main, render, route);
+    else renderLanding(main);
+    main.setAttribute("aria-busy", "false");
     return;
   }
   if (!household) {

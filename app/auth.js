@@ -15,8 +15,8 @@ function poster(content) {
   </section>`;
 }
 
-export function renderSignIn(main, onDone) {
-  let mode = "signin";
+export function renderSignIn(main, onDone, initial = "signin") {
+  let mode = initial;
   const draw = () => {
     const creating = mode === "register";
     main.innerHTML = poster(`
