@@ -1048,3 +1048,52 @@ html:has(.loader:not(.gone)) { overflow: hidden; }
   .fridge, .fridge .part, .fridge .door, .rings .ring { transition: none; }
   :root[data-chapter="numbers"] .rings .ring { animation: none; }
 }
+
+/* Now: the question, its answer as dish posters, then what to use today */
+.now-hero h1 { font-size: clamp(56px, 8.4vw, 152px); line-height: 0.88; }
+.now-hero .lead { max-width: 40ch; }
+.dish-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-m); }
+.dish-card { display: grid; gap: var(--space-s); align-content: start; min-width: 0; animation: rise var(--duration-slow) var(--ease-emphasized) both; animation-delay: calc(var(--i, 0) * var(--stagger)); }
+.dish-photo { margin: 0; display: grid; gap: 6px; }
+.dish-photo img { width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; border-radius: var(--radius-20); background: var(--color-meson); display: block; transition: transform var(--duration-slow) var(--ease-emphasized); }
+.dish-card:hover .dish-photo img { transform: scale(1.02); }
+.dish-photo figcaption { font-size: 12px; color: var(--color-text-weak); }
+.dish-plate { aspect-ratio: 4 / 5; border-radius: var(--radius-20); background: var(--color-papa); display: grid; place-items: center; }
+.dish-plate .plate { width: 72%; aspect-ratio: 1; border-radius: 50%; background: var(--color-white); display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 8px; padding: 18%; box-shadow: inset 0 0 0 10px var(--color-meson); }
+.dish-body { display: grid; gap: var(--space-xs); justify-items: start; }
+.dish-body h3 { font: 400 clamp(26px, 2.4vw, 36px)/0.95 var(--font-display); text-transform: uppercase; letter-spacing: var(--tracking-display); }
+.dish-meta { display: flex; flex-wrap: wrap; gap: var(--space-s); align-items: center; color: var(--color-text-weak); margin: 0; }
+.dish-meta .data { color: var(--color-text); font-weight: 700; }
+.dish-rescue { margin: 0; font-weight: 600; color: var(--color-cilantro); }
+.dish-foods { margin: 0; color: var(--color-text-weak); }
+.dish-foods .missing { color: var(--color-attention); font-weight: 600; }
+.dish-body .primary { margin-top: var(--space-xs); }
+.dish-card.skel { padding: 0; background: none; animation: skel-pulse 1.4s var(--ease-standard) infinite; animation-delay: calc(var(--i, 0) * var(--stagger)); }
+.skel-photo { display: block; aspect-ratio: 4 / 5; border-radius: var(--radius-20); background: var(--skeleton); }
+
+.adjust summary { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; }
+.adjust form { margin-top: var(--space-s); }
+
+.today { display: grid; gap: var(--space-m); }
+.today h2, .summary-row h2 { font: 400 clamp(32px, 3.4vw, 48px)/1 var(--font-display); text-transform: uppercase; }
+.today-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-s); }
+.today-card { display: grid; gap: var(--space-xs); align-content: start; padding: var(--space-m); border-radius: var(--radius-20); background: var(--color-surface); }
+.today-grams { font: 700 var(--size-figure)/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+.today-card .item-name { font-size: var(--size-h4); }
+.today-use { display: flex; gap: var(--space-xs); margin-top: var(--space-xs); }
+.today-use input.grams { width: 6ch; }
+
+.summary-row { display: grid; gap: var(--space-m); }
+.summary-figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-s); }
+.summary-figures .kpi { padding: var(--space-m); border-radius: var(--radius-20); background: var(--color-surface); }
+.summary-figures .kpi .value { font-weight: 700; letter-spacing: -0.03em; }
+
+@media (max-width: 760px) {
+  .dish-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 78%; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: var(--space-xs); scrollbar-width: none; }
+  .dish-card { scroll-snap-align: start; }
+  .summary-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dish-card, .dish-card.skel { animation: none; }
+  .dish-card:hover .dish-photo img { transform: none; }
+}
