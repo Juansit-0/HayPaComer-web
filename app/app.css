@@ -178,11 +178,29 @@ button, .button {
   background: var(--button-secondary-bg);
   color: var(--button-secondary-fg);
   cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
 }
 
 button:hover { background: var(--button-secondary-bg-hover); }
+button:active:not(:disabled) { transform: scale(0.97); }
+button:disabled { cursor: progress; opacity: 0.6; }
+button[aria-busy="true"] { position: relative; color: transparent; }
+button[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-color: var(--spin, var(--color-text)) transparent var(--spin, var(--color-text)) var(--spin, var(--color-text));
+  animation: spin 700ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(1turn); } }
 
 button.primary {
+  --spin: var(--button-primary-fg);
   background: var(--button-primary-bg);
   color: var(--button-primary-fg);
   border-color: transparent;

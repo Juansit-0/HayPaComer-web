@@ -221,3 +221,14 @@ export function openSheet(title, body, onReady) {
   onReady?.(dialog);
   return dialog;
 }
+
+export async function busy(button, task) {
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  try {
+    return await task();
+  } finally {
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+  }
+}
