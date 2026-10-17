@@ -1129,7 +1129,9 @@ html:has(.loader:not(.gone)) { overflow: hidden; }
 .food-card .days.attention { background: var(--color-tomate); color: var(--color-arroz); }
 .food-card .value { font: 700 var(--size-figure)/1 var(--font-body); letter-spacing: -0.03em; }
 @media (max-width: 760px) {
-  .fridge-hero { grid-template-columns: minmax(0, 1fr); }
+  .fridge-hero, .market-hero { grid-template-columns: minmax(0, 1fr); }
+  .market-hero .hero-figure { grid-column: 1; grid-row: auto; justify-items: start; }
+  .market-hero .hero-figure .data { font-size: 56px; }
   .fridge-hero .hero-figure { grid-column: 1; grid-row: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1463,25 +1465,75 @@ a.button:active { transform: scale(0.97); }
 .stage-zones [data-zone="use"].over { background: var(--color-cilantro); }
 .stage-zones [data-zone="discard"].over { background: var(--color-tomate); }
 
-/* Fridge-first layout: on the fridge screen the 3D fridge is the interface and the column becomes its panel */
-@media (min-width: 1024px) {
-  .shell { transition: grid-template-columns var(--duration-slow) var(--ease-emphasized); }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) { grid-template-columns: minmax(0, 1fr) clamp(360px, 30vw, 440px); }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .column { box-shadow: -1px 0 0 color-mix(in oklab, var(--color-tinta) 10%, transparent); }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .column main { padding-inline: var(--space-m); }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .fridge-hero { grid-template-columns: minmax(0, 1fr); padding: var(--space-m); }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .fridge-hero h1 { font-size: clamp(40px, 4vw, 56px); }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .fridge-hero .hero-figure { grid-column: 1; grid-row: auto; font-size: clamp(48px, 4.5vw, 64px); }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .fridge-hero .lead { display: none; }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .shelf-chips { flex-wrap: wrap; }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .shelf-chips a { min-height: 40px; padding: 8px 14px; font-size: var(--size-small); }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .shelf-tile header { flex-wrap: wrap; gap: var(--space-s); }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .food-cards { grid-template-columns: minmax(0, 1fr); }
-  :root[data-chapter="fridge"] .shell:has(.stage.has-three) .food-card .value { font-size: 40px; }
-}
 .food-card { scroll-margin: var(--space-xl); }
 .food-card:focus { outline: none; }
 .food-card:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
 .food-card.picked { animation: picked 1.2s var(--ease-emphasized); }
 @keyframes picked { 0% { box-shadow: 0 0 0 0 var(--color-papa); } 25% { box-shadow: 0 0 0 6px var(--color-papa); } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .food-card.picked { animation: none; box-shadow: 0 0 0 4px var(--color-papa); } }
+
+/* Fridge-first: on desktop with the 3D fridge, the fridge is the interface and the column is the panel of the part you opened */
+@media (min-width: 1024px) {
+  .shell:has(.stage.has-three:not([hidden])) { grid-template-columns: minmax(0, 1fr) clamp(400px, 36vw, 540px); }
+  .shell:has(.stage.has-three:not([hidden])) .column { position: relative; z-index: 7; background: var(--color-bg); box-shadow: -1px 0 0 color-mix(in oklab, var(--color-tinta) 12%, transparent), -24px 0 48px -32px color-mix(in oklab, var(--color-tinta) 30%, transparent); }
+  .shell:has(.stage.has-three:not([hidden])) .column main { container: panel / inline-size; max-width: none; padding-inline: var(--space-m); }
+  .shell:has(.stage.has-three:not([hidden])) .bar { flex-wrap: nowrap; gap: var(--space-s); padding-inline: var(--space-m); }
+  .shell:has(.stage.has-three:not([hidden])) .bar .wordmark { font-size: 22px; }
+  .shell:has(.stage.has-three:not([hidden])) .bar .session { gap: var(--space-s); margin-left: auto; }
+  .shell:has(.stage.has-three:not([hidden])) .bar .language { display: none; }
+  .shell:has(.stage.has-three:not([hidden])) .bar .household { display: none; }
+  .shell:has(.stage.has-three:not([hidden])) main > header:first-child { min-height: 0; padding-block: var(--space-l) var(--space-m); }
+  .shell:has(.stage.has-three:not([hidden])) main > header:first-child h1,
+  .shell:has(.stage.has-three:not([hidden])) .now-hero h1 { font-size: clamp(40px, 3.4vw, 60px); line-height: 0.92; }
+}
+
+/* Inside the panel, layouts answer to the panel width, not the window */
+@container panel (max-width: 620px) {
+  .bento { grid-template-columns: minmax(0, 1fr); }
+  .bento > *, .bento > [class*="w-"] { grid-column: 1 / -1; }
+  .dish-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-s); }
+  .dish-row .dish-card { grid-template-columns: 112px minmax(0, 1fr); align-items: center; }
+  .dish-row .dish-photo img, .dish-row .dish-plate { aspect-ratio: 1; }
+  .dish-row .dish-photo figcaption { display: none; }
+  .dish-row .dish-card h3 { font-size: var(--size-h3); }
+  .summary-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .today-list { grid-template-columns: minmax(0, 1fr); }
+  .fridge-hero, .market-hero { grid-template-columns: minmax(0, 1fr); }
+  .market-hero .hero-figure { grid-column: 1; grid-row: auto; justify-items: start; }
+  .market-hero .hero-figure .data { font-size: 56px; }
+  .fridge-hero .hero-figure { grid-column: 1; grid-row: auto; font-size: 56px; }
+  .fridge-hero .lead { display: none; }
+  .shelf-chips { flex-wrap: wrap; }
+  .shelf-chips a { min-height: 40px; padding: 8px 14px; font-size: var(--size-small); }
+  .shelf-tile header { flex-wrap: wrap; gap: var(--space-s); }
+  .food-cards { grid-template-columns: minmax(0, 1fr); }
+  .numbers-head { display: grid; }
+  .numbers-hero { grid-template-columns: minmax(0, 1fr); }
+  .numbers-money { font-size: 64px; }
+  .numbers-rings { gap: var(--space-xs); }
+  .ring { padding: var(--space-s) 6px; }
+  .ring-hint { display: none; }
+  .chat > li { max-width: 92%; }
+}
+
+/* The leader: a line from the part of the fridge you opened to its panel */
+.stage-leader { display: none; }
+@media (min-width: 1024px) {
+  .stage.has-three .stage-leader { display: block; position: absolute; top: var(--anchor-y, 50%); left: var(--anchor-x, 50%); right: 0; height: 0; border-top: 2px dashed color-mix(in oklab, var(--chapter-ink, var(--color-tinta)) 55%, var(--chapter)); pointer-events: none; transform-origin: right center; transition: opacity var(--duration-base) var(--ease-standard); }
+  .stage.has-three .stage-leader::before { content: ""; position: absolute; left: -6px; top: -7px; width: 12px; height: 12px; border-radius: 50%; background: var(--chapter); box-shadow: 0 0 0 3px var(--color-white); }
+  .stage.has-three .stage-leader::after { content: ""; position: absolute; right: -1px; top: -11px; border: 10px solid transparent; border-right: 12px solid var(--color-bg); border-left: 0; }
+  .stage.has-three .stage-leader.hidden { opacity: 0; }
+  .stage.has-three .stage-leader.draw { animation: leader-draw 520ms var(--ease-emphasized) both; }
+}
+@keyframes leader-draw { from { transform: scaleX(0); } }
+
+/* Moving between parts: the old panel slides back into the fridge, the new one slides out of it */
+@media (min-width: 1024px) {
+  :root:has(.stage.has-three:not([hidden]))::view-transition-old(column) { animation: panel-out 180ms var(--ease-standard) both; }
+  :root:has(.stage.has-three:not([hidden]))::view-transition-new(column) { animation: panel-in 460ms var(--ease-emphasized) 60ms both; }
+}
+@keyframes panel-out { to { opacity: 0; transform: translateX(-28px); } }
+@keyframes panel-in { from { opacity: 0; transform: translateX(-56px); } }
+@media (prefers-reduced-motion: reduce) {
+  .stage.has-three .stage-leader.draw { animation: none; }
+}

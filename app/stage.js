@@ -46,6 +46,7 @@ let household = null;
 let pending = null;
 let currentFridge = null;
 let zones = null;
+let leader = null;
 let focusRequest = null;
 
 export function shapeClass(name) {
@@ -270,6 +271,10 @@ function mountThree(element) {
   canvas.className = "stage-canvas";
   canvas.setAttribute("aria-hidden", "true");
   element.after(canvas);
+  leader = document.createElement("span");
+  leader.className = "stage-leader hidden";
+  leader.setAttribute("aria-hidden", "true");
+  canvas.after(leader);
   element.closest(".stage").classList.add("has-three");
   threeReady = import("./stage3d.js")
     .then(({ createFridgeScene }) => {
@@ -277,6 +282,12 @@ function mountThree(element) {
         labels: { market: t("nav.market") },
         describe: (item) => (item.days !== null && 2 >= item.days ? `${grams(item.grams)}, ${whenText(item.expiresOn)}` : grams(item.grams)),
         onDrop: act,
+        onAnchor: (x, y, inside) => {
+          const box = element.closest(".stage");
+          box.style.setProperty("--anchor-x", `${x}px`);
+          box.style.setProperty("--anchor-y", `${y}px`);
+          leader?.classList.toggle("hidden", !inside);
+        },
         zoneAt: (x, y) => {
           if (!zones?.classList.contains("open")) return null;
           let found = null;
@@ -362,6 +373,11 @@ export function showRoute(route) {
   three?.goTo(route);
   if (route !== "chef") three?.highlight([]);
   if (route !== "fridge") three?.focus(null);
+  if (leader) {
+    leader.classList.remove("draw");
+    void leader.offsetWidth;
+    leader.classList.add("draw");
+  }
   root.dataset.route = route;
   root.closest(".stage").dataset.route = route;
   root.querySelectorAll("[data-part]").forEach((part) => {

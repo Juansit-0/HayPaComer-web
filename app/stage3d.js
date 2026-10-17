@@ -13,10 +13,10 @@ const DOOR_OPEN = -1.92;
 const VIEWS = {
   now: { position: [1.2, 1.35, 2.7], target: [0.2, 0.85, 0], door: DOOR_OPEN, freezer: 0 },
   fridge: { position: [0.2, 0.78, 1.32], target: [0, 0.58, 0], door: DOOR_OPEN, freezer: 0 },
-  market: { position: [0.42, 1.48, 1.02], target: [0.1, 1.42, 0.34], door: -0.5, freezer: 0 },
-  numbers: { position: [0.55, 1.62, 1.45], target: [0, 1.42, 0.25], door: -0.4, freezer: -1.7 },
+  market: { position: [0.62, 1.52, 1.48], target: [0.08, 1.4, 0.3], door: -0.5, freezer: 0 },
+  numbers: { position: [0.72, 1.66, 1.85], target: [0, 1.4, 0.25], door: -0.4, freezer: -1.7 },
   chef: { position: [0.62, 0.92, 1.45], target: [0, 0.62, 0], door: DOOR_OPEN, freezer: 0 },
-  settings: { position: [0.2, 1.06, 0.82], target: [0, 1.02, -0.2], door: DOOR_OPEN, freezer: 0 },
+  settings: { position: [0.32, 1.02, 1.12], target: [0, 0.98, -0.2], door: DOOR_OPEN, freezer: 0 },
 };
 
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#cccccc";
@@ -375,7 +375,7 @@ function puffTexture() {
 
 const spring = (k) => 1 - Math.cos(k * Math.PI * 2.5) * Math.exp(-k * 6);
 
-export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zoneAt, onDragging }) {
+export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zoneAt, onDragging, onAnchor }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.toneMapping = THREE.NoToneMapping;
@@ -932,6 +932,20 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   new ResizeObserver(resize).observe(canvas);
   resize();
 
+  const anchors = () => ({ now: extras.now, fridge: shelfSlots[1].slab, market: note, numbers: extras.numbers, chef: shelfSlots[0].slab, settings: knob });
+  const lastAnchor = { x: -1, y: -1, inside: null };
+  function anchor() {
+    const part = anchors()[state.route];
+    if (!part || !onAnchor) return;
+    const spot = part.getWorldPosition(new THREE.Vector3()).project(camera);
+    const x = Math.round(canvas.offsetLeft + ((spot.x + 1) / 2) * canvas.clientWidth);
+    const y = Math.round(canvas.offsetTop + ((1 - spot.y) / 2) * canvas.clientHeight);
+    const inside = spot.z < 1 && Math.abs(spot.x) <= 1 && Math.abs(spot.y) <= 1;
+    if (x === lastAnchor.x && y === lastAnchor.y && inside === lastAnchor.inside) return;
+    Object.assign(lastAnchor, { x, y, inside });
+    onAnchor(x, y, inside);
+  }
+
   const STACK = [0, -1, -2];
   function placeTags(show) {
     const placed = [];
@@ -981,7 +995,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       state.freezer = THREE.MathUtils.lerp(state.tween.from.freezer, state.tween.to.freezer, k);
       if (progress === 1) state.tween = null;
     }
-    const reach = Math.max(1, 1.05 / camera.aspect);
+    const reach = Math.max(1.32, 1.05 / camera.aspect);
     camera.position.set(
       state.target.x + (state.position.x - state.target.x) * reach + state.tilt.x * 0.12,
       state.target.y + (state.position.y - state.target.y) * reach - state.tilt.y * 0.08,
@@ -1074,6 +1088,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       element.style.transform = `translate(${((spot.x + 1) / 2) * canvas.clientWidth - 14}px, ${((1 - spot.y) / 2) * canvas.clientHeight}px) translate(-100%, -50%)`;
     });
     placeTags(fridgeTags);
+    anchor();
 
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
