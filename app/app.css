@@ -1552,3 +1552,12 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 .freezer-text b { font-size: 19px; }
 .land-wordmark { font-size: 12vw; }
 :where(.fridge .part-name, .freezer-text b, .dish-body h3, .today h2, .summary-row h2, .shelf-tile > header h2, .notepad > h2, .cooking .cooking-step, .auth-question, .chapter h2, .kit-text b, .how-clause, .land-wordmark, .numbers-money, .wordmark) { font-weight: 900; font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1; }
+
+/* Ink transitions: the panel is revealed and withdrawn behind a ragged ink-brush edge that starts at the fridge */
+@property --ink { syntax: "<percentage>"; inherits: false; initial-value: 112%; }
+@media (min-width: 1024px) {
+  .shell:has(.stage.has-three:not([hidden])) .column {
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M0 0 L93.9 0.0 L91.5 2.1 L96.5 4.2 L91.7 6.2 L95.4 8.3 L93.7 10.4 L91.5 12.5 L95.1 14.6 L90.4 16.7 L94.9 18.8 L90.7 20.8 L90.9 22.9 L94.8 25.0 L98.3 27.1 L91.2 29.2 L93.0 31.2 L96.3 33.3 L99.5 35.4 L96.2 37.5 L94.0 39.6 L99.8 41.7 L91.4 43.8 L98.6 45.8 L92.9 47.9 L92.3 50.0 L91.2 52.1 L93.1 54.2 L98.3 56.2 L91.8 58.3 L95.8 60.4 L96.8 62.5 L93.7 64.6 L95.5 66.7 L91.6 68.8 L90.6 70.8 L92.1 72.9 L97.1 75.0 L94.3 77.1 L93.1 79.2 L96.3 81.2 L94.5 83.3 L93.0 85.4 L98.1 87.5 L97.0 89.6 L92.4 91.7 L96.2 93.8 L95.3 95.8 L98.8 97.9 L97.6 100.0 L0 100Z'/%3E%3C/svg%3E") left top / var(--ink) 100% no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M0 0 L93.9 0.0 L91.5 2.1 L96.5 4.2 L91.7 6.2 L95.4 8.3 L93.7 10.4 L91.5 12.5 L95.1 14.6 L90.4 16.7 L94.9 18.8 L90.7 20.8 L90.9 22.9 L94.8 25.0 L98.3 27.1 L91.2 29.2 L93.0 31.2 L96.3 33.3 L99.5 35.4 L96.2 37.5 L94.0 39.6 L99.8 41.7 L91.4 43.8 L98.6 45.8 L92.9 47.9 L92.3 50.0 L91.2 52.1 L93.1 54.2 L98.3 56.2 L91.8 58.3 L95.8 60.4 L96.8 62.5 L93.7 64.6 L95.5 66.7 L91.6 68.8 L90.6 70.8 L92.1 72.9 L97.1 75.0 L94.3 77.1 L93.1 79.2 L96.3 81.2 L94.5 83.3 L93.0 85.4 L98.1 87.5 L97.0 89.6 L92.4 91.7 L96.2 93.8 L95.3 95.8 L98.8 97.9 L97.6 100.0 L0 100Z'/%3E%3C/svg%3E") left top / var(--ink) 100% no-repeat;
+  }
+}

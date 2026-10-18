@@ -69,10 +69,12 @@ function paint(update) {
   if (stageBox.classList.contains("has-three") && !stageBox.hidden) {
     const column = document.querySelector(".column");
     if (still.matches) return Promise.resolve(update());
-    return column.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateX(-28px)" }], { duration: 160, easing: "cubic-bezier(.4,0,1,1)", fill: "forwards" }).finished.then(() => {
+    const withdraw = column.animate([{ "--ink": "112%" }, { "--ink": "0.5%" }], { duration: 240, easing: "cubic-bezier(.5,0,.9,.4)", fill: "forwards" });
+    return withdraw.finished.then(() => {
       update();
-      column.animate([{ opacity: 0, transform: "translateX(-56px)" }, { opacity: 1, transform: "none" }], { duration: 460, easing: "cubic-bezier(.2,.8,.2,1)", fill: "none" });
-      column.getAnimations().filter((animation) => animation.effect.getComputedTiming().fill === "forwards").forEach((animation) => animation.cancel());
+      column.scrollTop = 0;
+      column.animate([{ "--ink": "0.5%" }, { "--ink": "112%" }], { duration: 620, easing: "cubic-bezier(.16,.84,.3,1)" });
+      withdraw.cancel();
     });
   }
   if (!document.startViewTransition) return Promise.resolve(update());
