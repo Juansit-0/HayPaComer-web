@@ -515,3 +515,137 @@ export function createStory(canvas) {
     },
   };
 }
+
+function stocked() {
+  const fridge = fridgeBody();
+  fridge.userData.door.rotation.y = -1.95;
+  const { SHELVES } = FRIDGE;
+  [
+    ["Milk", -0.2, SHELVES[0], -0.08],
+    ["Cheese", 0.12, SHELVES[0], -0.02],
+    ["Egg", -0.1, SHELVES[1], 0],
+    ["Potato", 0.18, SHELVES[1], 0.05],
+    ["Carrot", -0.12, SHELVES[2], 0.04],
+    ["Avocado", 0.16, SHELVES[2], 0.02],
+  ].forEach(([name, x, y, z]) => {
+    const food = foodModel(name, undefined, name === "Egg" ? 360 : name === "Potato" ? 540 : 300);
+    food.position.set(x, y + 0.012, z);
+    fridge.add(food);
+  });
+  [
+    [0.02, SHELVES[0], 0.05],
+    [0.08, SHELVES[0], 0.08],
+  ].forEach(([x, y, z]) => {
+    const tomato = outline(group(treeTomato()));
+    tomato.position.set(x, y + 0.012, z);
+    fridge.add(tomato);
+  });
+  return fridge;
+}
+
+function doorSensor() {
+  const fridge = fridgeBody();
+  fridge.userData.door.rotation.y = -0.32;
+  const reed = outline(mesh(new RoundedBoxGeometry(0.018, 0.07, 0.014, 2, 0.003), paint("#ffffff"), (m) => m.position.set(FRIDGE.W / 2 - 0.012, 0.98, FRIDGE.D / 2 + 0.008)));
+  const magnet = outline(mesh(new RoundedBoxGeometry(0.016, 0.05, 0.012, 2, 0.003), paint("#d2492f"), (m) => m.position.set(FRIDGE.W - 0.014, 0.94, 0.07)));
+  fridge.userData.door.add(magnet);
+  const wire = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(FRIDGE.W / 2 - 0.012, 1.015, FRIDGE.D / 2 + 0.01),
+    new THREE.Vector3(FRIDGE.W / 2 + 0.02, 1.2, FRIDGE.D / 2 + 0.01),
+    new THREE.Vector3(FRIDGE.W / 2 + 0.01, 1.6, FRIDGE.D / 2 - 0.1),
+  ]);
+  const cable = outline(mesh(new THREE.TubeGeometry(wire, 24, 0.003, 6), paint("#1c1712")));
+  return group(fridge, reed, cable);
+}
+
+function probe() {
+  const shelf = outline(mesh(new RoundedBoxGeometry(0.5, 0.012, 0.3, 2, 0.004), paint("#c4d3cc"), (m) => (m.position.y = -0.006)));
+  const steel = paint("#c9d0d3");
+  const stick = outline(
+    group(
+      mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.13, 16), steel, (m) => {
+        m.rotation.z = Math.PI / 2;
+        m.position.set(0.0, 0.008, 0);
+      }),
+      mesh(new THREE.ConeGeometry(0.007, 0.02, 16), steel, (m) => {
+        m.rotation.z = -Math.PI / 2;
+        m.position.set(0.075, 0.008, 0);
+      }),
+      mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.025, 16), paint("#1c1712"), (m) => {
+        m.rotation.z = Math.PI / 2;
+        m.position.set(-0.075, 0.008, 0);
+      }),
+    ),
+  );
+  stick.rotation.y = 0.5;
+  const wire = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.075, 0.008, 0.04),
+    new THREE.Vector3(-0.14, 0.006, 0.08),
+    new THREE.Vector3(-0.19, 0.01, -0.02),
+    new THREE.Vector3(-0.23, 0.05, -0.12),
+  ]);
+  const cable = outline(mesh(new THREE.TubeGeometry(wire, 32, 0.0035, 6), paint("#1c1712")));
+  const tomato = outline(group(treeTomato()));
+  tomato.position.set(0.1, 0, -0.07);
+  const potato = foodModel("Potato");
+  potato.position.set(-0.05, 0, -0.09);
+  return group(shelf, stick, cable, tomato, potato);
+}
+
+function board() {
+  const pcb = mesh(new RoundedBoxGeometry(0.11, 0.004, 0.05, 2, 0.0015), paint("#1d4a2c"));
+  const shield = mesh(new RoundedBoxGeometry(0.03, 0.004, 0.034, 2, 0.001), paint("#c9d0d3"), (m) => m.position.set(-0.015, 0.004, 0));
+  const antenna = group(
+    ...[0, 1, 2, 3].map((index) => mesh(new THREE.BoxGeometry(0.0012, 0.0006, 0.028), paint("#e2c56b"), (m) => m.position.set(-0.045 + index * 0.004, 0.0025, 0))),
+  );
+  const usb = mesh(new RoundedBoxGeometry(0.009, 0.004, 0.012, 2, 0.001), paint("#c9d0d3"), (m) => m.position.set(0.054, 0.004, 0));
+  const pins = group(
+    ...[-1, 1].flatMap((side) =>
+      Array.from({ length: 12 }, (_, index) =>
+        mesh(new THREE.BoxGeometry(0.0035, 0.004, 0.0035), paint("#1c1712"), (m) => m.position.set(-0.035 + index * 0.0068, 0.004, side * 0.021)),
+      ),
+    ),
+  );
+  const led = mesh(new THREE.BoxGeometry(0.003, 0.002, 0.002), paint("#d2492f"), (m) => m.position.set(0.035, 0.003, 0.01));
+  const chip = mesh(new THREE.BoxGeometry(0.008, 0.002, 0.008), paint("#1c1712"), (m) => m.position.set(0.02, 0.003, -0.005));
+  return outline(group(pcb, shield, antenna, usb, pins, led, chip));
+}
+
+const VIGNETTES = {
+  fridge: { build: stocked, position: [1.35, 1.55, 3.0], target: [-0.12, 0.84, 0], fov: 34, size: [720, 900] },
+  door: { build: doorSensor, position: [0.95, 1.18, 0.95], target: [0.33, 0.98, 0.3], fov: 30 },
+  probe: { build: probe, position: [0.22, 0.26, 0.34], target: [0, 0.01, 0], fov: 32 },
+  board: { build: board, position: [0.07, 0.1, 0.11], target: [0.002, 0, 0], fov: 34 },
+  scale: { build: scaleScene, position: [0.5, 1.28, 0.62], target: [0.03, 0.99, 0.05], fov: 34 },
+  plate: { build: plateScene, position: [0.48, 1.22, 0.66], target: [0.02, 0.8, 0.02], fov: 34 },
+};
+
+export function renderVignettes(defaultWidth, defaultHeight) {
+  const canvas = document.createElement("canvas");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setClearColor(PAPER);
+  renderer.toneMapping = THREE.NoToneMapping;
+  inkBias.value = 0.06;
+  const pictures = {};
+  Object.entries(VIGNETTES).forEach(([kind, view]) => {
+    const [width, height] = view.size ?? [defaultWidth, defaultHeight];
+    renderer.setSize(width, height, false);
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight("#ffffff", "#b9b19c", 1.0));
+    const sun = new THREE.DirectionalLight("#ffffff", 1.4);
+    sun.position.set(-3, 6, 5);
+    scene.add(sun);
+    const world = view.build();
+    world.userData.play?.(1);
+    scene.add(world);
+    const camera = new THREE.PerspectiveCamera(view.fov, width / height, 0.005, 60);
+    camera.position.set(...view.position);
+    camera.lookAt(new THREE.Vector3(...view.target));
+    renderer.render(scene, camera);
+    pictures[kind] = canvas.toDataURL("image/webp", 0.9);
+  });
+  inkBias.value = 0;
+  renderer.dispose();
+  return pictures;
+}

@@ -7,9 +7,11 @@ const WEEKS_PER_MONTH = 4.3;
 const STAGES = ["weigh", "know", "warn", "cook"];
 const WORDMARK = "HayPaComer";
 
-function kitPart(key, shape) {
+const STAGE_SCENES = { weigh: "scale", know: "fridge", warn: "door", cook: "plate" };
+
+function kitPart(key, vignette) {
   return `<li class="kit-part kit-${key}" style="--i:${["door", "probe", "brain", "scale"].indexOf(key)}">
-    <span class="kit-shape kit-shape-${shape}" aria-hidden="true"><i></i><i></i></span>
+    <span class="kit-medallion" aria-hidden="true"><img data-vignette="${vignette}" alt="" width="480" height="480"></span>
     <span class="kit-text"><b>${t(`landing.kit.${key}`)}</b><span>${t(`landing.kit.${key}-text`)}</span></span>
   </li>`;
 }
@@ -76,16 +78,16 @@ export function renderLanding(main) {
             <a class="button" href="#/signin">${t("auth.signin")}</a>
           </div>
         </div>
-        <div class="land-fridge" aria-hidden="true">
-          <span class="land-fridge-body"><span class="land-freezer"><i class="food f-yogur"></i><i class="food f-queso"></i></span><span class="land-shelf"><i class="food f-pollo"></i><i class="food f-tomate"></i><i class="food f-huevo"></i></span><span class="land-shelf"><i class="food f-papa"></i><i class="food f-zanahoria"></i><i class="food f-aguacate"></i></span><span class="land-shelf"><i class="food f-leche"></i><i class="food f-jugo"></i><i class="food f-cebolla"></i></span></span>
+        <figure class="land-vignette" aria-hidden="true">
+          <img data-vignette="fridge" alt="" width="720" height="900">
           <span class="land-label l1">842 g</span><span class="land-label l2">${t("landing.ui.expires")}</span><span class="land-label l3">4,2 °C</span>
-        </div>
+        </figure>
       </section>
 
       <section class="chapter chapter-cilantro land-kit" aria-labelledby="kit-title" data-explode>
         <h2 id="kit-title">${t("landing.kit.title")}</h2>
         <p class="land-text">${t("landing.kit.lead")}</p>
-        <ul class="kit">${kitPart("door", "reed")}${kitPart("probe", "probe")}${kitPart("brain", "board")}${kitPart("scale", "scale")}</ul>
+        <ul class="kit">${kitPart("door", "door")}${kitPart("probe", "probe")}${kitPart("brain", "board")}${kitPart("scale", "scale")}</ul>
       </section>
 
       <section class="chapter chapter-arroz land-how" aria-labelledby="how-title">
@@ -94,6 +96,7 @@ export function renderLanding(main) {
           <p class="how-clause" data-clause aria-live="polite">${t(`landing.how.${STAGES[0]}`)}</p>
         </div>
         <div class="how-right">
+          <img class="how-scene" data-vignette="${STAGE_SCENES[STAGES[0]]}" data-how-scene alt="" width="720" height="540" aria-hidden="true">
           <div class="how-fragment" data-ui data-fragment>${stageFragment(STAGES[0])}</div>
         </div>
         <div class="how-slider">
@@ -138,6 +141,19 @@ export function renderLanding(main) {
       </footer>
     </div>`;
 
+  let pictures = {};
+  if (document.createElement("canvas").getContext("webgl2")) {
+    import("./story3d.js")
+      .then(({ renderVignettes }) => {
+        pictures = renderVignettes(720, 720);
+        main.querySelectorAll("[data-vignette]").forEach((image) => {
+          image.src = pictures[image.dataset.vignette];
+        });
+        main.querySelector(".landing").classList.add("drawn");
+      })
+      .catch(() => null);
+  }
+
   const range = main.querySelector("[data-stage-range]");
   range.addEventListener("input", () => {
     const stage = STAGES[Number(range.value)];
@@ -147,6 +163,9 @@ export function renderLanding(main) {
     fragment.classList.add("swap");
     fragment.innerHTML = stageFragment(stage);
     main.querySelector("[data-clause]").textContent = t(`landing.how.${stage}`);
+    const picture = main.querySelector("[data-how-scene]");
+    picture.dataset.vignette = STAGE_SCENES[stage];
+    if (pictures[STAGE_SCENES[stage]]) picture.src = pictures[STAGE_SCENES[stage]];
     main.querySelectorAll("[data-name]").forEach((name) => {
       if (name.dataset.name === range.value) name.setAttribute("aria-current", "step");
       else name.removeAttribute("aria-current");
