@@ -221,7 +221,7 @@ languageSelect.addEventListener("change", async () => {
 });
 
 progress(0.2);
-await Promise.all([loadLocale(), document.fonts.load("1em Anton").catch(() => null)]);
+await Promise.all([loadLocale(), document.fonts.load("900 1em Fraunces").catch(() => null)]);
 progress(0.6);
 drawLanguages();
 await render();

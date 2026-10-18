@@ -44,18 +44,41 @@ function lathe(profile, segments = 32) {
   return new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), segments);
 }
 
-const tones = new THREE.DataTexture(new Uint8Array([150, 150, 150, 255, 215, 215, 215, 255, 255, 255, 255, 255]), 3, 1);
-tones.minFilter = THREE.NearestFilter;
-tones.magFilter = THREE.NearestFilter;
-tones.needsUpdate = true;
+
+const hatchScale = { value: Math.min(devicePixelRatio, 2) };
+const INK = "vec3(0.11, 0.09, 0.08)";
+
+function engrave(shader) {
+  shader.uniforms.hatchScale = hatchScale;
+  shader.fragmentShader = shader.fragmentShader
+    .replace("void main() {", "uniform float hatchScale;\nvoid main() {")
+    .replace(
+      "#include <dithering_fragment>",
+      `#include <dithering_fragment>
+      vec3 base = sRGBTransferOETF(vec4(diffuseColor.rgb, 1.0)).rgb;
+      vec3 glow = sRGBTransferOETF(vec4(totalEmissiveRadiance, 1.0)).rgb;
+      float lit = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114)) / max(dot(base, vec3(0.299, 0.587, 0.114)), 0.04);
+      float shade = smoothstep(0.8, 0.28, lit);
+      vec2 p = gl_FragCoord.xy / hatchScale;
+      float wave = sin(p.y * 0.07 + p.x * 0.013) * 1.4;
+      float a = abs(fract((p.x + p.y + wave) / 7.0) - 0.5);
+      float b = abs(fract((p.x - p.y - wave) / 8.0) - 0.5);
+      float c = abs(fract((p.y + wave) / 4.5) - 0.5);
+      float ink = step(a, 0.3 * smoothstep(0.18, 0.75, shade));
+      ink = max(ink, step(b, 0.24 * smoothstep(0.55, 0.95, shade)));
+      ink = max(ink, step(c, 0.2 * smoothstep(0.85, 1.0, shade)));
+      gl_FragColor.rgb = mix(base * mix(0.86, 1.0, clamp(lit, 0.0, 1.0)) + glow, ${INK}, ink * 0.88);`,
+    );
+}
 
 function paint(color, options = {}) {
-  return new THREE.MeshToonMaterial({
+  const material = new THREE.MeshLambertMaterial({
     color,
-    gradientMap: tones,
     transparent: Boolean(options.transparent),
     opacity: options.opacity ?? 1,
   });
+  material.onBeforeCompile = engrave;
+  return material;
 }
 
 const ink = new THREE.ShaderMaterial({
@@ -327,8 +350,11 @@ function labelTexture(text, background, color) {
   context.fillStyle = "#121212";
   for (let line = 0; line < 4; line++) context.fillRect(28, 96 + line * 40, 200 - line * 30, 8);
   context.fillStyle = color;
-  context.font = "64px Anton, Impact, sans-serif";
-  context.fillText(text.toUpperCase(), 28, 290);
+  const word = text.toUpperCase();
+  context.font = "900 48px Fraunces, Georgia, serif";
+  const size = Math.min(48, Math.floor((48 * 200) / context.measureText(word).width));
+  context.font = `900 ${size}px Fraunces, Georgia, serif`;
+  context.fillText(word, 28, 290);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
@@ -397,17 +423,21 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   });
   scene.add(floor);
 
-  const shell = paint("#fdfdfb", { roughness: 0.32, clearcoat: 0.6, clearcoatRoughness: 0.25 });
-  const liner = paint("#bcd6df");
+  const shell = paint("#f6f1e6", { roughness: 0.32, clearcoat: 0.6, clearcoatRoughness: 0.25 });
+  const liner = paint("#d9ddd0");
   const steel = paint("#c9d0d3", { metalness: 0.9, roughness: 0.25 });
-  const glass = paint("#9fc3cf");
+  const glass = paint("#c4d3cc");
   const fridge = new THREE.Group();
   scene.add(fridge);
   const parts = new Map();
   const tag = (object, part) => {
     object.traverse((child) => {
       child.userData.part = part;
-      if (child.isMesh) child.material = child.material.clone();
+      if (child.isMesh) {
+        const engraved = child.material.onBeforeCompile === engrave;
+        child.material = child.material.clone();
+        if (engraved) child.material.onBeforeCompile = engrave;
+      }
     });
     parts.set(part, [...(parts.get(part) ?? []), object]);
     return object;

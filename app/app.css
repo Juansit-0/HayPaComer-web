@@ -977,7 +977,7 @@ html:has(.loader:not(.gone)) { overflow: hidden; }
 .fridge .note::before { content: ""; position: absolute; top: -7px; left: 31px; width: 14px; height: 14px; border-radius: 50%; background: var(--color-tomate); }
 .fridge .note > span:not(.part-name) { display: block; height: 4px; border-radius: 2px; background: var(--color-tinta); }
 .fridge .note > span:nth-child(2) { width: 70%; }
-.fridge .note .part-name { margin-top: auto; font-size: 13px; color: var(--color-tomate); }
+.fridge .note .part-name { margin-top: auto; font-size: 10px; color: var(--color-tomate); }
 .fridge .note:hover, .fridge .note[aria-current="page"] { rotate: -3deg; scale: 1.08; }
 .fridge .freezer:hover, .fridge .freezer[aria-current="page"] { background: color-mix(in oklab, var(--color-mora) 12%, var(--color-white)); }
 
@@ -1478,7 +1478,7 @@ a.button:active { transform: scale(0.97); }
   .shell:has(.stage.has-three:not([hidden])) .column { position: relative; z-index: 7; background: var(--color-bg); box-shadow: -1px 0 0 color-mix(in oklab, var(--color-tinta) 12%, transparent), -24px 0 48px -32px color-mix(in oklab, var(--color-tinta) 30%, transparent); }
   .shell:has(.stage.has-three:not([hidden])) .column main { container: panel / inline-size; max-width: none; padding-inline: var(--space-m); }
   .shell:has(.stage.has-three:not([hidden])) .bar { flex-wrap: nowrap; gap: var(--space-s); padding-inline: var(--space-m); }
-  .shell:has(.stage.has-three:not([hidden])) .bar .wordmark { font-size: 22px; }
+  .shell:has(.stage.has-three:not([hidden])) .bar .wordmark { font-size: 19px; }
   .shell:has(.stage.has-three:not([hidden])) .bar .session { gap: var(--space-s); margin-left: auto; }
   .shell:has(.stage.has-three:not([hidden])) .bar .language { display: none; }
   .shell:has(.stage.has-three:not([hidden])) .bar .household { display: none; }
@@ -1543,3 +1543,12 @@ a.button:active { transform: scale(0.97); }
 .market-empty img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--radius-20); }
 .market-empty figcaption { display: grid; gap: 4px; }
 .market-empty small { font-size: 12px; color: var(--color-text-weak); }
+
+/* Fraunces as the engraved-poster display: heavy, soft, slightly wonky, set tight */
+h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1; font-weight: 900; letter-spacing: -0.02em; }
+.fridge .part-name { font-size: 11px; letter-spacing: 0; }
+.fridge .note { overflow: hidden; }
+.fridge .note .part-name { font-size: 8.5px; }
+.freezer-text b { font-size: 19px; }
+.land-wordmark { font-size: 12vw; }
+:where(.fridge .part-name, .freezer-text b, .dish-body h3, .today h2, .summary-row h2, .shelf-tile > header h2, .notepad > h2, .cooking .cooking-step, .auth-question, .chapter h2, .kit-text b, .how-clause, .land-wordmark, .numbers-money, .wordmark) { font-weight: 900; font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1; }
