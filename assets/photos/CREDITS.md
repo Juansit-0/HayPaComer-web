@@ -13,3 +13,14 @@ All photographs are from Wikimedia Commons, cropped and resized. They illustrate
 | `tomate-de-arbol.jpg` | Tomate de Arbol | michael clarke stuff | CC BY-SA 2.0 | https://commons.wikimedia.org/wiki/File:Tomate_de_Arbol_(3842828584).jpg |
 
 Share-alike: the cropped versions are shared under the same licence as each original.
+
+## Engravings
+
+| File | Title | Source | Licence | Page |
+| --- | --- | --- | --- | --- |
+| `engravings/entrada-pasto.jpg` | Entrada de Pasto | *América pintoresca* (Barcelona, 1884), from Édouard André's *Viaje á la América equinoccial* | Public domain | https://archive.org/details/americapintoresca00wien/page/n707 |
+| `engravings/mercado-bogota.jpg` | Mercado de Bogotá | *América pintoresca* (Barcelona, 1884), same journey | Public domain | https://archive.org/details/americapintoresca00wien/page/n519 |
+| `engravings/calle-pasto.jpg` | Una calle de Pasto | *América pintoresca* (Barcelona, 1884), same journey | Public domain | https://archive.org/details/americapintoresca00wien/page/n708 |
+
+The engravings were cropped from the scanned pages and their levels adjusted so the paper reads white and the ink black; nothing was redrawn.
+
