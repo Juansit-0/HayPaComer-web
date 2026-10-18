@@ -24,6 +24,20 @@ function stageFragment(stage) {
   return fragments[stage];
 }
 
+const SCENES = [
+  { image: "entrada-pasto", width: 1800, height: 1117, captions: ["landing.story.arrive", "landing.story.market-day"] },
+  { image: "mercado-bogota", width: 1800, height: 1231, captions: ["landing.story.heaps", "landing.story.oca"], label: "landing.story.bogota" },
+  { image: "calle-pasto", width: 880, height: 1409, captions: ["landing.story.today", "landing.story.fridge"] },
+];
+
+function scene({ image, width, height, captions, label }, index) {
+  return `<figure class="story-frame" data-frame="${index}" style="--frame:${index}">
+    <img src="/brand/engravings/${image}.jpg" alt="" width="${width}" height="${height}" ${index ? 'loading="lazy"' : ""}>
+    ${captions.map((key, order) => `<p class="story-caption c${order}">${t(key)}</p>`).join("")}
+    ${label ? `<figcaption class="story-label">${t(label)}</figcaption>` : ""}
+  </figure>`;
+}
+
 function monthly(kilos) {
   return kilos * RESCUED_SHARE * WEEKS_PER_MONTH * PRICE_PER_KG;
 }
@@ -44,6 +58,12 @@ export function renderLanding(main) {
           <span class="land-fridge-body"><span class="land-freezer"><i class="food f-yogur"></i><i class="food f-queso"></i></span><span class="land-shelf"><i class="food f-pollo"></i><i class="food f-tomate"></i><i class="food f-huevo"></i></span><span class="land-shelf"><i class="food f-papa"></i><i class="food f-zanahoria"></i><i class="food f-aguacate"></i></span><span class="land-shelf"><i class="food f-leche"></i><i class="food f-jugo"></i><i class="food f-cebolla"></i></span></span>
           <span class="land-label l1">842 g</span><span class="land-label l2">${t("landing.ui.expires")}</span><span class="land-label l3">4,2 °C</span>
         </div>
+      </section>
+
+      <section class="land-story" aria-labelledby="story-title" data-story>
+        <h2 id="story-title" class="visually-hidden">${t("landing.story.title")}</h2>
+        <div class="story-stage">${SCENES.map(scene).join("")}</div>
+        <p class="story-credit">${t("landing.story.credit")}</p>
       </section>
 
       <section class="chapter chapter-cilantro land-kit" aria-labelledby="kit-title" data-explode>
@@ -123,6 +143,31 @@ export function renderLanding(main) {
     main.querySelector("[data-kilos-out]").textContent = `${formatNumber(value, 1)} kg`;
     main.querySelector("[data-money]").textContent = formatMoney(monthly(value), "COP");
   });
+
+  const story = main.querySelector("[data-story]");
+  const frames = [...story.querySelectorAll("[data-frame]")];
+  const playStory = () => {
+    if (!document.body.contains(story)) {
+      window.removeEventListener("scroll", playStory);
+      return;
+    }
+    const box = story.getBoundingClientRect();
+    const travel = Math.max(1, box.height - innerHeight);
+    const progress = Math.min(0.9999, Math.max(0, -box.top / travel)) * frames.length;
+    frames.forEach((frame, index) => {
+      const local = progress - index;
+      const reveal = index === 0 ? 1 : Math.min(1, Math.max(0, (local + 0.18) / 0.36));
+      frame.style.setProperty("--reveal", `${(reveal * 112).toFixed(1)}%`);
+      frame.style.setProperty("--zoom", (1 + Math.min(1, Math.max(0, local)) * 0.14).toFixed(4));
+      frame.classList.toggle("shown", local > -0.2);
+      frame.querySelectorAll(".story-caption").forEach((caption, order) => caption.classList.toggle("on", local - order * 0.32 >= 0.08 && 1.1 >= local));
+    });
+  };
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    story.classList.add("playing");
+    window.addEventListener("scroll", playStory, { passive: true });
+    playStory();
+  }
 
   const kit = main.querySelector("[data-explode]");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
