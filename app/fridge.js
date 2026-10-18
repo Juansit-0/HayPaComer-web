@@ -83,7 +83,7 @@ function foodCard(item) {
             <input id="use-${esc(item.id)}" class="grams" name="grams" type="number" inputmode="numeric" min="1" step="1" required value="${Math.min(100, Math.round(item.grams))}">
             <button type="submit" name="action" value="consume">${t("fridge.use")}</button>
             ${item.openedOn ? "" : `<button class="ghost" type="submit" name="action" value="open" formnovalidate>${t("fridge.opened")}</button>`}
-            <button class="ghost" type="submit" name="action" value="discard" formnovalidate>${t("fridge.discard")}</button>
+            <button class="ghost" type="submit" name="action" value="discard" formnovalidate data-hold aria-describedby="hold-hint">${t("fridge.discard")}</button>
           </form>`
         : ""
     }

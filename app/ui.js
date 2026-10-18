@@ -263,3 +263,57 @@ export async function busy(button, task) {
     button.removeAttribute("aria-busy");
   }
 }
+
+const HOLD_MS = 800;
+const holding = new WeakMap();
+
+function startHold(button) {
+  if (button.disabled || holding.has(button)) return;
+  button.classList.add("holding");
+  holding.set(
+    button,
+    setTimeout(() => {
+      holding.delete(button);
+      button.classList.remove("holding");
+      button.dataset.held = "true";
+      button.click();
+    }, HOLD_MS),
+  );
+}
+
+function stopHold(button) {
+  clearTimeout(holding.get(button));
+  holding.delete(button);
+  button.classList.remove("holding");
+}
+
+const holdTarget = (event) => event.target.closest?.("[data-hold]");
+document.addEventListener("pointerdown", (event) => holdTarget(event) && startHold(holdTarget(event)));
+["pointerup", "pointerleave", "pointercancel"].forEach((type) =>
+  document.addEventListener(type, (event) => holdTarget(event) && stopHold(holdTarget(event)), true),
+);
+document.addEventListener("keydown", (event) => {
+  const button = holdTarget(event);
+  if (!button || (event.key !== " " && event.key !== "Enter")) return;
+  event.preventDefault();
+  if (!event.repeat) startHold(button);
+});
+document.addEventListener("keyup", (event) => {
+  const button = holdTarget(event);
+  if (button && (event.key === " " || event.key === "Enter")) stopHold(button);
+});
+document.addEventListener(
+  "click",
+  (event) => {
+    const button = holdTarget(event);
+    if (!button) return;
+    if (button.dataset.held) {
+      delete button.dataset.held;
+      return;
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toast(t("hold.hint"));
+  },
+  true,
+);

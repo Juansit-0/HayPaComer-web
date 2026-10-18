@@ -95,7 +95,7 @@ function confirmations(list) {
     <ul class="list">${list
       .map(
         (pending) => `<li><span class="item-name">${esc(pending.summary)}</span>
-          <span class="item-actions"><button class="primary" type="button" data-approve="${esc(pending.id)}">${t("chef.approve")}</button><button type="button" data-reject="${esc(pending.id)}">${t("chef.reject")}</button></span></li>`,
+          <span class="item-actions"><button class="primary" type="button" data-approve="${esc(pending.id)}" data-hold aria-describedby="hold-hint">${t("chef.approve")}</button><button type="button" data-reject="${esc(pending.id)}">${t("chef.reject")}</button></span></li>`,
       )
       .join("")}</ul>
   </section>`;
