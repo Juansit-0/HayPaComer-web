@@ -40,7 +40,6 @@ const FILM = [
   ["landing.story.weigh", 0.67, 0.81, 0],
   ["landing.story.knows", 0.72, 0.81, 1],
   ["landing.story.cook", 0.84, 0.99, 0],
-  ["now.question", 0.9, 1.01, 1],
 ];
 
 function scene({ image, width, height, captions, label }, index) {
@@ -58,9 +57,19 @@ function monthly(kilos) {
 export function renderLanding(main) {
   main.innerHTML = `
     <div class="landing">
-      <section class="chapter chapter-papa land-hero" aria-labelledby="land-title">
+      <section class="land-story" aria-labelledby="story-title" data-story>
+        <div class="story-intro" data-intro>
+          <h1 id="story-title">${t("landing.story.title")}</h1>
+          <p>${t("landing.story.scroll")}</p>
+          <a class="button" href="#land-answer" data-skip>${t("landing.story.skip")}</a>
+        </div>
+        <div class="story-stage">${SCENES.map(scene).join("")}</div>
+        <p class="story-credit">${t("landing.story.credit")}</p>
+      </section>
+
+      <section class="chapter chapter-papa land-hero" id="land-answer" aria-labelledby="land-title">
         <div class="land-hero-text">
-          <h1 id="land-title">${t("now.question")}</h1>
+          <h2 id="land-title">${t("now.question")}</h2>
           <p class="land-lead">${t("landing.lead")}</p>
           <div class="land-actions">
             <a class="button primary" href="#/register">${t("auth.create-account")}</a>
@@ -71,12 +80,6 @@ export function renderLanding(main) {
           <span class="land-fridge-body"><span class="land-freezer"><i class="food f-yogur"></i><i class="food f-queso"></i></span><span class="land-shelf"><i class="food f-pollo"></i><i class="food f-tomate"></i><i class="food f-huevo"></i></span><span class="land-shelf"><i class="food f-papa"></i><i class="food f-zanahoria"></i><i class="food f-aguacate"></i></span><span class="land-shelf"><i class="food f-leche"></i><i class="food f-jugo"></i><i class="food f-cebolla"></i></span></span>
           <span class="land-label l1">842 g</span><span class="land-label l2">${t("landing.ui.expires")}</span><span class="land-label l3">4,2 °C</span>
         </div>
-      </section>
-
-      <section class="land-story" aria-labelledby="story-title" data-story>
-        <h2 id="story-title" class="visually-hidden">${t("landing.story.title")}</h2>
-        <div class="story-stage">${SCENES.map(scene).join("")}</div>
-        <p class="story-credit">${t("landing.story.credit")}</p>
       </section>
 
       <section class="chapter chapter-cilantro land-kit" aria-labelledby="kit-title" data-explode>
@@ -150,6 +153,11 @@ export function renderLanding(main) {
     });
   });
 
+  main.querySelector("[data-skip]").addEventListener("click", (event) => {
+    event.preventDefault();
+    main.querySelector("#land-answer").scrollIntoView({ behavior: still ? "auto" : "smooth" });
+  });
+
   const kilos = main.querySelector("[data-kilos]");
   kilos.addEventListener("input", () => {
     const value = Number(kilos.value);
@@ -191,6 +199,7 @@ export function renderLanding(main) {
     const travel = Math.max(1, box.height - innerHeight);
     const share = Math.min(0.9999, Math.max(0, -box.top / travel));
     film?.seek(share);
+    story.querySelector("[data-intro]").classList.toggle("gone", share > 0.015);
     story.querySelectorAll(".film-captions [data-from]").forEach((caption) =>
       caption.classList.toggle("on", share >= Number(caption.dataset.from) && Number(caption.dataset.to) > share),
     );

@@ -294,15 +294,19 @@ function plateScene() {
   const plate = outline(mesh(new THREE.LatheGeometry([[0, 0], [0.17, 0], [0.22, 0.025], [0.23, 0.035], [0, 0.035]].map(([x, y]) => new THREE.Vector2(x, y)), 48), paint("#ffffff"), (m) => (m.position.y = 0.781)));
   scene.add(plate);
   const food = new THREE.Group();
-  for (let index = 0; 9 > index; index++) {
-    const egg = outline(mesh(lumpy(new THREE.SphereGeometry(0.035, 14, 10), 0.3), paint(index % 3 ? "#f3c443" : "#f6e3a0")));
-    egg.position.set((random(index) - 0.5) * 0.18, 0.825, (random(index * 3) - 0.5) * 0.16);
-    egg.scale.y = 0.55;
+  for (let index = 0; 16 > index; index++) {
+    const angle = random(index * 1.3) * Math.PI * 2;
+    const reach = Math.sqrt(random(index * 2.9)) * 0.1;
+    const egg = outline(mesh(lumpy(new THREE.SphereGeometry(0.022 + random(index) * 0.012, 14, 10), 0.35), paint(index % 4 ? "#f2c94c" : "#f7e6a6")));
+    egg.position.set(-0.05 + Math.cos(angle) * reach, 0.81 + random(index * 5) * 0.012, Math.sin(angle) * reach * 0.8);
+    egg.scale.y = 0.6;
     food.add(egg);
   }
-  for (let index = 0; 5 > index; index++) {
-    const bit = outline(mesh(new THREE.BoxGeometry(0.025, 0.02, 0.025), paint("#c8432a")));
-    bit.position.set((random(index * 7) - 0.5) * 0.16, 0.835, (random(index * 11) - 0.5) * 0.14);
+  for (let index = 0; 10 > index; index++) {
+    const angle = random(index * 4.1) * Math.PI * 2;
+    const reach = Math.sqrt(random(index * 6.7)) * 0.09;
+    const bit = outline(mesh(lumpy(new THREE.SphereGeometry(0.011, 10, 8), 0.3), paint(index % 3 ? "#c8432a" : "#3f7a3a")));
+    bit.position.set(-0.05 + Math.cos(angle) * reach, 0.832, Math.sin(angle) * reach * 0.8);
     food.add(bit);
   }
   const arepa = outline(mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.03, 32), paint("#e9d3a0"), (m) => m.position.set(0.12, 0.83, 0.07)));

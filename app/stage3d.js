@@ -90,10 +90,32 @@ export function paint(color, options = {}) {
   return material;
 }
 
+function inkNormals(geometry) {
+  if (geometry.attributes.inkNormal) return;
+  if (!geometry.attributes.normal) geometry.computeVertexNormals();
+  const position = geometry.attributes.position;
+  const normal = geometry.attributes.normal;
+  const sums = new Map();
+  const key = (index) => `${Math.round(position.getX(index) * 1e4)},${Math.round(position.getY(index) * 1e4)},${Math.round(position.getZ(index) * 1e4)}`;
+  for (let index = 0; position.count > index; index++) {
+    const sum = sums.get(key(index)) ?? new THREE.Vector3();
+    sum.x += normal.getX(index);
+    sum.y += normal.getY(index);
+    sum.z += normal.getZ(index);
+    sums.set(key(index), sum);
+  }
+  const smooth = new Float32Array(position.count * 3);
+  for (let index = 0; position.count > index; index++) {
+    const sum = sums.get(key(index)).clone().normalize();
+    smooth.set([sum.x, sum.y, sum.z], index * 3);
+  }
+  geometry.setAttribute("inkNormal", new THREE.BufferAttribute(smooth, 3));
+}
+
 const ink = new THREE.ShaderMaterial({
   uniforms: { thickness: { value: 0.0045 }, color: { value: new THREE.Color("#121212") } },
   vertexShader:
-    "uniform float thickness; void main() { float wobble = 0.82 + 0.22 * (sin(position.x * 71.0) + sin(position.y * 83.0 + 1.3) + sin(position.z * 67.0 + 2.1)) / 3.0; float reach = 0.4 + 0.35 * max(0.0, -(modelViewMatrix * vec4(position, 1.0)).z); gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * thickness * wobble * reach, 1.0); }",
+    "uniform float thickness; attribute vec3 inkNormal; void main() { float wobble = 0.82 + 0.22 * (sin(position.x * 71.0) + sin(position.y * 83.0 + 1.3) + sin(position.z * 67.0 + 2.1)) / 3.0; float reach = 0.4 + 0.35 * max(0.0, -(modelViewMatrix * vec4(position, 1.0)).z); gl_Position = projectionMatrix * modelViewMatrix * vec4(position + inkNormal * thickness * wobble * reach, 1.0); }",
   fragmentShader: "uniform vec3 color; void main() { gl_FragColor = vec4(color, 1.0); }",
   side: THREE.BackSide,
 });
@@ -105,6 +127,7 @@ export function outline(root) {
     if (child.isMesh && !inked && !child.userData.outline && !child.userData.noOutline && !child.material.transparent && !child.material.isShaderMaterial) meshes.push(child);
   });
   meshes.forEach((child) => {
+    inkNormals(child.geometry);
     const line = new THREE.Mesh(child.geometry, ink);
     line.userData.outline = true;
     line.raycast = () => {};
