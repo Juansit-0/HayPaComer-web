@@ -30,6 +30,19 @@ const SCENES = [
   { image: "calle-pasto", width: 880, height: 1409, captions: ["landing.story.today", "landing.story.fridge"] },
 ];
 
+const FILM = [
+  ["landing.story.arrive", 0.02, 0.15, 0],
+  ["landing.story.market-day", 0.07, 0.15, 1],
+  ["landing.story.heaps", 0.17, 0.32, 0],
+  ["landing.story.oca", 0.22, 0.32, 1],
+  ["landing.story.today", 0.37, 0.5, 0],
+  ["landing.story.fridge", 0.48, 0.63, 1],
+  ["landing.story.weigh", 0.67, 0.81, 0],
+  ["landing.story.knows", 0.72, 0.81, 1],
+  ["landing.story.cook", 0.84, 0.99, 0],
+  ["now.question", 0.9, 1.01, 1],
+];
+
 function scene({ image, width, height, captions, label }, index) {
   return `<figure class="story-frame" data-frame="${index}" style="--frame:${index}">
     <img src="/brand/engravings/${image}.jpg" alt="" width="${width}" height="${height}" ${index ? 'loading="lazy"' : ""}>
@@ -152,6 +165,10 @@ export function renderLanding(main) {
     canvas.className = "story-canvas";
     canvas.setAttribute("aria-hidden", "true");
     story.querySelector(".story-stage").prepend(canvas);
+    canvas.insertAdjacentHTML(
+      "afterend",
+      `<div class="film-captions">${FILM.map(([key, from, to, corner]) => `<p class="story-caption c${corner}" data-from="${from}" data-to="${to}">${t(key)}</p>`).join("")}</div>`,
+    );
     story.classList.add("filming");
     import("./story3d.js")
       .then(({ createStory }) => {
@@ -174,6 +191,9 @@ export function renderLanding(main) {
     const travel = Math.max(1, box.height - innerHeight);
     const share = Math.min(0.9999, Math.max(0, -box.top / travel));
     film?.seek(share);
+    story.querySelectorAll(".film-captions [data-from]").forEach((caption) =>
+      caption.classList.toggle("on", share >= Number(caption.dataset.from) && Number(caption.dataset.to) > share),
+    );
     const progress = share * frames.length;
     frames.forEach((frame, index) => {
       const local = progress - index;

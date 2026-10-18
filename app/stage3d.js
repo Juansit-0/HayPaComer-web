@@ -74,7 +74,7 @@ function engrave(shader) {
       ink = max(ink, step(c, 0.2 * smoothstep(0.85, 1.0, shade)));
       vec2 cell = floor(p / 3.0) + inkTime;
       float speck = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
-      ink = max(ink, step(speck, 0.018 * smoothstep(0.1, 0.2, shade) * (1.0 - smoothstep(0.2, 0.28, shade))));
+      ink = max(ink, step(length(fract(p / 3.0) - 0.5), 0.28) * step(speck, 0.009 * smoothstep(0.1, 0.2, shade) * (1.0 - smoothstep(0.2, 0.28, shade))));
       gl_FragColor.rgb = mix(base * mix(0.86, 1.0, clamp(lit, 0.0, 1.0)) + glow, ${INK}, ink * 0.88);`,
     );
 }

@@ -1596,3 +1596,6 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 .land-story.filming .story-canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
 .land-story.filming .story-frame { background: transparent; -webkit-mask: none; mask: none; pointer-events: none; }
 .land-story.filming .story-frame img, .land-story.filming .story-label { display: none; }
+.film-captions { display: none; }
+.land-story.filming .film-captions { display: block; position: absolute; inset: 0; pointer-events: none; }
+.land-story.filming .story-frame { display: none; }
