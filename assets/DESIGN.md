@@ -8,7 +8,7 @@ Single source of truth for the visual language of the web app and the landing. I
 |---|---|
 | `assets/tokens.css` | Design tokens as CSS custom properties: primitives, semantic roles, chapters, motion, components. Light only. |
 | `assets/theme.md` | One-page theme summary |
-| `assets/logo-mark.svg`, `assets/logo-lockup.svg` | The H-and-tray mark and the Anton lockup |
+| `assets/logo-mark.svg`, `assets/logo-lockup.svg` | The H-and-tray mark and the lockup (the lockup keeps its original Anton drawing until it is redrawn in Fraunces) |
 
 `tokens.json` (v1 and v2, DTCG) is retired; `tokens.css` is the only token source.
 
@@ -42,13 +42,13 @@ Rules: one chapter colour per screen; no tints, no gradients; no shadows on rest
 
 | Step | Token | Face | Use |
 |---|---|---|---|
-| Poster | `--size-poster` clamp(64px, 12vw, 200px) | Anton | Landing headlines, loader |
-| Head | `--size-head` clamp(40px, 6vw, 88px) | Anton, uppercase | Screen titles in the chapter band |
+| Poster | `--size-poster` clamp(64px, 12vw, 200px) | Fraunces 900, SOFT 100, WONK 1 | Landing headlines, loader |
+| Head | `--size-head` clamp(40px, 6vw, 88px) | Fraunces 900, uppercase | Screen titles in the chapter band |
 | Figure | `--size-figure` clamp(40px, 5vw, 72px) | Hanken Grotesk 600 to 700, tabular | The number of a tile |
 | Body | `--size-body` 17px | Hanken Grotesk 400 | Reading, controls |
 | Small | `--size-small` 14px | Hanken Grotesk 500 | Secondary notes |
 
-Headlines stay within two lines. Every number uses `font-variant-numeric: tabular-nums`. No monospace, no italics, no uppercase letter-spaced labels.
+Fraunces is set at its heaviest optical size with the soft, slightly wonky cut, so headlines read like an engraved poster. It is about 40% wider than the old Anton: tight spots (the drawn fridge, the 3D note) size their text to fit. Headlines stay within two lines. Every number uses `font-variant-numeric: tabular-nums`. No monospace, no italics, no uppercase letter-spaced labels.
 
 ## Shape and space
 
@@ -71,7 +71,8 @@ Patterns:
 - **Loader.** The wordmark at full width fills from the bottom with real progress (texts, fonts, session, first data), then the destination chapter rises as a shutter and the page slides away.
 - **Skeleton.** On every route change `skeleton(route, title)` in `ui.js` paints the chapter band with the real title and pulsing blocks shaped like that screen's tiles; `main` carries `aria-busy` until data arrives.
 - **Entrance.** When a view renders, its header and tiles rise in sequence (`data-enter`, `--i`, `--stagger`).
-- **Tab transition.** View Transitions API between routes; the chapter band morphs as `view-transition-name: chapter`.
+- **Tab transition.** With the 3D fridge (desktop), the panel is withdrawn toward the fridge and revealed again behind a ragged ink-brush mask (`--ink`, 240ms out, 620ms in) while the fridge keeps moving. Without it, View Transitions cross-fade the column.
+- **Press and hold.** Actions that cannot be taken back lightly (throwing food away, approving what the Chef proposes) carry `data-hold`: the button fills like ink for 800ms and acts only when full; a quick tap explains the gesture. Holding Space or Enter works the same, and the hint is read by screen readers.
 - **Busy buttons.** `busy(button, task)` disables the button and shows a spinner while the request runs.
 
 All of it collapses to instant changes under `prefers-reduced-motion: reduce` (durations, stagger and rise are zero).
@@ -79,3 +80,8 @@ All of it collapses to instant changes under `prefers-reduced-motion: reduce` (d
 ## Accessibility
 
 AA contrast on every pair above; visible 2 px focus outline in tinta; skeletons are `aria-hidden` and `main` announces `aria-busy`; the loader is decorative (`aria-hidden`); status is never told by colour alone.
+
+## Engraving
+
+The 3D fridge is drawn like an engraving, after the woodcut and engraved-poster language of illustrated spirits and food labels. Every material keeps its flat colour, the way a print is filled, and the light only decides how many ink lines cross it: none in full light, wavy diagonal hatching in half shadow, cross-hatching in deep shadow. Lines are drawn in screen space at a fixed pitch so the fridge reads as printed, and colours are mixed in display space so produce keeps its true hue. The fridge body is cream paper (`#f6f1e6`), the interior a pale grey green, and the food is the only saturated colour in the scene, the way a single bottle glows in an engraved label.
+
