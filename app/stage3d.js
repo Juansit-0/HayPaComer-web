@@ -22,12 +22,12 @@ const VIEWS = {
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#cccccc";
 const ease = (x) => 1 - Math.pow(1 - x, 4);
 
-function hash(x, y, z) {
+export function hash(x, y, z) {
   const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
   return s - Math.floor(s);
 }
 
-function lumpy(geometry, amount) {
+export function lumpy(geometry, amount) {
   const position = geometry.attributes.position;
   const v = new THREE.Vector3();
   for (let i = 0; i < position.count; i++) {
@@ -40,42 +40,51 @@ function lumpy(geometry, amount) {
   return geometry;
 }
 
-function lathe(profile, segments = 32) {
+export function lathe(profile, segments = 32) {
   return new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), segments);
 }
 
 
 const hatchScale = { value: Math.min(devicePixelRatio, 2) };
+export const inkTime = { value: 0 };
+export const inkBias = { value: 0 };
+export const boil = (now) => (inkTime.value = Math.floor(now / 125) % 8);
 const INK = "vec3(0.11, 0.09, 0.08)";
 
 function engrave(shader) {
   shader.uniforms.hatchScale = hatchScale;
+  shader.uniforms.inkTime = inkTime;
+  shader.uniforms.inkBias = inkBias;
   shader.fragmentShader = shader.fragmentShader
-    .replace("void main() {", "uniform float hatchScale;\nvoid main() {")
+    .replace("void main() {", "uniform float hatchScale;\nuniform float inkTime;\nuniform float inkBias;\nvoid main() {")
     .replace(
       "#include <dithering_fragment>",
       `#include <dithering_fragment>
       vec3 base = sRGBTransferOETF(vec4(diffuseColor.rgb, 1.0)).rgb;
       vec3 glow = sRGBTransferOETF(vec4(totalEmissiveRadiance, 1.0)).rgb;
       float lit = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114)) / max(dot(base, vec3(0.299, 0.587, 0.114)), 0.04);
-      float shade = smoothstep(0.8, 0.28, lit);
+      float shade = smoothstep(0.8 + inkBias, 0.28 + inkBias * 0.5, lit);
       vec2 p = gl_FragCoord.xy / hatchScale;
-      float wave = sin(p.y * 0.07 + p.x * 0.013) * 1.4;
+      float wave = sin(p.y * 0.07 + p.x * 0.013 + inkTime * 2.1) * 1.4 + fract(sin(inkTime * 12.9898) * 43758.5) * 1.2;
       float a = abs(fract((p.x + p.y + wave) / 7.0) - 0.5);
       float b = abs(fract((p.x - p.y - wave) / 8.0) - 0.5);
       float c = abs(fract((p.y + wave) / 4.5) - 0.5);
       float ink = step(a, 0.3 * smoothstep(0.18, 0.75, shade));
       ink = max(ink, step(b, 0.24 * smoothstep(0.55, 0.95, shade)));
       ink = max(ink, step(c, 0.2 * smoothstep(0.85, 1.0, shade)));
+      vec2 cell = floor(p / 3.0) + inkTime;
+      float speck = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+      ink = max(ink, step(speck, 0.018 * smoothstep(0.1, 0.2, shade) * (1.0 - smoothstep(0.2, 0.28, shade))));
       gl_FragColor.rgb = mix(base * mix(0.86, 1.0, clamp(lit, 0.0, 1.0)) + glow, ${INK}, ink * 0.88);`,
     );
 }
 
-function paint(color, options = {}) {
+export function paint(color, options = {}) {
   const material = new THREE.MeshLambertMaterial({
     color,
     transparent: Boolean(options.transparent),
     opacity: options.opacity ?? 1,
+    side: options.side ?? THREE.FrontSide,
   });
   material.onBeforeCompile = engrave;
   return material;
@@ -84,15 +93,16 @@ function paint(color, options = {}) {
 const ink = new THREE.ShaderMaterial({
   uniforms: { thickness: { value: 0.0045 }, color: { value: new THREE.Color("#121212") } },
   vertexShader:
-    "uniform float thickness; void main() { float wobble = 0.82 + 0.22 * (sin(position.x * 71.0) + sin(position.y * 83.0 + 1.3) + sin(position.z * 67.0 + 2.1)) / 3.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * thickness * wobble, 1.0); }",
+    "uniform float thickness; void main() { float wobble = 0.82 + 0.22 * (sin(position.x * 71.0) + sin(position.y * 83.0 + 1.3) + sin(position.z * 67.0 + 2.1)) / 3.0; float reach = 0.4 + 0.35 * max(0.0, -(modelViewMatrix * vec4(position, 1.0)).z); gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * thickness * wobble * reach, 1.0); }",
   fragmentShader: "uniform vec3 color; void main() { gl_FragColor = vec4(color, 1.0); }",
   side: THREE.BackSide,
 });
 
-function outline(root) {
+export function outline(root) {
   const meshes = [];
   root.traverse((child) => {
-    if (child.isMesh && !child.userData.outline && !child.userData.noOutline && !child.material.transparent && !child.material.isShaderMaterial) meshes.push(child);
+    const inked = child.children.some((line) => line.userData.outline);
+    if (child.isMesh && !inked && !child.userData.outline && !child.userData.noOutline && !child.material.transparent && !child.material.isShaderMaterial) meshes.push(child);
   });
   meshes.forEach((child) => {
     const line = new THREE.Mesh(child.geometry, ink);
@@ -103,13 +113,13 @@ function outline(root) {
   return root;
 }
 
-function mesh(geometry, material, setup) {
+export function mesh(geometry, material, setup) {
   const result = new THREE.Mesh(geometry, material);
   setup?.(result);
   return result;
 }
 
-function group(...children) {
+export function group(...children) {
   const result = new THREE.Group();
   children.forEach((child) => result.add(child));
   return result;
@@ -1020,6 +1030,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
 
   const clock = new THREE.Clock();
   function frame(now) {
+    if (!reduced) boil(now);
     const delta = Math.min(clock.getDelta(), 0.05);
     if (state.tween) {
       const progress = Math.min(1, (now - state.tween.start) / state.tween.duration);

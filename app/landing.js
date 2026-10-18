@@ -145,15 +145,36 @@ export function renderLanding(main) {
   });
 
   const story = main.querySelector("[data-story]");
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let film = null;
+  if (!still && document.createElement("canvas").getContext("webgl2")) {
+    const canvas = document.createElement("canvas");
+    canvas.className = "story-canvas";
+    canvas.setAttribute("aria-hidden", "true");
+    story.querySelector(".story-stage").prepend(canvas);
+    story.classList.add("filming");
+    import("./story3d.js")
+      .then(({ createStory }) => {
+        film = createStory(canvas);
+        playStory();
+      })
+      .catch(() => {
+        canvas.remove();
+        story.classList.remove("filming");
+      });
+  }
   const frames = [...story.querySelectorAll("[data-frame]")];
   const playStory = () => {
     if (!document.body.contains(story)) {
       window.removeEventListener("scroll", playStory);
+      film?.stop();
       return;
     }
     const box = story.getBoundingClientRect();
     const travel = Math.max(1, box.height - innerHeight);
-    const progress = Math.min(0.9999, Math.max(0, -box.top / travel)) * frames.length;
+    const share = Math.min(0.9999, Math.max(0, -box.top / travel));
+    film?.seek(share);
+    const progress = share * frames.length;
     frames.forEach((frame, index) => {
       const local = progress - index;
       const reveal = index === 0 ? 1 : Math.min(1, Math.max(0, (local + 0.18) / 0.36));
@@ -163,7 +184,7 @@ export function renderLanding(main) {
       frame.querySelectorAll(".story-caption").forEach((caption, order) => caption.classList.toggle("on", local - order * 0.32 >= 0.08 && 1.1 >= local));
     });
   };
-  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  if (!still) {
     story.classList.add("playing");
     window.addEventListener("scroll", playStory, { passive: true });
     playStory();
