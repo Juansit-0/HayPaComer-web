@@ -1,4 +1,5 @@
 import { newPage } from "./motion.js";
+import { setSound, soundOn } from "./sound.js";
 import { api, session } from "./api.js";
 import { chooseHousehold, householdLabel, renderSignIn } from "./auth.js";
 import { renderFridge } from "./fridge.js";
@@ -19,6 +20,14 @@ const loader = document.querySelector("[data-loader]");
 const tabs = document.querySelector(".tabs");
 const stageBox = document.querySelector("[data-stage-box]");
 const sessionBar = document.querySelector(".session");
+const soundButton = document.querySelector("[data-sound]");
+soundButton.setAttribute("aria-pressed", String(soundOn()));
+soundButton.addEventListener("click", () => {
+  const on = !soundOn();
+  setSound(on);
+  soundButton.setAttribute("aria-pressed", String(on));
+});
+["pointerdown", "keydown"].forEach((type) => window.addEventListener(type, () => soundOn() && setSound(true), { once: true }));
 const views = {
   now: renderNow,
   fridge: renderFridge,

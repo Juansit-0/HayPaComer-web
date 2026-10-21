@@ -1646,3 +1646,7 @@ dialog.sheet :is(button, a.button):not(.primary) { background: transparent; colo
 .inbox-item { background: var(--card); border: 2px solid var(--line); border-radius: 6px; box-shadow: 3px 3px 0 var(--line); }
 .inbox-item.inbox-unread { border-color: var(--line); box-shadow: 3px 3px 0 var(--color-tomate); border-left: 8px solid var(--color-tomate); }
 .inbox-when { color: color-mix(in oklab, var(--line) 70%, transparent); }
+
+.bar .session[hidden] + .sound-toggle { margin-left: auto; }
+.bar .session:not([hidden]) ~ .sound-toggle { display: none; }
+.sound-toggle[aria-pressed="true"] { box-shadow: inset 0 -3px 0 var(--color-primary); }

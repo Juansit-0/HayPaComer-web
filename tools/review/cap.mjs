@@ -13,6 +13,7 @@ const profile = mkdtempSync(join(tmpdir(), "hpc-chrome-"));
 const port = 9300 + Math.floor(Math.random() * 600);
 const chrome = spawn("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", ["--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "--use-angle=metal", "--enable-webgl", "--ignore-gpu-blocklist", "--no-first-run", `--window-size=${width},${height}`, "about:blank"], { stdio: "ignore" });
 const done = () => { chrome.kill(); setTimeout(() => rmSync(profile, { recursive: true, force: true }), 500); };
+setTimeout(() => { console.log("timed out"); done(); setTimeout(() => process.exit(2), 600); }, Number(wait) + 60000).unref();
 try {
   let target;
   for (let i = 0; i < 50 && !target; i++) {

@@ -2,6 +2,7 @@ import { t } from "./i18n.js";
 import { toast } from "./ui.js";
 import { page, reduced } from "./motion.js";
 import { initialTier, webgl2 } from "./quality.js";
+import { ambienceLevel, inkSweep, play, quiet } from "./sound.js";
 import { createScroller } from "./story/scroller.js";
 
 const SCENES = [
@@ -115,6 +116,19 @@ export function mountStory(main) {
       timeline.chapters.reduce((from, chapter) => (starts.push(from), from + chapter.share), 0);
 
       const closedGate = () => gates.find((gate) => !gate.open);
+      let heard = 0;
+      let heardAt = performance.now();
+      const listen = (value) => {
+        const now = performance.now();
+        const speed = Math.abs(value - heard) / Math.max(0.001, (now - heardAt) / 1000);
+        const cutting = starts.slice(1).some((start) => timeline.cut.width > Math.abs(value - start));
+        inkSweep(cutting ? speed * 2 : 0);
+        ambienceLevel(Math.max(0, 1 - value / starts[1]));
+        timeline.sounds.forEach((cue) => value >= cue.at && cue.at > heard && play(cue.name));
+        heard = value;
+        heardAt = now;
+      };
+      page.defer(quiet);
       showProgress = (value) => {
         rail.style.transform = `scaleX(${value.toFixed(4)})`;
         intro.classList.toggle("gone", value > 0.015);
@@ -123,6 +137,7 @@ export function mountStory(main) {
         chapterButtons.forEach((button, index) => (index === active ? button.setAttribute("aria-current", "step") : button.removeAttribute("aria-current")));
         const gate = closedGate();
         holdButton.hidden = !(gate && value > gate.at - 0.012);
+        listen(value);
       };
       const syncCaptured = () => story.toggleAttribute("data-captured", Boolean(scroller?.captured()));
 
@@ -171,6 +186,7 @@ export function mountStory(main) {
         const gate = closedGate();
         if (!gate) return;
         gate.open = true;
+        play("door");
         held = 0;
         holdButton.style.setProperty("--held", 0);
         holdButton.hidden = true;
