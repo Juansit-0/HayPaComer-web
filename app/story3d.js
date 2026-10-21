@@ -1,6 +1,6 @@
 import * as THREE from "./vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
-import { boil, foodModel, group, hash, inkBias, lumpy, mesh, outline, paint } from "./stage3d.js";
+import { boil, foodModel, group, hash, inkBias, lumpy, mesh, outline, paint } from "./engrave.js";
 
 const PAPER = "#f3ecdf";
 const random = (seed) => hash(seed, seed * 1.7, seed * 2.3);
