@@ -58,3 +58,5 @@ html:has(.land-story[data-captured]) { overscroll-behavior: none; }
   .land-story.filming .story-chapters { justify-content: center; }
   .story-hold { bottom: 30%; white-space: nowrap; font-size: 14px; }
 }
+
+.story-frame.still img { object-fit: contain; max-height: 80svh; mix-blend-mode: normal; }

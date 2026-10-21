@@ -9,6 +9,8 @@ const SCENES = [
   { image: "entrada-pasto", width: 1800, height: 1117, captions: ["landing.story.arrive", "landing.story.market-day"] },
   { image: "mercado-bogota", width: 1800, height: 1231, captions: ["landing.story.heaps", "landing.story.oca"], label: "landing.story.bogota" },
   { image: "calle-pasto", width: 880, height: 1409, captions: ["landing.story.today", "landing.story.fridge"] },
+  { still: "scale", width: 960, height: 960, captions: ["landing.story.weigh", "landing.story.knows"] },
+  { still: "plate", width: 960, height: 960, captions: ["landing.story.cook"] },
 ];
 
 const STORY_SCREENS = 3.2;
@@ -25,9 +27,10 @@ function chapterName(id) {
   }[id];
 }
 
-function scene({ image, width, height, captions, label }, index) {
-  return `<figure class="story-frame" data-frame="${index}">
-    <img src="/brand/engravings/${image}.jpg" alt="" width="${width}" height="${height}" ${index ? 'loading="lazy"' : ""}>
+function scene({ image, still, width, height, captions, label }, index) {
+  const source = still ? `/app/stills/${still}.webp` : `/brand/engravings/${image}.jpg`;
+  return `<figure class="story-frame${still ? " still" : ""}" data-frame="${index}">
+    <img src="${source}" alt="" width="${width}" height="${height}" loading="lazy">
     ${captions.map((key, order) => `<p class="story-caption c${order}">${t(key)}</p>`).join("")}
     ${label ? `<figcaption class="story-label">${t(label)}</figcaption>` : ""}
   </figure>`;
