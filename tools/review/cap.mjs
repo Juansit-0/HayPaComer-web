@@ -1,6 +1,6 @@
 // Screenshot the mock-served UI with headless Chrome over CDP.
 // usage: node cap.mjs <route> <out-prefix> <width> [waitMs]
-// env: OUT_SIGNED=1 signed out, REDUCED=1 reduced motion, EVAL=<js, awaited, printed>, AT=<comma list: story share or #selector, one shot each>
+// env: OUT_SIGNED=1 signed out, REDUCED=1 reduced motion, PRELOAD=<js run before each page>, EVAL=<js, awaited, printed>, AT=<comma list: story share or #selector, one shot each>
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -34,13 +34,14 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Emulation.setDeviceMetricsOverride", { width: Number(width), height, deviceScaleFactor: 1, mobile: Number(width) < 700 });
+  if (process.env.PRELOAD) await send("Page.addScriptToEvaluateOnNewDocument", { source: process.env.PRELOAD });
   if (process.env.REDUCED) await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
   await send("Page.navigate", { url: "http://localhost:8091/" });
   await sleep(800);
   const jwt = "x." + Buffer.from(JSON.stringify({ exp: 4102444800, sub: "u1" })).toString("base64").replace(/=+$/, "") + ".y";
   const session = process.env.OUT_SIGNED ? "localStorage.clear();" : `localStorage.setItem("hpc.access", "${jwt}"); localStorage.setItem("hpc.refresh", "mock"); localStorage.setItem("hpc.household", "11111111-1111-4111-8111-111111111111");`;
   await send("Runtime.evaluate", { expression: `${session} localStorage.setItem("hpc.locale", "es-CO");` });
-  await send("Page.navigate", { url: `http://localhost:8091/${process.env.AT ? "?dev=review" : ""}#/${route}` });
+  await send("Page.navigate", { url: `http://localhost:8091/${process.env.AT || process.env.DEV ? "?dev=review" : ""}#/${route}` });
   await sleep(Number(wait));
   if (process.env.EVAL) console.log(JSON.stringify((await send("Runtime.evaluate", { expression: process.env.EVAL, returnByValue: true, awaitPromise: true })).result.result?.value ?? null));
   const points = process.env.AT ? process.env.AT.split(",") : [null];

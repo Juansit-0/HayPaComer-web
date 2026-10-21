@@ -1,4 +1,4 @@
-import { newPage } from "./motion.js";
+import { newPage, reduced, token } from "./motion.js";
 import { setSound, soundOn } from "./sound.js";
 import { api, session } from "./api.js";
 import { chooseHousehold, householdLabel, renderSignIn } from "./auth.js";
@@ -13,7 +13,7 @@ import { renderLanding } from "./landing.js";
 import { openInbox } from "./inbox.js";
 import { mountStage, refreshStage, refreshStageSoon, showRoute } from "./stage.js";
 import { currentLocale, loadLocale, locales, plural, t, translatePage } from "./i18n.js";
-import { errorText, esc, skeleton } from "./ui.js";
+import { errorText, esc, skeleton, swap } from "./ui.js";
 
 const main = document.getElementById("main");
 const loader = document.querySelector("[data-loader]");
@@ -72,39 +72,40 @@ function progress(value) {
   loader.style.setProperty("--p", value);
 }
 
-const still = matchMedia("(prefers-reduced-motion: reduce)");
+let ink = null;
+// A gentler exit than --ease-exit: its steep tail would move the ink edge a third of the panel in one frame.
+const INK_EXIT = "cubic-bezier(.45,0,.75,.65)";
 
-function paint(update) {
-  if (!loader.classList.contains("gone")) return Promise.resolve(update());
-  if (stageBox.classList.contains("has-three") && !stageBox.hidden) {
-    const column = document.querySelector(".column");
-    if (still.matches) return Promise.resolve(update());
-    const withdraw = column.animate([{ "--ink": "112%" }, { "--ink": "0.5%" }], { duration: 240, easing: "cubic-bezier(.5,0,.9,.4)", fill: "forwards" });
-    return withdraw.finished.then(() => {
-      update();
-      column.scrollTop = 0;
-      column.animate([{ "--ink": "0.5%" }, { "--ink": "112%" }], { duration: 620, easing: "cubic-bezier(.16,.84,.3,1)" });
-      withdraw.cancel();
-    });
-  }
-  if (!document.startViewTransition) return Promise.resolve(update());
-  const transition = document.startViewTransition(update);
-  transition.ready.catch(() => null);
-  return transition.updateCallbackDone.catch(() => null);
+// The panel withdraws behind the ink edge from wherever it is, so a new route can interrupt the last one at any point.
+function inkTo(column, to, duration, easing) {
+  const from = getComputedStyle(column).getPropertyValue("--ink").trim() || "112%";
+  ink?.cancel();
+  ink = column.animate([{ "--ink": from }, { "--ink": to }], { duration, easing, fill: "forwards" });
+  return ink;
+}
+
+async function paint(update) {
+  const inked = loader.classList.contains("gone") && stageBox.classList.contains("has-three") && !stageBox.hidden && !reduced();
+  if (!inked) return update();
+  const column = document.querySelector(".column");
+  const withdraw = inkTo(column, "0.5%", token("duration-withdraw"), INK_EXIT);
+  const done = await withdraw.finished.then(() => true, () => false);
+  if (!done) return false;
+  update();
+  const reveal = inkTo(column, "112%", token("duration-spring"), getComputedStyle(document.documentElement).getPropertyValue("--ease-spring").trim());
+  reveal.finished.then(() => reveal === ink && (reveal.cancel(), (ink = null)), () => null);
 }
 
 function enter() {
   main.setAttribute("aria-busy", "false");
-  [...main.children, ...main.querySelectorAll(".bento > *")].forEach((element, index) =>
-    element.style.setProperty("--i", Math.min(index, 8)),
-  );
+  [...main.querySelectorAll(":scope > header, .bento > *")].forEach((element, index) => element.style.setProperty("--i", Math.min(index, 5)));
   main.setAttribute("data-enter", "");
   setTimeout(() => main.removeAttribute("data-enter"), 1400);
 }
 
 let renders = 0;
 
-async function render() {
+async function render({ navigate = false, refresh = false } = {}) {
   const ticket = ++renders;
   newPage();
   if (!session.signedIn) {
@@ -140,9 +141,19 @@ async function render() {
   const route = current();
   document.documentElement.dataset.chapter = route;
   showRoute(route);
+  if (refresh && main.dataset.route === route) {
+    await swap(main, () => views[route](main, household)).catch(() => null);
+    return;
+  }
   main.setAttribute("aria-busy", "true");
   await paint(() => {
     main.innerHTML = skeleton(route, t(`nav.${route}`));
+    main.dataset.route = route;
+    if (navigate) {
+      window.scrollTo(0, 0);
+      document.querySelector(".column").scrollTop = 0;
+      main.focus({ preventScroll: true });
+    }
   });
   if (ticket !== renders) return;
   document.querySelectorAll(".tabs a, [data-settings-link]").forEach((link) => {
@@ -162,10 +173,11 @@ async function render() {
   }
 }
 
-window.addEventListener("hashchange", async () => {
-  await render();
-  window.scrollTo(0, 0);
-  main.focus({ preventScroll: true });
+window.addEventListener("hashchange", () => render({ navigate: true }));
+
+document.querySelector(".skip").addEventListener("click", (event) => {
+  event.preventDefault();
+  main.focus();
 });
 
 window.addEventListener("hpc:live-state", (event) => {
@@ -179,7 +191,7 @@ window.addEventListener("hpc:live", (event) => {
 });
 
 window.addEventListener("hpc:inventory-changed", () => {
-  if (["now", "fridge"].includes(current()) && !document.querySelector("dialog[open]")) render();
+  if (["now", "fridge"].includes(current()) && !document.querySelector("dialog[open]")) render({ refresh: true });
 });
 
 window.addEventListener("hpc:session-changed", (event) => {
@@ -234,13 +246,17 @@ languageSelect.addEventListener("change", async () => {
 });
 
 progress(0.2);
-await Promise.all([loadLocale(), document.fonts.load("900 1em Fraunces").catch(() => null)]);
+const fontsOrLate = Promise.race([document.fonts.load("900 1em Fraunces").catch(() => null), new Promise((resolve) => setTimeout(resolve, 600))]);
+await Promise.all([loadLocale(), fontsOrLate]);
 progress(0.6);
 drawLanguages();
 await render();
 progress(1);
-setTimeout(() => {
-  loader.classList.add("done");
-  document.documentElement.dataset.ready = "";
-  setTimeout(() => loader.classList.add("gone"), 2400);
-}, 450);
+loader.classList.add("done");
+document.documentElement.dataset.ready = "";
+const leave = () => loader.classList.add("gone");
+if (reduced()) leave();
+else {
+  loader.addEventListener("transitionend", (event) => event.target === loader && leave());
+  setTimeout(leave, token("duration-shutter") + 400);
+}

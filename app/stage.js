@@ -305,15 +305,7 @@ function mountThree(element) {
           zones?.classList.toggle("open", on);
           if (!on) zones?.querySelectorAll(".over").forEach((zone) => zone.classList.remove("over"));
         },
-        onPart: (part, data) => {
-          if (part === "fridge" && data.itemId) focusRequest = data.itemId;
-          if (part === "fridge" && data.trayId) {
-            const target = `#/fridge/${data.trayId}`;
-            if (location.hash === target) window.dispatchEvent(new CustomEvent("hpc:focus-item"));
-            else location.hash = target;
-          }
-          else location.hash = `#/${part}`;
-        },
+        onPart: openPart,
       });
       three.goTo(lastRoute);
       palette(element.closest(".stage"), canvas);
@@ -354,6 +346,17 @@ export function mountStage(element) {
     });
   }
 }
+
+function openPart(part, data) {
+  if (part === "fridge" && data.itemId) focusRequest = data.itemId;
+  if (part === "fridge" && data.trayId) {
+    const target = `#/fridge/${data.trayId}`;
+    if (location.hash === target) window.dispatchEvent(new CustomEvent("hpc:focus-item"));
+    else location.hash = target;
+  } else location.hash = `#/${part}`;
+}
+
+if (location.search.includes("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { openPart });
 
 export function takeFocusRequest() {
   const itemId = focusRequest;

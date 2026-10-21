@@ -809,7 +809,7 @@ main[data-enter] .bento > * {
   padding: 0 max(16px, env(safe-area-inset-left, 0px)) max(3vw, env(safe-area-inset-bottom, 0px));
   background: var(--color-bg);
   overflow: hidden;
-  transition: transform var(--duration-shutter) var(--ease-emphasized) var(--duration-shutter);
+  transition: transform var(--duration-shutter) var(--ease-emphasized);
 }
 .loader-word {
   position: relative;
@@ -837,22 +837,14 @@ main[data-enter] .bento > * {
 }
 .loader.done .loader-shutter { transform: translateY(0); }
 .loader.done { transform: translateY(-100%); }
-html:has(.loader:not(.gone)) { overflow: hidden; }
+html:has(.loader:not(.done)) { overflow: hidden; }
+.loader.done { pointer-events: none; }
 
-.stage { view-transition-name: stage; }
-.column { view-transition-name: column; }
-::view-transition-old(stage), ::view-transition-new(stage) { animation: none; }
-::view-transition-group(stage) { animation: none; }
-::view-transition-old(column) { animation: column-out 140ms var(--ease-standard) both; }
-::view-transition-new(column) { animation: column-in var(--duration-slow) var(--ease-emphasized) both; }
-@keyframes column-out { to { opacity: 0; } }
-@keyframes column-in { from { opacity: 0; transform: translateY(var(--rise)); } }
 
 @media (prefers-reduced-motion: reduce) {
   .skel, main[data-enter] > *, main[data-enter] .bento > * { animation: none; }
   .loader { transition: opacity 1ms; }
   .loader.done { transform: none; opacity: 0; }
-  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none; }
 }
 
 /* Shell: the fridge stage on the left, the chapter column on the right */
@@ -1480,7 +1472,7 @@ a.button:active { transform: scale(0.97); }
   .market-hero .hero-figure { grid-column: 1; grid-row: auto; justify-items: start; }
   .market-hero .hero-figure .data { font-size: 56px; }
   .fridge-hero .hero-figure { grid-column: 1; grid-row: auto; font-size: 56px; }
-  .fridge-hero .lead { display: none; }
+  .fridge-hero .lead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .shelf-chips { flex-wrap: wrap; }
   .shelf-chips a { min-height: 40px; padding: 8px 14px; font-size: var(--size-small); }
   .shelf-tile header { flex-wrap: wrap; gap: var(--space-s); }
@@ -1505,13 +1497,6 @@ a.button:active { transform: scale(0.97); }
 }
 @keyframes leader-draw { from { transform: scaleX(0); } }
 
-/* Moving between parts: the old panel slides back into the fridge, the new one slides out of it */
-@media (min-width: 1024px) {
-  :root:has(.stage.has-three:not([hidden]))::view-transition-old(column) { animation: panel-out 180ms var(--ease-standard) both; }
-  :root:has(.stage.has-three:not([hidden]))::view-transition-new(column) { animation: panel-in 460ms var(--ease-emphasized) 60ms both; }
-}
-@keyframes panel-out { to { opacity: 0; transform: translateX(-28px); } }
-@keyframes panel-in { from { opacity: 0; transform: translateX(-56px); } }
 @media (prefers-reduced-motion: reduce) {
   .stage.has-three .stage-leader.draw { animation: none; }
 }
