@@ -99,6 +99,8 @@ createServer((request, response) => {
   if (url.startsWith("/api/v1/")) {
     const path = url.slice(7);
     if (path.includes("/stream")) { response.writeHead(200, { "content-type": "text/event-stream" }); return; }
+    const failing = path.match(/\/items\/[^/]+\/(move|consume|discard)$/)?.[1];
+    if (failing && (request.headers.referer ?? "").includes(`fail=${failing}`)) { response.writeHead(500, { "content-type": "application/problem+json" }); response.end('{"title":"Mock failure"}'); return; }
     const route = routes.find(([pattern]) => pattern.test(path));
     if (!route && request.method === "GET") { response.writeHead(404, { "content-type": "application/problem+json" }); response.end('{"title":"Not found"}'); return; }
     response.writeHead(200, { "content-type": "application/json" });
