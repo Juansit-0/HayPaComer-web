@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mock": "node tools/mock/server.mjs",
+    "check": "node tools/check-texts.mjs && node --test tools/checks"
+  }
+}
