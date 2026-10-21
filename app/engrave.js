@@ -97,10 +97,36 @@ function inkNormals(geometry) {
 const ink = new THREE.ShaderMaterial({
   uniforms: { thickness: { value: 0.0045 }, color: { value: new THREE.Color("#121212") } },
   vertexShader:
-    "uniform float thickness; attribute vec3 inkNormal; void main() { float wobble = 0.82 + 0.22 * (sin(position.x * 71.0) + sin(position.y * 83.0 + 1.3) + sin(position.z * 67.0 + 2.1)) / 3.0; float reach = 0.4 + 0.35 * max(0.0, -(modelViewMatrix * vec4(position, 1.0)).z); gl_Position = projectionMatrix * modelViewMatrix * vec4(position + inkNormal * thickness * wobble * reach, 1.0); }",
+    "uniform float thickness;\nattribute vec3 inkNormal;\nvoid main() {\n  vec4 local = vec4(position, 1.0);\n  vec3 push = inkNormal;\n  #ifdef USE_INSTANCING\n  local = instanceMatrix * local;\n  push = mat3(instanceMatrix) * inkNormal;\n  #endif\n  float wobble = 0.82 + 0.22 * (sin(position.x * 71.0) + sin(position.y * 83.0 + 1.3) + sin(position.z * 67.0 + 2.1)) / 3.0;\n  float reach = 0.4 + 0.35 * max(0.0, -(modelViewMatrix * local).z);\n  gl_Position = projectionMatrix * modelViewMatrix * vec4(local.xyz + normalize(push) * thickness * wobble * reach, 1.0);\n}",
   fragmentShader: "uniform vec3 color; void main() { gl_FragColor = vec4(color, 1.0); }",
   side: THREE.BackSide,
 });
+
+export function instance(model, placements) {
+  const parts = [];
+  model.updateMatrixWorld(true);
+  model.traverse((child) => {
+    if (child.isMesh && !child.userData.outline) parts.push(child);
+  });
+  const root = new THREE.Group();
+  const matrix = new THREE.Matrix4();
+  for (const part of parts) {
+    const local = part.matrixWorld.clone();
+    const inked = part.children.some((line) => line.userData.outline);
+    const meshes = [new THREE.InstancedMesh(part.geometry, part.material, placements.length)];
+    if (inked) {
+      inkNormals(part.geometry);
+      meshes.push(new THREE.InstancedMesh(part.geometry, ink, placements.length));
+    }
+    for (const instanced of meshes) {
+      placements.forEach((placement, index) => instanced.setMatrixAt(index, matrix.multiplyMatrices(placement, local)));
+      instanced.instanceMatrix.needsUpdate = true;
+      instanced.computeBoundingSphere();
+      root.add(instanced);
+    }
+  }
+  return root;
+}
 
 export function outline(root) {
   const meshes = [];
