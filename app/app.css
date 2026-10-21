@@ -1171,7 +1171,7 @@ html:has(.loader:not(.done)) { overflow: hidden; }
 /* Chef: a real conversation, a round composer, and the guided step as a poster */
 .chef-tile { display: grid; gap: var(--space-m); }
 .chat { gap: var(--space-s); }
-.chat > li { max-width: min(78%, 620px); padding: var(--space-s) var(--space-m); border-radius: 22px; animation: rise var(--duration-base) var(--ease-emphasized) both; }
+.chat > li { max-width: min(78%, 620px); padding: var(--space-s) var(--space-m); border-radius: 22px; }
 .chat .said { justify-self: end; background: var(--color-tinta); color: var(--color-arroz); border-bottom-right-radius: 6px; }
 .chat .said .who { color: color-mix(in oklab, var(--color-arroz) 70%, transparent); }
 .chat .answer { justify-self: start; border: 0; background: var(--color-surface); border-bottom-left-radius: 6px; }
@@ -1195,7 +1195,7 @@ button.round { min-height: 48px; padding: 0 20px; }
 .cooking .step-text { font-size: clamp(22px, 2.2vw, 32px); line-height: 1.25; }
 .cooking .hint, .cooking .status { color: color-mix(in oklab, var(--color-arroz) 75%, transparent); }
 @media (prefers-reduced-motion: reduce) {
-  .chat > li, .chat .typing span { animation: none; }
+  .chat .typing span { animation: none; }
 }
 .prompts { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
 .chip-button { min-height: 48px; border-radius: var(--radius-full); background: var(--color-surface); font-weight: 600; }

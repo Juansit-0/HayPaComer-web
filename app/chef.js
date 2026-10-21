@@ -3,9 +3,13 @@ import { currentLocale, foodName, locales, plural, recipeName, t } from "./i18n.
 import { candidate, dishCard, kitchenRecipes } from "./now.js";
 import { highlightFoods, shapeClass } from "./stage.js";
 import { daysLeft, esc, grams, toast, whenText } from "./ui.js";
+import { reduced } from "./motion.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
-const state = { conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null };
+const state = { conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, shown: null };
+
+const arrive = (element) => element?.animate([{ opacity: 0, translate: "0 var(--rise)" }, { opacity: 1, translate: "0 0" }], { duration: 420, easing: "cubic-bezier(.16,.84,.3,1)" });
+const scrollBehavior = () => (reduced() ? "auto" : "smooth");
 const TOOLS = ["query_inventory", "view_expiries", "view_market_list", "view_cold_chain", "view_weekly_plan", "recall_memory", "review_budget", "investigate_cold", "waste_patterns"];
 const SOON_DAYS = 2;
 
@@ -188,8 +192,10 @@ export async function renderChef(main, household) {
     state.messages.push({ role: "user", text });
     input.value = "";
     const chat = main.querySelector("[data-chat]");
-    chat.innerHTML = `${state.messages.map(message).join("")}<li class="answer typing" aria-label="${esc(t("chef.thinking"))}"><span></span><span></span><span></span></li>`;
-    chat.lastElementChild.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    chat.insertAdjacentHTML("beforeend", `${message(state.messages.at(-1))}<li class="answer typing" aria-label="${esc(t("chef.thinking"))}"><span></span><span></span><span></span></li>`);
+    state.shown = state.messages.length;
+    arrive(chat.lastElementChild.previousElementSibling);
+    chat.lastElementChild.scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
     try {
       const reply = await api(`${base}/agent/chat`, {
         method: "POST",
@@ -270,7 +276,11 @@ export async function renderChef(main, household) {
     }),
   );
 
-  main.querySelector("[data-chat]").lastElementChild?.scrollIntoView({ block: "nearest" });
+  const chat = main.querySelector("[data-chat]");
+  const grew = state.shown !== null && state.messages.length > state.shown;
+  if (grew) arrive(chat.lastElementChild);
+  state.shown = state.messages.length;
+  chat.lastElementChild?.scrollIntoView({ block: "nearest", behavior: grew ? scrollBehavior() : "auto" });
   let wanted = null;
   try {
     wanted = sessionStorage.getItem("hpc.chef.cook");
