@@ -288,20 +288,48 @@ export function wireDateFields(root) {
   });
 }
 
+const sheetMotion = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const cssValue = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const compactSheet = () => matchMedia("(max-width: 760px)").matches;
+
+// Every way out (close button, backdrop, Esc, a finished form) plays the exit before the dialog really closes.
+export function closeSheet(dialog) {
+  if (!dialog.open || dialog.dataset.closing) return;
+  const shut = () => HTMLDialogElement.prototype.close.call(dialog);
+  if (!sheetMotion()) return shut();
+  dialog.dataset.closing = "";
+  const duration = parseFloat(cssValue("--duration-withdraw")) || 180;
+  const easing = cssValue("--ease-exit") || "ease-in";
+  dialog.animate({ opacity: [1, 0] }, { duration, easing, pseudoElement: "::backdrop", fill: "forwards" });
+  dialog
+    .animate([{ translate: "0 0", opacity: 1 }, { translate: compactSheet() ? "0 100%" : "0 24px", opacity: compactSheet() ? 1 : 0 }], { duration, easing, fill: "forwards" })
+    .finished.finally(shut);
+}
+
 export function openSheet(title, body, onReady) {
   const dialog = document.createElement("dialog");
   dialog.className = "sheet";
   dialog.setAttribute("aria-label", title);
   dialog.innerHTML = `<div><div class="sheet-head"><h2>${esc(title)}</h2><button type="button" class="ghost" data-close>${t("action.close")}</button></div>${body}</div>`;
   document.body.append(dialog);
-  dialog.querySelector("[data-close]").addEventListener("click", () => dialog.close());
+  dialog.close = () => closeSheet(dialog);
+  dialog.querySelector("[data-close]").addEventListener("click", () => closeSheet(dialog));
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeSheet(dialog);
+  });
   dialog.addEventListener("close", () => dialog.remove());
   dialog.addEventListener("click", (event) => {
-    if (event.target === dialog) dialog.close();
+    if (event.target === dialog) closeSheet(dialog);
   });
   wireSteppers(dialog);
   wireDateFields(dialog);
   dialog.showModal();
+  if (sheetMotion()) {
+    const duration = parseFloat(cssValue("--duration-spring")) || 745;
+    dialog.animate({ opacity: [0, 1] }, { duration: duration / 2, easing: "ease-out", pseudoElement: "::backdrop" });
+    dialog.animate([{ translate: compactSheet() ? "0 100%" : "0 24px", opacity: compactSheet() ? 1 : 0 }, { translate: "0 0", opacity: 1 }], { duration, easing: cssValue("--ease-spring") || "ease-out" });
+  }
   onReady?.(dialog);
   return dialog;
 }

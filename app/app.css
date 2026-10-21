@@ -422,11 +422,12 @@ input.money { width: var(--number-width-money); }
   color: var(--color-bg);
   box-shadow: var(--shadow-raised);
   opacity: 0;
+  translate: 0 var(--rise);
   pointer-events: none;
-  transition: opacity var(--duration-base) var(--ease-standard);
+  transition: opacity var(--duration-withdraw) var(--ease-exit), translate var(--duration-withdraw) var(--ease-exit);
 }
 
-.toast.visible { opacity: 1; }
+.toast.visible { opacity: 1; translate: 0 0; transition: opacity var(--duration-base) var(--ease-standard), translate var(--duration-spring) var(--ease-spring); }
 
 @media (max-width: 760px) {
   .bar { flex-wrap: wrap; padding: var(--space-xs) var(--space-s); }
@@ -630,8 +631,6 @@ dialog.sheet {
 dialog.sheet::backdrop { background: var(--scrim); }
 dialog.sheet > form, dialog.sheet > div { display: grid; gap: var(--space-m); padding: var(--space-m); }
 dialog.sheet .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-s); }
-dialog.sheet[open] { animation: sheet-in var(--duration-slow) var(--ease-standard); }
-@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } }
 
 @media (max-width: 760px) {
   .bento { grid-template-columns: repeat(var(--bento-columns-compact), minmax(0, 1fr)); }
