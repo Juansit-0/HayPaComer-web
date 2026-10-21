@@ -620,7 +620,7 @@ const VIGNETTES = {
   plate: { build: plateScene, position: [0.48, 1.22, 0.66], target: [0.02, 0.8, 0.02], fov: 34 },
 };
 
-export function renderVignettes(defaultWidth, defaultHeight) {
+export function renderVignettes(defaultWidth, defaultHeight, kinds = Object.keys(VIGNETTES)) {
   const canvas = document.createElement("canvas");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -628,7 +628,9 @@ export function renderVignettes(defaultWidth, defaultHeight) {
   renderer.toneMapping = THREE.NoToneMapping;
   inkBias.value = 0.06;
   const pictures = {};
-  Object.entries(VIGNETTES).forEach(([kind, view]) => {
+  Object.entries(VIGNETTES)
+    .filter(([kind]) => kinds.includes(kind))
+    .forEach(([kind, view]) => {
     const [width, height] = view.size ?? [defaultWidth, defaultHeight];
     renderer.setSize(width, height, false);
     const scene = new THREE.Scene();

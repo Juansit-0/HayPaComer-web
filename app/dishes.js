@@ -1,6 +1,5 @@
 import { recipeName, t } from "./i18n.js";
 import { esc } from "./ui.js";
-import { shapeClass } from "./stage.js";
 
 const PHOTOS = {
   "arepa with cheese": ["arepa", "Raymvc97, CC BY-SA 4.0"],
@@ -18,8 +17,15 @@ export function dishPicture(name, foods = []) {
       <figcaption>${esc(t("photo.credit", { credit: photo[1] }))}</figcaption>
     </figure>`;
   }
-  return `<div class="dish-plate" aria-hidden="true"><span class="plate">${foods
-    .slice(0, 5)
-    .map((food) => `<i class="${shapeClass(food)}"></i>`)
-    .join("")}</span></div>`;
+  return `<figure class="dish-photo dish-engraved" aria-hidden="true"><img data-engraving="plate" alt="" width="480" height="480"></figure>`;
 }
+
+let engravings = null;
+
+export function paintEngravings(root) {
+  const images = root.querySelectorAll("[data-engraving]");
+  if (!images.length || !document.createElement("canvas").getContext("webgl2")) return;
+  engravings ??= import("./story3d.js").then(({ renderVignettes }) => renderVignettes(480, 480, ["plate"]));
+  engravings.then((pictures) => images.forEach((image) => (image.src = pictures[image.dataset.engraving]))).catch(() => null);
+}
+

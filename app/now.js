@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { dishPicture } from "./dishes.js";
+import { dishPicture, paintEngravings } from "./dishes.js";
 import { liveFeed } from "./live.js";
 import { foodName, formatTime, plural, recipeName, t } from "./i18n.js";
 import { busy, esc, expiryText, grams, kpi, numberField, showError, statusPill, toast, wireSteppers } from "./ui.js";
@@ -196,6 +196,7 @@ export async function renderNow(main, household) {
       const dishes = result.suggestions.slice(0, DISHES);
       answer.textContent = dishes.length ? plural("now.answer", dishes.length) : t("now.answer.none");
       box.innerHTML = dishes.length ? dishes.map(dishCard).join("") : "";
+      paintEngravings(box);
       box.querySelectorAll("[data-cook]").forEach((button) =>
         button.addEventListener("click", () => {
           try {
