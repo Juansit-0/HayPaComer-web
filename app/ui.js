@@ -295,6 +295,7 @@ const compactSheet = () => matchMedia("(max-width: 760px)").matches;
 // Every way out (close button, backdrop, Esc, a finished form) plays the exit before the dialog really closes.
 export function closeSheet(dialog) {
   if (!dialog.open || dialog.dataset.closing) return;
+  dialog.dispatchEvent(new Event("closing"));
   const shut = () => HTMLDialogElement.prototype.close.call(dialog);
   if (!sheetMotion()) return shut();
   dialog.dataset.closing = "";

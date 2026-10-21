@@ -145,8 +145,10 @@ const SHARES = [1, 0.5, 0.25];
 
 async function undoable(task, message) {
   const base = `/households/${household.id}`;
+  let ok = false;
   try {
     await task();
+    ok = true;
     toast(message, {
       label: t("stage.undo"),
       run: async () => {
@@ -158,6 +160,7 @@ async function undoable(task, message) {
     toast(error.message);
   }
   changed();
+  return ok;
 }
 
 async function quickAdd(food, trayId) {
@@ -174,12 +177,10 @@ async function act(drop) {
   const base = `/households/${household.id}`;
   const food = foodName(drop.item.name);
   if (drop.kind === "move") {
-    await undoable(() => api(`${base}/items/${drop.item.id}/move`, { method: "POST", body: { trayId: drop.trayId } }), t("stage.moved", { food }));
-    return;
+    return undoable(() => api(`${base}/items/${drop.item.id}/move`, { method: "POST", body: { trayId: drop.trayId } }), t("stage.moved", { food }));
   }
   if (drop.kind === "discard") {
-    await undoable(() => api(`${base}/items/${drop.item.id}/discard`, { method: "POST" }), t("fridge.toast-discarded", { food }));
-    return;
+    return undoable(() => api(`${base}/items/${drop.item.id}/discard`, { method: "POST" }), t("fridge.toast-discarded", { food }));
   }
   const total = Number(drop.item.grams);
   const dialog = openSheet(
@@ -190,19 +191,23 @@ async function act(drop) {
       </button>`,
     ).join("")}</div>`,
   );
-  let used = false;
-  dialog.addEventListener("close", () => used || changed(), { once: true });
-  dialog.querySelectorAll("[data-grams]").forEach((button) =>
-    button.addEventListener("click", async () => {
-      used = true;
-      const amount = Number(button.dataset.grams);
-      dialog.close();
-      await undoable(
-        () => api(`${base}/items/${drop.item.id}/consume`, { method: "POST", body: { grams: amount } }),
-        t("now.toast-used", { grams: grams(amount), food }),
-      );
-    }),
-  );
+  return new Promise((resolve) => {
+    let used = false;
+    ["closing", "close"].forEach((type) => dialog.addEventListener(type, () => used || resolve(false), { once: true }));
+    dialog.querySelectorAll("[data-grams]").forEach((button) =>
+      button.addEventListener("click", async () => {
+        used = true;
+        const amount = Number(button.dataset.grams);
+        dialog.close();
+        resolve(
+          await undoable(
+            () => api(`${base}/items/${drop.item.id}/consume`, { method: "POST", body: { grams: amount } }),
+            t("now.toast-used", { grams: grams(amount), food }),
+          ),
+        );
+      }),
+    );
+  });
 }
 
 function palette(stageBox, canvas) {

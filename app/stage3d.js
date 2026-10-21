@@ -1,6 +1,7 @@
 import * as THREE from "./vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
 import { boil, css, engrave, foodModel, group, hash, lathe, mesh, outline, paint, sized } from "./engrave.js";
+import { damp, loop, SPRINGS, springConstants, springStep } from "./motion.js";
 
 const W = 0.72;
 const H = 1.7;
@@ -20,7 +21,32 @@ const VIEWS = {
   settings: { position: [0.32, 1.02, 1.12], target: [0, 0.98, -0.2], door: DOOR_OPEN, freezer: 0 },
 };
 
-const ease = (x) => 1 - Math.pow(1 - x, 4);
+const CAMERA = springConstants(SPRINGS.camera);
+const DOOR = springConstants(SPRINGS.door);
+const DROP = springConstants(SPRINGS.drop);
+const RETURN = springConstants(SPRINGS.snappy);
+const RING_RADIAL = 16;
+const RING_TUBULAR = 96;
+
+// A full torus whose triangles run around the ring, so setDrawRange shows any arc without new geometry.
+function ringArc(radius, tube) {
+  const geometry = new THREE.TorusGeometry(radius, tube, RING_RADIAL, RING_TUBULAR);
+  const index = [];
+  const row = RING_TUBULAR + 1;
+  for (let i = 1; RING_TUBULAR >= i; i++) {
+    for (let j = 1; RING_RADIAL >= j; j++) {
+      const a = row * j + i - 1;
+      const b = row * (j - 1) + i - 1;
+      const c = row * (j - 1) + i;
+      const d = row * j + i;
+      index.push(a, b, d, b, c, d);
+    }
+  }
+  geometry.setIndex(index);
+  return geometry;
+}
+
+const arcRange = (share) => Math.round(Math.min(1, Math.max(0, share)) * RING_TUBULAR) * RING_RADIAL * 6;
 
 function labelTexture(text, background, color) {
   const canvas = document.createElement("canvas");
@@ -269,9 +295,11 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       rings.userData.arcs = [0.24, 0.17, 0.1].map((radius, index) => {
         const color = [css("--color-cilantro"), css("--color-papa"), css("--color-tomate")][index];
         rings.add(mesh(new THREE.TorusGeometry(radius, 0.022, 16, 96), paint("#e9e7e0", { roughness: 0.6 })));
-        const arc = mesh(new THREE.TorusGeometry(radius, 0.026, 16, 96, Math.PI * 1.2), paint(color), (m) => {
+        const arc = mesh(ringArc(radius, 0.026), paint(color), (m) => {
           m.rotation.z = Math.PI / 2;
           m.userData.noOutline = true;
+          m.userData.share = 0.02;
+          m.geometry.setDrawRange(0, arcRange(0.02));
         });
         rings.add(arc);
         return arc;
@@ -295,7 +323,14 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     freezer: 0,
     position: new THREE.Vector3(...VIEWS.now.position),
     target: new THREE.Vector3(...VIEWS.now.target),
-    tween: null,
+    axes: [...VIEWS.now.position, ...VIEWS.now.target].map((value) => ({ value, velocity: 0 })),
+    goals: [...VIEWS.now.position, ...VIEWS.now.target],
+    doorSpring: { value: DOOR_OPEN, velocity: 0 },
+    freezerSpring: { value: 0, velocity: 0 },
+    doorGoal: DOOR_OPEN,
+    freezerGoal: 0,
+    moving: false,
+    gaze: new THREE.Vector2(),
     hover: null,
     pointer: new THREE.Vector2(9, 9),
     tilt: new THREE.Vector2(),
@@ -309,6 +344,10 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   };
   camera.position.copy(state.position);
   camera.lookAt(state.target);
+  let film = null;
+  const flights = new Map();
+  const scratch = new THREE.Vector3();
+  const lifted = new THREE.Vector3();
 
   let arrived = false;
   function goTo(route) {
@@ -316,12 +355,15 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     arrived = true;
     const view = VIEWS[route] ?? VIEWS.now;
     state.route = route;
-    state.tween = {
-      start: performance.now(),
-      duration: 1300,
-      from: { position: state.position.clone(), target: state.target.clone(), door: state.door, freezer: state.freezer },
-      to: { position: new THREE.Vector3(...view.position), target: new THREE.Vector3(...view.target), door: view.door, freezer: view.freezer },
-    };
+    state.goals = [...view.position, ...view.target];
+    state.doorGoal = view.door;
+    state.freezerGoal = view.freezer;
+    if (reduced) {
+      state.axes.forEach((axis, index) => Object.assign(axis, { value: state.goals[index], velocity: 0 }));
+      Object.assign(state.doorSpring, { value: view.door, velocity: 0 });
+      Object.assign(state.freezerSpring, { value: view.freezer, velocity: 0 });
+    }
+    film?.wake();
     Object.entries(extras).forEach(([key, extra]) => {
       extra.userData.goal = key === route ? 1 : 0;
       if (key === route) extra.visible = true;
@@ -334,6 +376,8 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       deferred = [fridgeTree, inventory];
       return;
     }
+    flights.clear();
+    film?.wake();
     const known = new Map([...items.children, ...doorItems.children].map((model) => [model.userData.key, model.userData.item?.trayId]));
     [...items.children, ...doorItems.children].forEach(release);
     items.clear();
@@ -452,21 +496,25 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
 
   function setRings(shares, labels = []) {
     state.ringShares = shares;
+    film?.wake();
     ringTags.forEach((element, index) => (element.textContent = labels[index] ?? ""));
   }
 
   function highlight(names) {
     state.highlight = new Set(names.map((name) => name.toLowerCase()));
+    film?.wake();
   }
 
   function focus(itemId) {
     state.focusId = itemId;
+    film?.wake();
   }
 
   function setStatus(twin) {
     state.doorAlarm = Boolean(twin?.doorOpen);
     const celsius = twin?.celsius;
     state.frost = celsius === null || celsius === undefined ? 0 : THREE.MathUtils.clamp((5 - celsius) / 5, 0, 1) * 0.55;
+    film?.wake();
   }
 
   const raycaster = new THREE.Raycaster();
@@ -574,11 +622,18 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       return;
     }
     const sameTray = target?.kind === "tray" && target.trayId === item.trayId;
+    const home = drag.origin.clone();
     if (target && !sameTray) {
-      model.visible = false;
-      onDrop(target.kind === "tray" ? { kind: "move", item, trayId: target.trayId } : { kind: target.kind, item });
+      const into = target.kind !== "tray";
+      const destination = into ? target.object.getWorldPosition(new THREE.Vector3()).add(lifted.set(0, 0.08, 0)) : model.getWorldPosition(new THREE.Vector3());
+      fly(model, model.parent.worldToLocal(destination), into ? 0.15 : 1);
+      const settle = (ok) => {
+        if (!ok) fly(model, home, 1);
+        else setTimeout(() => model.parent && fly(model, home, 1), 1500);
+      };
+      Promise.resolve(onDrop(target.kind === "tray" ? { kind: "move", item, trayId: target.trayId } : { kind: target.kind, item })).then(settle, () => settle(false));
     } else {
-      model.position.copy(drag.origin);
+      fly(model, home, 1);
     }
   });
 
@@ -637,6 +692,13 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     return target?.trayId ?? null;
   }
 
+  // A dropped food flies on the drop spring; a failed or cancelled drop flies it back home, so it is never left hidden.
+  function fly(model, to, scale) {
+    flights.set(model, { spring: scale === 1 ? RETURN : DROP, from: model.position.clone(), to, scaleFrom: flights.get(model)?.scale ?? 1, scaleTo: scale, scale: flights.get(model)?.scale ?? 1, progress: { value: reduced ? 1 : 0, velocity: 0 } });
+    model.visible = true;
+    film?.wake();
+  }
+
   function resize() {
     const { clientWidth, clientHeight } = canvas;
     if (!clientWidth || !clientHeight) return;
@@ -653,7 +715,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   function anchor() {
     const part = anchors()[state.route];
     if (!part || !onAnchor) return;
-    const spot = part.getWorldPosition(new THREE.Vector3()).project(camera);
+    const spot = part.getWorldPosition(scratch).project(camera);
     const x = Math.round(canvas.offsetLeft + ((spot.x + 1) / 2) * canvas.clientWidth);
     const y = Math.round(canvas.offsetTop + ((1 - spot.y) / 2) * canvas.clientHeight);
     const inside = spot.z < 1 && Math.abs(spot.x) <= 1 && Math.abs(spot.y) <= 1;
@@ -667,8 +729,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     const placed = [];
     const ordered = [...tags]
       .map(([model, tag]) => {
-        const anchor = model.parent.localToWorld(model.position.clone().add(new THREE.Vector3(0, (model.userData.height ?? 0.1) * (model.userData.fit ?? 1) + 0.012, 0)));
-        const spot = anchor.project(camera);
+        const spot = model.parent.localToWorld(scratch.copy(model.position).setY(model.position.y + (model.userData.height ?? 0.1) * (model.userData.fit ?? 1) + 0.012)).project(camera);
         return { model, tag, x: ((spot.x + 1) / 2) * canvas.clientWidth, y: ((1 - spot.y) / 2) * canvas.clientHeight };
       })
       .sort((a, b) => b.tag.soon - a.tag.soon || b.model.position.z - a.model.position.z || a.x - b.x);
@@ -700,23 +761,31 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     });
   }
 
-  const clock = new THREE.Clock();
-  function frame(now) {
+  const settled = (a, b, epsilon = 1e-3) => epsilon >= Math.abs(a - b);
+
+  // Runs on the shared loop: returns true while anything still moves; otherwise the loop drops to the 8 Hz boil and freezes 5 s after the last interaction.
+  function tick(dt, seconds) {
+    const now = seconds * 1000;
+    const delta = dt;
+    let moving = Boolean(drag.model);
     if (!reduced) boil(now);
-    const delta = Math.min(clock.getDelta(), 0.05);
-    if (state.tween) {
-      const progress = Math.min(1, (now - state.tween.start) / state.tween.duration);
-      const k = ease(progress);
-      state.position.lerpVectors(state.tween.from.position, state.tween.to.position, k);
-      state.target.lerpVectors(state.tween.from.target, state.tween.to.target, k);
-      state.door = THREE.MathUtils.lerp(state.tween.from.door, state.tween.to.door, reduced ? k : spring(Math.min(1, progress * 1.15)));
-      state.freezer = THREE.MathUtils.lerp(state.tween.from.freezer, state.tween.to.freezer, k);
-      if (progress === 1) state.tween = null;
-    }
+    let travelling = false;
+    state.axes.forEach((axis, index) => (travelling = springStep(axis, state.goals[index], CAMERA, delta) || travelling));
+    travelling = springStep(state.doorSpring, state.doorGoal, DOOR, delta) || travelling;
+    travelling = springStep(state.freezerSpring, state.freezerGoal, CAMERA, delta) || travelling;
+    moving ||= travelling;
+    const [px, py, pz, tx, ty, tz] = state.axes.map((axis) => axis.value);
+    state.position.set(px, py, pz);
+    state.target.set(tx, ty, tz);
+    state.door = state.doorSpring.value;
+    state.freezer = state.freezerSpring.value;
+    state.gaze.x = damp(state.gaze.x, reduced ? 0 : state.tilt.x, 4, delta);
+    state.gaze.y = damp(state.gaze.y, reduced ? 0 : state.tilt.y, 4, delta);
+    moving ||= !settled(state.gaze.x, reduced ? 0 : state.tilt.x) || !settled(state.gaze.y, reduced ? 0 : state.tilt.y);
     const reach = Math.max(1.32, 1.05 / camera.aspect);
     camera.position.set(
-      state.target.x + (state.position.x - state.target.x) * reach + state.tilt.x * 0.12,
-      state.target.y + (state.position.y - state.target.y) * reach - state.tilt.y * 0.08,
+      state.target.x + (state.position.x - state.target.x) * reach + state.gaze.x * 0.12,
+      state.target.y + (state.position.y - state.target.y) * reach - state.gaze.y * 0.08,
       state.target.z + (state.position.z - state.target.z) * reach,
     );
     camera.lookAt(state.target);
@@ -724,30 +793,33 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     freezerPivot.rotation.y = state.freezer;
     Object.entries(extras).forEach(([key, extra]) => {
       const goal = extra.userData.goal ?? 0;
-      const scale = THREE.MathUtils.damp(extra.scale.x, goal || 0.001, 6, delta);
+      const scale = damp(extra.scale.x, goal || 0.001, 6, delta);
+      moving ||= !settled(scale, goal || 0.001);
       extra.scale.setScalar(scale);
       if (goal === 0 && scale < 0.01) extra.visible = false;
       if (key === "now" || key === "market") extra.rotation.y += delta * 0.35;
       if (key === "numbers") {
         extra.userData.arcs.forEach((arc, index) => {
-          const share = Math.max(0.02, state.ringShares[index] ?? 0);
-          const geometry = arc.geometry;
-          const wanted = Math.PI * 2 * share;
-          if (Math.abs((geometry.parameters.arc ?? 0) - wanted) > 0.01) {
-            const next = THREE.MathUtils.damp(geometry.parameters.arc, wanted, 4, delta);
-            arc.geometry.dispose();
-            arc.geometry = new THREE.TorusGeometry(geometry.parameters.radius, geometry.parameters.tube, 16, 96, next);
-          }
+          const wanted = Math.max(0.02, state.ringShares[index] ?? 0);
+          if (settled(arc.userData.share, wanted)) return;
+          arc.userData.share = damp(arc.userData.share, wanted, 4, delta);
+          arc.geometry.setDrawRange(0, arcRange(arc.userData.share));
+          moving = true;
         });
       }
     });
     book.position.y = H + (state.route === "chef" ? 0.08 + Math.sin(now / 600) * 0.01 : 0);
-    knob.rotation.z = THREE.MathUtils.damp(knob.rotation.z, state.route === "settings" ? -2.1 : 0, 5, delta);
+    const knobGoal = state.route === "settings" ? -2.1 : 0;
+    knob.rotation.z = damp(knob.rotation.z, knobGoal, 5, delta);
+    moving ||= !settled(knob.rotation.z, knobGoal);
     parts.forEach((objects, part) => {
       const lift = part === state.hover ? 1 : 0;
       objects.forEach((object) => {
         if (object.userData.glowing) return;
-        object.userData.lift = THREE.MathUtils.damp(object.userData.lift ?? 0, lift, 10, delta);
+        const before = object.userData.lift ?? 0;
+        if (settled(before, lift)) return;
+        object.userData.lift = damp(before, lift, 10, delta);
+        moving = true;
         object.traverse((child) => {
           if (child.isMesh && child.material.emissive) child.material.emissive.setScalar(object.userData.lift * 0.06);
         });
@@ -756,12 +828,15 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     const open = THREE.MathUtils.clamp(-state.door / 1.2, 0, 1);
     if (open > 0.05 && !state.lit) state.litAt = now;
     state.lit = open > 0.05;
-    const flicker = 260 > now - state.litAt && !reduced ? (Math.sin(now * 0.09) > 0 ? 1 : 0.35) : 1;
+    const flickering = 260 > now - state.litAt && !reduced;
+    moving ||= flickering;
+    const flicker = flickering ? (Math.sin(now * 0.09) > 0 ? 1 : 0.35) : 1;
     inside.intensity = open * 0.6 * flicker;
 
     const doorPanel = door.children[0].material;
     doorPanel.color.lerpColors(WHITE, ALARM, state.doorAlarm ? 0.18 + Math.sin(now / 420) * 0.06 : 0);
-    frost.material.opacity = THREE.MathUtils.damp(frost.material.opacity, state.frost, 2, delta);
+    frost.material.opacity = damp(frost.material.opacity, state.frost, 2, delta);
+    moving ||= !settled(frost.material.opacity, state.frost);
 
     const positions = vapor.geometry.attributes.position;
     puffs.forEach((puff, index) => {
@@ -778,14 +853,32 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
 
     [...items.children, ...doorItems.children].forEach((model) => {
       const age = (now - model.userData.born) / 520;
-      const base = model.userData.born === 0 || age >= 1 || reduced ? 1 : 0 >= age ? 0.001 : spring(age);
+      const growing = !(model.userData.born === 0 || age >= 1 || reduced);
+      moving ||= growing;
+      const base = growing ? (0 >= age ? 0.001 : spring(age)) : 1;
       const hovered = state.hoverModel === model;
-      model.userData.wobble = THREE.MathUtils.damp(model.userData.wobble ?? 0, hovered ? 1 : 0, 8, delta);
-      model.scale.setScalar(Math.max(0.001, base * (model.userData.fit ?? 1) * (1 + model.userData.wobble * 0.06)));
-      if (model !== drag.model && model.userData.home) {
-        model.userData.push = THREE.MathUtils.damp(model.userData.push ?? 0, pushFor(model), 12, delta);
-        model.position.x = model.userData.home.x + model.userData.push;
+      const wobble = damp(model.userData.wobble ?? 0, hovered ? 1 : 0, 8, delta);
+      moving ||= !settled(wobble, hovered ? 1 : 0);
+      model.userData.wobble = wobble;
+      const flight = flights.get(model);
+      if (flight) {
+        const flying = springStep(flight.progress, 1, flight.spring, delta);
+        const k = flight.progress.value;
+        model.position.lerpVectors(flight.from, flight.to, k);
+        model.position.y += Math.sin(Math.PI * Math.min(1, Math.max(0, k))) * 0.08;
+        flight.scale = flight.scaleFrom + (flight.scaleTo - flight.scaleFrom) * Math.min(1, Math.max(0, k));
+        if (!flying) {
+          model.position.copy(flight.to);
+          if (flight.scaleTo === 1) flights.delete(model);
+        }
+        moving ||= flying;
+      } else if (model !== drag.model && model.userData.home) {
+        const push = damp(model.userData.push ?? 0, pushFor(model), 12, delta);
+        moving ||= !settled(push, pushFor(model));
+        model.userData.push = push;
+        model.position.x = model.userData.home.x + push;
       }
+      model.scale.setScalar(Math.max(0.001, base * (flight?.scale ?? 1) * (model.userData.fit ?? 1) * (1 + wobble * 0.06)));
       const lit = state.highlight.has(String(model.userData.item?.name ?? "").toLowerCase()) || (state.focusId && model.userData.key === state.focusId);
       if (lit || model.userData.lit) {
         const strength = lit ? 0.22 + Math.sin(now / 320) * 0.1 : 0;
@@ -793,25 +886,26 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
         model.userData.lit = lit;
       }
       model.userData.rz ??= model.rotation.z;
-      model.rotation.z = model.userData.rz + (reduced ? 0 : Math.sin(now / 90) * 0.04 * model.userData.wobble);
+      model.rotation.z = model.userData.rz + (reduced ? 0 : Math.sin(now / 90) * 0.04 * wobble);
     });
 
-    const fridgeTags = state.route === "fridge" && open > 0.8 && !state.tween;
+    const fridgeTags = state.route === "fridge" && open > 0.8 && !travelling;
     tagLayer.style.opacity = fridgeTags || state.route === "numbers" ? 1 : 0;
     ringTags.forEach((element, index) => {
       element.style.visibility = state.route === "numbers" && element.textContent ? "" : "hidden";
       if (state.route !== "numbers") return;
       const arc = extras.numbers.userData.arcs[index];
-      const spot = arc.localToWorld(new THREE.Vector3(arc.geometry.parameters.radius, 0, 0)).project(camera);
+      const spot = arc.localToWorld(scratch.set(arc.geometry.parameters.radius, 0, 0)).project(camera);
       element.style.transform = `translate(${((spot.x + 1) / 2) * canvas.clientWidth - 14}px, ${((1 - spot.y) / 2) * canvas.clientHeight}px) translate(-100%, -50%)`;
     });
     placeTags(fridgeTags);
     anchor();
 
     renderer.render(scene, camera);
-    requestAnimationFrame(frame);
+    return moving;
   }
-  requestAnimationFrame(frame);
+  film = loop(canvas, tick, { gpu: true });
+  if (location.search.includes("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { fridge: { renderer, flights, items, doorItems, camera, canvas, pick, state, shelves: () => [...shelfSlots.map((slot) => slot.slab)] } });
 
   return {
     goTo,
