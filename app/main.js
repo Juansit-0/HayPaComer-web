@@ -1,3 +1,4 @@
+import { newPage } from "./motion.js";
 import { api, session } from "./api.js";
 import { chooseHousehold, householdLabel, renderSignIn } from "./auth.js";
 import { renderFridge } from "./fridge.js";
@@ -96,6 +97,7 @@ let renders = 0;
 
 async function render() {
   const ticket = ++renders;
+  newPage();
   if (!session.signedIn) {
     tabs.hidden = true;
     stageBox.hidden = true;

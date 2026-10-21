@@ -1,5 +1,7 @@
 import { formatMoney, formatNumber, t } from "./i18n.js";
 import { esc } from "./ui.js";
+import { page } from "./motion.js";
+import { initialTier, webgl2 } from "./quality.js";
 
 const PRICE_PER_KG = 9750;
 const RESCUED_SHARE = 0.5;
@@ -11,7 +13,7 @@ const STAGE_SCENES = { weigh: "scale", know: "fridge", warn: "door", cook: "plat
 
 function kitPart(key, vignette) {
   return `<li class="kit-part kit-${key}" style="--i:${["door", "probe", "brain", "scale"].indexOf(key)}">
-    <span class="kit-medallion" aria-hidden="true"><img data-vignette="${vignette}" alt="" width="480" height="480"></span>
+    <span class="kit-medallion" aria-hidden="true"><img src="/app/stills/${vignette}.webp" alt="" width="960" height="960" loading="lazy"></span>
     <span class="kit-text"><b>${t(`landing.kit.${key}`)}</b><span>${t(`landing.kit.${key}-text`)}</span></span>
   </li>`;
 }
@@ -79,7 +81,7 @@ export function renderLanding(main) {
           </div>
         </div>
         <figure class="land-vignette" aria-hidden="true">
-          <img data-vignette="fridge" alt="" width="720" height="900">
+          <img src="/app/stills/fridge.webp" alt="" width="768" height="960" loading="lazy">
           <span class="land-label l1">842 g</span><span class="land-label l2">${t("landing.ui.expires")}</span><span class="land-label l3">4,2 °C</span>
         </figure>
       </section>
@@ -96,7 +98,7 @@ export function renderLanding(main) {
           <p class="how-clause" data-clause aria-live="polite">${t(`landing.how.${STAGES[0]}`)}</p>
         </div>
         <div class="how-right">
-          <img class="how-scene" data-vignette="${STAGE_SCENES[STAGES[0]]}" data-how-scene alt="" width="720" height="540" aria-hidden="true">
+          <img class="how-scene" src="/app/stills/${STAGE_SCENES[STAGES[0]]}.webp" data-how-scene alt="" width="960" height="960" loading="lazy" aria-hidden="true">
           <div class="how-fragment" data-ui data-fragment>${stageFragment(STAGES[0])}</div>
         </div>
         <div class="how-slider">
@@ -141,18 +143,7 @@ export function renderLanding(main) {
       </footer>
     </div>`;
 
-  let pictures = {};
-  if (document.createElement("canvas").getContext("webgl2")) {
-    import("./story3d.js")
-      .then(({ renderVignettes }) => {
-        pictures = renderVignettes(720, 720);
-        main.querySelectorAll("[data-vignette]").forEach((image) => {
-          image.src = pictures[image.dataset.vignette];
-        });
-        main.querySelector(".landing").classList.add("drawn");
-      })
-      .catch(() => null);
-  }
+  main.querySelector(".landing").classList.add("drawn");
 
   const range = main.querySelector("[data-stage-range]");
   range.addEventListener("input", () => {
@@ -164,8 +155,7 @@ export function renderLanding(main) {
     fragment.innerHTML = stageFragment(stage);
     main.querySelector("[data-clause]").textContent = t(`landing.how.${stage}`);
     const picture = main.querySelector("[data-how-scene]");
-    picture.dataset.vignette = STAGE_SCENES[stage];
-    if (pictures[STAGE_SCENES[stage]]) picture.src = pictures[STAGE_SCENES[stage]];
+    picture.src = `/app/stills/${STAGE_SCENES[stage]}.webp`;
     main.querySelectorAll("[data-name]").forEach((name) => {
       if (name.dataset.name === range.value) name.setAttribute("aria-current", "step");
       else name.removeAttribute("aria-current");
@@ -187,7 +177,7 @@ export function renderLanding(main) {
   const story = main.querySelector("[data-story]");
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let film = null;
-  if (!still && document.createElement("canvas").getContext("webgl2")) {
+  if (!still && webgl2()) {
     const canvas = document.createElement("canvas");
     canvas.className = "story-canvas";
     canvas.setAttribute("aria-hidden", "true");
@@ -197,21 +187,31 @@ export function renderLanding(main) {
       `<div class="film-captions">${FILM.map(([key, from, to, corner]) => `<p class="story-caption c${corner}" data-from="${from}" data-to="${to}">${t(key)}</p>`).join("")}</div>`,
     );
     story.classList.add("filming");
-    import("./story3d.js")
-      .then(({ createStory }) => {
-        film = createStory(canvas);
+    const signal = page.signal;
+    const fallBack = () => {
+      film?.dispose();
+      film = null;
+      canvas.remove();
+      story.classList.remove("filming");
+    };
+    Promise.all([import("./story3d.js"), fetch("/app/story/story.json").then((response) => response.json())])
+      .then(([{ createStory }, timeline]) => createStory(canvas, timeline, { tier: initialTier(), onStills: fallBack }).then((created) => [created, timeline]))
+      .then(([created, timeline]) => {
+        if (signal.aborted) {
+          created.dispose();
+          return;
+        }
+        film = created;
+        page.defer(() => created.dispose());
         playStory();
+        if (new URLSearchParams(location.search).get("dev") === "camera") import("./dev/editor.js").then(({ openEditor }) => openEditor(created, timeline));
       })
-      .catch(() => {
-        canvas.remove();
-        story.classList.remove("filming");
-      });
+      .catch(fallBack);
   }
   const frames = [...story.querySelectorAll("[data-frame]")];
   const playStory = () => {
     if (!document.body.contains(story)) {
       window.removeEventListener("scroll", playStory);
-      film?.stop();
       return;
     }
     const box = story.getBoundingClientRect();

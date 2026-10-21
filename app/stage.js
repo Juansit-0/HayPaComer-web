@@ -1,3 +1,4 @@
+import { webgl2 } from "./quality.js";
 import { api } from "./api.js";
 import { foodName, formatNumber, t } from "./i18n.js";
 import { daysLeft, esc, grams, openSheet, toast, whenText } from "./ui.js";
@@ -125,7 +126,7 @@ function fill(fridge, inventory, twin, week) {
 function wantsThree() {
   if (!matchMedia("(min-width: 1024px)").matches || matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
   try {
-    return Boolean(document.createElement("canvas").getContext("webgl2"));
+    return webgl2();
   } catch {
     return false;
   }

@@ -1,6 +1,6 @@
 // Local mock of the HayPaComer API so the web UI can be reviewed without Docker.
 import { createServer } from "node:http";
-import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, statSync, writeFileSync } from "node:fs";
 import { join, extname } from "node:path";
 
 const WEB = new URL("../..", import.meta.url).pathname.replace(/\/$/, "");
@@ -79,6 +79,23 @@ const routes = [
 const TYPES = { ".js": "text/javascript", ".css": "text/css", ".html": "text/html", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".png": "image/png", ".woff2": "font/woff2", ".json": "application/json" };
 createServer((request, response) => {
   const url = request.url;
+  if (url.startsWith("/__dev/save") && request.method === "PUT") {
+    const target = new URL(url, "http://localhost").searchParams.get("path") ?? "";
+    const allowed = target === "app/story/story.json" || target === "app/stage-views.json" || /^app\/stills\/[a-z]+\.webp$/.test(target);
+    if (!allowed || !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.socket.remoteAddress)) {
+      response.writeHead(403);
+      response.end();
+      return;
+    }
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      writeFileSync(join(WEB, target), Buffer.concat(chunks));
+      response.writeHead(204);
+      response.end();
+    });
+    return;
+  }
   if (url.startsWith("/api/v1/")) {
     const path = url.slice(7);
     if (path.includes("/stream")) { response.writeHead(200, { "content-type": "text/event-stream" }); return; }

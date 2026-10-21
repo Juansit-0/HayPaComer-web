@@ -34,7 +34,7 @@ const PROBE = `(() => {
     }
     return context;
   };
-  const probe = { frames: [], long: [], shift: 0, live: () => [...live].filter((gl) => !gl.isContextLost()).length, created: () => live.size };
+  const probe = { frames: [], long: [], shift: 0, live: () => [...live].filter((gl) => !gl.isContextLost()).length, created: () => live.size, who: () => [...live].filter((gl) => !gl.isContextLost()).map((gl) => (gl.canvas.className || "no-class") + (gl.canvas.isConnected ? "" : " detached") + " " + gl.canvas.width + "x" + gl.canvas.height) };
   new PerformanceObserver((list) => list.getEntries().forEach((entry) => probe.long.push(entry.duration))).observe({ type: "longtask", buffered: true });
   new PerformanceObserver((list) => list.getEntries().forEach((entry) => { if (!entry.hadRecentInput) probe.shift += entry.value; })).observe({ type: "layout-shift", buffered: true });
   window.__probe = probe;
@@ -79,7 +79,7 @@ try {
   }
   const left = Number(seconds) * 1000 - (Date.now() - start);
   if (left > 0) await sleep(left);
-  const raw = await evaluate(`({ frames: window.__probe.frames, long: window.__probe.long, shift: window.__probe.shift, live: window.__probe.live(), created: window.__probe.created(), hpc: window.__hpc ?? null })`);
+  const raw = await evaluate(`({ frames: window.__probe.frames, long: window.__probe.long, shift: window.__probe.shift, live: window.__probe.live(), created: window.__probe.created(), who: window.__probe.who().concat([...document.querySelectorAll("canvas")].map((c) => "dom " + c.className + " " + c.width + "x" + c.height + " css " + c.clientWidth)), hpc: window.__hpc ?? null })`);
   const sorted = [...raw.frames].sort((a, b) => a - b);
   const at = (q) => Number((sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 0).toFixed(2));
   const interval = at(0.5);
@@ -97,6 +97,7 @@ try {
     cls: Number(raw.shift.toFixed(4)),
     webglLive: raw.live,
     webglCreated: raw.created,
+    webglWho: raw.who,
     hpc: raw.hpc,
   };
   writeFileSync(out, JSON.stringify(metrics, null, 2));

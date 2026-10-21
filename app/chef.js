@@ -1,6 +1,5 @@
 import { api } from "./api.js";
 import { currentLocale, foodName, locales, plural, recipeName, t } from "./i18n.js";
-import { paintEngravings } from "./dishes.js";
 import { candidate, dishCard, kitchenRecipes } from "./now.js";
 import { highlightFoods, shapeClass } from "./stage.js";
 import { daysLeft, esc, grams, toast, whenText } from "./ui.js";
@@ -250,7 +249,6 @@ export async function renderChef(main, household) {
   main.querySelectorAll(".cooking [data-cook]").forEach((button) => button.addEventListener("click", () => cook(button.dataset.cook)));
   main.querySelectorAll(".dish-card [data-cook]").forEach((button) => button.addEventListener("click", () => ask(t("chef.how-to", { recipe: recipeName(button.dataset.cook) }))));
   highlightFoods(state.messages.findLast((entry) => entry.role === "assistant")?.foods ?? []);
-  paintEngravings(main);
 
   main.querySelectorAll("[data-approve]").forEach((button) =>
     button.addEventListener("click", async () => {

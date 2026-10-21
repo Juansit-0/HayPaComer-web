@@ -17,15 +17,5 @@ export function dishPicture(name, foods = []) {
       <figcaption>${esc(t("photo.credit", { credit: photo[1] }))}</figcaption>
     </figure>`;
   }
-  return `<figure class="dish-photo dish-engraved" aria-hidden="true"><img data-engraving="plate" alt="" width="480" height="480"></figure>`;
+  return `<figure class="dish-photo dish-engraved" aria-hidden="true"><img src="/app/stills/plate.webp" alt="" width="960" height="960" loading="lazy"></figure>`;
 }
-
-let engravings = null;
-
-export function paintEngravings(root) {
-  const images = root.querySelectorAll("[data-engraving]");
-  if (!images.length || !document.createElement("canvas").getContext("webgl2")) return;
-  engravings ??= import("./story3d.js").then(({ renderVignettes }) => renderVignettes(480, 480, ["plate"]));
-  engravings.then((pictures) => images.forEach((image) => (image.src = pictures[image.dataset.engraving]))).catch(() => null);
-}
-
