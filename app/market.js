@@ -1,5 +1,6 @@
 import { api } from "./api.js";
 import { foodName, formatMoney, plural, t } from "./i18n.js";
+import { page, reduced } from "./motion.js";
 import {
   esc,
   foodOptions,
@@ -10,6 +11,8 @@ import {
   moneyValue,
   numberField,
   showError,
+  swap,
+  ticker,
   toast,
   wireFoodSearch,
   wireSteppers,
@@ -23,9 +26,9 @@ function perKilo(line, currency) {
 }
 
 function row(item, bought, line, currency) {
-  return `<li class="market-row ${bought ? "bought" : ""}">
+  return `<li class="market-row ${bought ? "bought" : ""}" data-key="${esc(item.id)}">
     <label class="check">
-      <input type="checkbox" data-check="${esc(item.id)}" ${bought ? "checked" : ""}>
+      <input type="checkbox" id="check-${esc(item.id)}" data-check="${esc(item.id)}" ${bought ? "checked" : ""}>
       <span class="item-name">${esc(foodName(item.food))}</span>
     </label>
     <span class="market-amount"><span class="data">${grams(item.grams)}</span>${
@@ -46,7 +49,7 @@ function budgetRing(spent, planned, monthly) {
   const length = 2 * Math.PI * r;
   const part = (value) => (monthly > 0 ? Math.min(1, Math.max(0, value / monthly)) : 0);
   const arc = (kind, from, size) =>
-    `<circle class="ring ${kind}" cx="64" cy="64" r="${r}" style="--len:${length.toFixed(1)};--to:${(length * (1 - size)).toFixed(1)};rotate:${(from * 360).toFixed(1)}deg"/>`;
+    `<circle class="ring ${kind}" data-ring="${kind}" cx="64" cy="64" r="${r}" style="--len:${length.toFixed(1)};--to:${(length * (1 - size)).toFixed(1)};rotate:${(from * 360).toFixed(1)}deg"/>`;
   return `<svg class="budget-ring" viewBox="0 0 128 128" aria-hidden="true"><circle class="ring-bg" cx="64" cy="64" r="${r}"/>${arc("spent", 0, part(spent))}${arc("planned", part(spent), part(planned))}</svg>`;
 }
 
@@ -111,23 +114,49 @@ function budgetTile(budget, currency) {
   </section>`;
 }
 
+// Moves an item between the aisles and the cart in the local copy, so a check shows before the server answers.
+function moveLocally(list, id, bought, categories) {
+  const pendingItem = list.pending.flatMap((group) => group.items).find((item) => item.id === id);
+  const checkedItem = list.checked.find((item) => item.id === id);
+  const item = pendingItem ?? checkedItem;
+  if (!item) return;
+  list.pending = list.pending.map((group) => ({ ...group, items: group.items.filter((entry) => entry.id !== id) })).filter((group) => group.items.length);
+  list.checked = list.checked.filter((entry) => entry.id !== id);
+  if (bought === null) return;
+  if (bought) {
+    list.checked.push(item);
+    return;
+  }
+  const category = categories.get(id) ?? item.category ?? "OTHER";
+  const group = list.pending.find((entry) => entry.category === category);
+  if (group) group.items.push(item);
+  else list.pending.push({ category, items: [item] });
+}
+
 export async function renderMarket(main, household) {
   const base = `/households/${household.id}/market-list`;
-  const [list, budget] = await Promise.all([
-    api(base),
-    api(`/households/${household.id}/market-budget`).catch(() => null),
-  ]);
+  let list;
+  let budget;
+  const categories = new Map();
+  const shown = new Map();
+  const load = async () => {
+    [list, budget] = await Promise.all([api(base), api(`/households/${household.id}/market-budget`).catch(() => null)]);
+    list.pending.forEach((group) => group.items.forEach((item) => categories.set(item.id, group.category)));
+  };
+  await load();
+
+  function draw() {
   const pending = list.pending.reduce((sum, group) => sum + group.items.length, 0);
   const currency = budget?.currency ?? household.currency ?? "COP";
   const lines = new Map((budget?.lines ?? []).map((line) => [line.itemId, line]));
+  const first = !main.querySelector(".market-bento");
 
   main.innerHTML = `
     <header class="market-hero">
       <h1 id="market-title">${t("market.title")}</h1>
       <p class="lead">${pending ? plural("market.pending", pending) : t("market.empty")}</p>
-      ${budget ? `<p class="hero-figure"><span class="data">${formatMoney(Number(budget.remaining), budget.currency)}</span><span>${t("market.left")}</span></p>` : ""}
-    </header>
-    <div class="bento market-bento">
+      ${budget ? `<p class="hero-figure"><span class="data" data-remaining></span><span>${t("market.left")}</span></p>` : ""}
+    </header>    <div class="bento market-bento">
       <section class="tile w-7 notepad" aria-labelledby="add-title">
         <h2 id="add-title">${t("market.add-title")}</h2>
         <form class="row-form" data-add>
@@ -168,6 +197,16 @@ export async function renderMarket(main, household) {
     </div>`;
 
   wireSteppers(main);
+  const remaining = main.querySelector("[data-remaining]");
+  if (remaining) ticker(remaining, formatMoney(Number(budget.remaining), budget.currency));
+  main.querySelectorAll("[data-ring]").forEach((circle) => {
+    const to = circle.style.getPropertyValue("--to");
+    const from = shown.get(circle.dataset.ring);
+    shown.set(circle.dataset.ring, to);
+    if (first || from === undefined || from === to) return;
+    circle.style.animation = "none";
+    if (!reduced()) circle.animate([{ strokeDashoffset: from }, { strokeDashoffset: to }], { duration: 600, easing: "cubic-bezier(.16,.84,.3,1)" });
+  });
   main.querySelectorAll("[data-budget]").forEach((budgetForm) =>
     budgetForm.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -179,7 +218,7 @@ export async function renderMarket(main, household) {
       try {
         await api(`/households/${household.id}/market-budget`, { method: "PUT", body: { monthly } });
         toast(t("market.toast-budget"));
-        renderMarket(main, household);
+        refresh();
       } catch (error) {
         showError(budgetForm, error);
       }
@@ -194,7 +233,7 @@ export async function renderMarket(main, household) {
     try {
       await api(`${base}/items`, { method: "POST", body: { food: values.food, grams: Number(values.grams) } });
       toast(t("market.toast-added", { food: foodName(values.food) }));
-      renderMarket(main, household);
+      refresh();
     } catch (error) {
       showError(add, error);
     }
@@ -205,29 +244,56 @@ export async function renderMarket(main, household) {
       const delta = await api(`${base}/from-plan`, { method: "POST" });
       const added = delta.filter((item) => Number(item.addedGrams) > 0).length;
       toast(added ? plural("market.toast-plan", added) : t("market.plan-covered"));
-      renderMarket(main, household);
+      refresh();
     } catch (error) {
       toast(error.status === 404 ? t("market.no-plan") : error.message);
     }
   });
 
-  main.querySelectorAll("[data-check]").forEach((box) =>
-    box.addEventListener("change", async () => {
-      await api(`${base}/items/${box.dataset.check}/check`, { method: box.checked ? "POST" : "DELETE" });
-      renderMarket(main, household);
-    }),
-  );
-
-  main.querySelectorAll("[data-remove]").forEach((button) =>
-    button.addEventListener("click", async () => {
-      await api(`${base}/items/${button.dataset.remove}`, { method: "DELETE" });
-      renderMarket(main, household);
-    }),
-  );
-
   main.querySelector("[data-clear]")?.addEventListener("click", async () => {
     await api(`${base}/checked`, { method: "DELETE" });
     toast(t("market.toast-cleared"));
-    renderMarket(main, household);
+    refresh();
   });
+  }
+
+  const refresh = () => swap(main, async () => {
+    await load();
+    draw();
+  });
+
+  // Optimistic: the row moves at once; if the server says no, it moves back and the error is shown.
+  async function optimistic(id, bought, request) {
+    const before = structuredClone(list);
+    moveLocally(list, id, bought, categories);
+    await swap(main, draw);
+    try {
+      await request();
+      refresh();
+    } catch (error) {
+      list = before;
+      await swap(main, draw);
+      toast(error.message);
+    }
+  }
+
+  const signal = page.signal;
+  main.addEventListener(
+    "change",
+    (event) => {
+      const box = event.target.closest("[data-check]");
+      if (box) optimistic(box.dataset.check, box.checked, () => api(`${base}/items/${box.dataset.check}/check`, { method: box.checked ? "POST" : "DELETE" }));
+    },
+    { signal },
+  );
+  main.addEventListener(
+    "click",
+    (event) => {
+      const button = event.target.closest("[data-remove]");
+      if (button) optimistic(button.dataset.remove, null, () => api(`${base}/items/${button.dataset.remove}`, { method: "DELETE" }));
+    },
+    { signal },
+  );
+
+  draw();
 }

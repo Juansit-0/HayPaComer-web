@@ -47,6 +47,13 @@ const notifications = [
   { id: "n2", type: "BRIEFING", title: "Usa primero el tomate", body: "Vence mañana: 360 g de tomate.", at: new Date(Date.now() - 86400000).toISOString(), readAt: new Date().toISOString() },
 ];
 
+const market = [
+  { id: "m1", food: "Onion", grams: 500, source: "MANUAL", category: "VEGETABLE", checked: false },
+  { id: "m2", food: "Tomato", grams: 1000, source: "PLAN", category: "VEGETABLE", checked: false },
+  { id: "m3", food: "Milk", grams: 1000, source: "RECIPE", category: "DAIRY", checked: false },
+  { id: "m4", food: "Rice", grams: 1000, source: "MANUAL", category: "GRAIN", checked: true },
+];
+
 const routes = [
   [/^\/i18n$/, () => ({ available: [{ code: "es-CO", name: "Español", isDefault: true }, { code: "en", name: "English", isDefault: false }], current: "es-CO" })],
   [/^\/i18n\/(.+)$/, (m) => texts[decodeURIComponent(m[1])] ?? {}],
@@ -64,7 +71,7 @@ const routes = [
     days: Array.from({ length: 30 }, (_, index) => ({ day: day(index - 29), tally: tally(index % 4 ? 0 : 60, index % 6 ? 0 : 40, index === 20 ? 80 : 0) })),
     members: [{ userId: "u1", name: "Juan", tally: tally(320, 270, 0) }, { userId: "u2", name: "Jenifer", tally: tally(200, 0, 80) }],
     foods: [{ foodKey: "chicken breast", tally: tally(0, 0, 80) }, { foodKey: "tomato", tally: tally(150, 150, 0) }] })],
-  [/^\/households\/[^/]+\/market-list$/, () => ({ pending: [{ category: "VEGETABLE", items: [{ id: "m1", food: "Onion", grams: 500, source: "MANUAL" }, { id: "m2", food: "Tomato", grams: 1000, source: "PLAN" }] }, { category: "DAIRY", items: [{ id: "m3", food: "Milk", grams: 1000, source: "RECIPE" }] }], checked: [{ id: "m4", food: "Rice", grams: 1000, source: "MANUAL" }] })],
+  [/^\/households\/[^/]+\/market-list$/, () => ({ pending: ["VEGETABLE", "DAIRY", "GRAIN"].map((category) => ({ category, items: market.filter((entry) => entry.category === category && !entry.checked) })).filter((group) => group.items.length), checked: market.filter((entry) => entry.checked) })],
   [/^\/households\/[^/]+\/market-budget$/, () => ({ currency: "COP", monthly: 600000, spent: 210000, plannedCost: 48000, remaining: 342000, lines: [] })],
   [/^\/households\/[^/]+\/cooking-sessions\/active$/, () => null],
   [/^\/households\/[^/]+\/profiles$/, () => []],
@@ -99,8 +106,17 @@ createServer((request, response) => {
   if (url.startsWith("/api/v1/")) {
     const path = url.slice(7);
     if (path.includes("/stream")) { response.writeHead(200, { "content-type": "text/event-stream" }); return; }
-    const failing = path.match(/\/items\/[^/]+\/(move|consume|discard)$/)?.[1];
+    const marketItem = request.method !== "GET" && path.match(/\/market-list\/items\/([^/]+)(\/check)?$/);
+    const failing = path.match(/\/items\/[^/]+\/(move|consume|discard)$/)?.[1] ?? (marketItem ? (marketItem[2] ? "check" : "remove") : null);
     if (failing && (request.headers.referer ?? "").includes(`fail=${failing}`)) { response.writeHead(500, { "content-type": "application/problem+json" }); response.end('{"title":"Mock failure"}'); return; }
+    if (marketItem) {
+      const entry = market.find((candidate) => candidate.id === marketItem[1]);
+      if (entry && marketItem[2]) entry.checked = request.method === "POST";
+      else if (entry) market.splice(market.indexOf(entry), 1);
+      response.writeHead(204);
+      response.end();
+      return;
+    }
     const route = routes.find(([pattern]) => pattern.test(path));
     if (!route && request.method === "GET") { response.writeHead(404, { "content-type": "application/problem+json" }); response.end('{"title":"Not found"}'); return; }
     response.writeHead(200, { "content-type": "application/json" });

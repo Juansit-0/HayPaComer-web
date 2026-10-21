@@ -41,7 +41,7 @@ try {
   const jwt = "x." + Buffer.from(JSON.stringify({ exp: 4102444800, sub: "u1" })).toString("base64").replace(/=+$/, "") + ".y";
   const session = process.env.OUT_SIGNED ? "localStorage.clear();" : `localStorage.setItem("hpc.access", "${jwt}"); localStorage.setItem("hpc.refresh", "mock"); localStorage.setItem("hpc.household", "11111111-1111-4111-8111-111111111111");`;
   await send("Runtime.evaluate", { expression: `${session} localStorage.setItem("hpc.locale", "es-CO");` });
-  await send("Page.navigate", { url: `http://localhost:8091/${process.env.AT || process.env.DEV ? "?dev=review" : ""}#/${route}` });
+  await send("Page.navigate", { url: `http://localhost:8091/${process.env.QUERY ?? (process.env.AT || process.env.DEV ? "?dev=review" : "")}#/${route}` });
   await sleep(Number(wait));
   if (process.env.EVAL) console.log(JSON.stringify((await send("Runtime.evaluate", { expression: process.env.EVAL, returnByValue: true, awaitPromise: true })).result.result?.value ?? null));
   const points = process.env.AT ? process.env.AT.split(",") : [null];
