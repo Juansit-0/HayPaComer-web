@@ -1,0 +1,60 @@
+/* Landing story. Static: the engravings and their captions on native scroll. Filming: one screen held at the top of the page while wheel, touch and keys move the 3D story */
+.land-story { --paper: #f3ecdf; position: relative; background: var(--paper); color: var(--color-tinta); }
+.story-intro { display: grid; gap: var(--space-s); justify-items: start; padding: var(--space-xl) max(20px, 6vw); }
+.story-intro h1 { font-size: clamp(48px, 7vw, 112px); line-height: 0.92; max-width: 12ch; }
+.story-intro p { margin: 0; padding: 10px 14px; background: var(--color-white); box-shadow: 0 0 0 2px var(--color-tinta); font-weight: 600; }
+.story-stage { display: grid; gap: var(--space-xl); padding: var(--space-xl) max(20px, 5vw); }
+.story-frame { position: relative; margin: 0; display: grid; place-items: center; background: var(--paper); }
+.story-frame img { width: 100%; height: 100%; max-height: 100svh; object-fit: cover; mix-blend-mode: multiply; filter: contrast(1.08); }
+.story-frame[data-frame="2"] img { object-fit: contain; }
+.story-caption { position: absolute; z-index: 1; max-width: min(34ch, 80vw); margin: 0; padding: 12px 16px; background: var(--color-white); box-shadow: 0 0 0 2px var(--color-tinta); font: 600 clamp(15px, 1.3vw, 19px)/1.4 var(--font-body); }
+.story-caption.c0 { top: 14%; left: max(20px, 6vw); }
+.story-caption.c1 { bottom: 14%; right: max(20px, 6vw); }
+.story-label { position: absolute; left: max(20px, 6vw); bottom: 5%; padding: 4px 10px; background: var(--paper); box-shadow: 0 0 0 1px var(--color-tinta); font-size: 13px; color: var(--color-tinta); }
+.story-credit { margin: 0; padding: var(--space-s) max(20px, 5vw) var(--space-m); font-size: 13px; color: var(--color-text-weak); background: var(--paper); }
+
+.column:has(.landing) { position: relative; }
+.column:has(.landing) > .bar { position: absolute; top: 0; left: 0; right: 0; z-index: 6; background: transparent; transition: translate var(--duration-base) var(--ease-standard), opacity var(--duration-base) var(--ease-standard); }
+.column:has(.land-story[data-captured] .story-intro.gone) > .bar { translate: 0 -100%; opacity: 0; }
+html:has(.land-story[data-captured]) { overscroll-behavior: none; }
+
+.story-canvas, .film-captions, .story-rail, .story-chapters { display: none; }
+.land-story.filming { height: 100svh; overflow: hidden; }
+.land-story.filming .story-stage { position: absolute; inset: 0; display: block; padding: 0; }
+.land-story.filming .story-frame, .land-story.filming .story-credit { display: none; }
+.land-story.filming .story-canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
+.land-story.filming .story-intro { position: absolute; z-index: 2; inset: 0; align-content: center; pointer-events: none; transition: opacity var(--duration-slow) var(--ease-standard), translate var(--duration-slow) var(--ease-emphasized); }
+.land-story.filming .story-intro a { pointer-events: auto; }
+.land-story.filming .story-intro.gone { opacity: 0; translate: 0 calc(var(--rise) * -1.5); }
+.land-story.filming .story-intro.gone a { pointer-events: none; }
+.land-story.filming .story-intro > * { opacity: 0; translate: 0 var(--rise); transition: opacity var(--duration-slow) var(--ease-standard), translate var(--duration-slow) var(--ease-emphasized); }
+:root[data-ready] .land-story.filming .story-intro > * { opacity: 1; translate: 0 0; }
+:root[data-ready] .land-story.filming .story-intro > :nth-child(2) { transition-delay: calc(var(--stagger) * 2); }
+:root[data-ready] .land-story.filming .story-intro > :nth-child(3) { transition-delay: calc(var(--stagger) * 4); }
+
+.land-story.filming .film-captions { display: block; position: absolute; inset: 0; pointer-events: none; }
+.film-captions .story-caption { opacity: 0; clip-path: inset(-4px 100% -4px -4px); transition: clip-path var(--duration-caption) var(--ease-emphasized), opacity var(--duration-fast) var(--ease-standard); }
+.film-captions .story-caption.on { opacity: 1; clip-path: inset(-4px -4px -4px -4px); }
+.caption-words > span { display: inline-block; opacity: 0; translate: 0 0.35em; transition: opacity var(--duration-fast) var(--ease-standard), translate var(--duration-fast) var(--ease-standard); }
+.story-caption.on .caption-words > span { opacity: 1; translate: 0 0; transition-duration: var(--duration-slow); transition-timing-function: var(--ease-emphasized); transition-delay: calc(var(--duration-caption) * 0.4 + var(--i) * 110ms); }
+
+.land-story.filming .story-rail { display: block; position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 4px; background: color-mix(in srgb, var(--color-tinta) 14%, transparent); }
+.story-rail span { display: block; height: 100%; background: var(--color-tinta); transform: scaleX(0); transform-origin: left center; }
+
+.land-story.filming .story-chapters { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; position: absolute; z-index: 3; right: max(16px, 4vw); bottom: 20px; left: max(16px, 4vw); pointer-events: none; }
+.story-chapters button { pointer-events: auto; min-height: 36px; padding: 6px 12px; border: 0; border-radius: 999px; background: var(--paper); color: var(--color-tinta); box-shadow: 0 0 0 1.5px var(--color-tinta); font: 600 13px/1 var(--font-body); cursor: pointer; }
+.story-chapters button[aria-current] { background: var(--color-tinta); color: var(--paper); }
+
+.story-hold { position: absolute; z-index: 3; left: 50%; bottom: 18%; translate: -50% 0; overflow: hidden; isolation: isolate; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; background: var(--color-white); box-shadow: 0 0 0 2px var(--color-tinta); }
+.story-hold::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--color-primary); opacity: 0.35; transform: scaleX(var(--held, 0)); transform-origin: left center; }
+.story-hold[hidden] { display: none; }
+
+@media (max-width: 700px) {
+  .story-caption.c0 { top: 8%; }
+  .story-caption.c1 { bottom: 10%; }
+  .story-frame:has(.story-label) .story-caption.c1 { bottom: 20%; }
+  .land-story.filming .story-caption.c0 { top: 12%; }
+  .land-story.filming .story-caption.c1 { bottom: 96px; }
+  .land-story.filming .story-chapters { justify-content: center; }
+  .story-hold { bottom: 30%; white-space: nowrap; font-size: 14px; }
+}

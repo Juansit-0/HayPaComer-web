@@ -23,6 +23,7 @@ for (const name of scripts) {
   for (const match of readFileSync(join(app, name), "utf8").matchAll(CALL)) (match[1] === "plural" ? counted : plain).add(match[2]);
 }
 for (const match of readFileSync(join(WEB, "index.html"), "utf8").matchAll(ATTRIBUTE)) plain.add(match[1]);
+for (const caption of JSON.parse(readFileSync(join(app, "story", "story.json"), "utf8")).captions) plain.add(`landing.story.${caption.id}`);
 
 const problems = [];
 for (const locale of ["es-CO", "en"]) {

@@ -232,5 +232,6 @@ await render();
 progress(1);
 setTimeout(() => {
   loader.classList.add("done");
+  document.documentElement.dataset.ready = "";
   setTimeout(() => loader.classList.add("gone"), 2400);
 }, 450);

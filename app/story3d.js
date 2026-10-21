@@ -13,7 +13,7 @@ const WINDS = {
   plate: { origin: [-0.06, 0.84, 0], spread: [0.1, 0.01, 0.06], length: 0.015, rise: 0.12, width: 0.0018, jitter: 0.0012, share: 0.125 },
 };
 
-export async function createStory(canvas, story, { tier = "high", onStills } = {}) {
+export async function createStory(canvas, story, { tier = "high", onStills, onProgress } = {}) {
   await document.fonts.load("700 64px 'Hanken Grotesk'").catch(() => null);
   const settings = TIERS[tier];
   setDensity(settings.instances);
@@ -108,6 +108,7 @@ export async function createStory(canvas, story, { tier = "high", onStills } = {
     const before = state.progress;
     state.progress = damp(state.progress, state.goal, follow, dt);
     if (0.00002 > Math.abs(state.progress - state.goal)) state.progress = state.goal;
+    if (state.progress !== before) onProgress?.(state.progress);
     state.speed = dt > 0 ? (state.progress - before) / dt : 0;
     const still = reduced();
     state.pitch = damp(state.pitch, still ? 0 : Math.max(-0.2, Math.min(0.2, state.speed * 0.6)), 3, dt);

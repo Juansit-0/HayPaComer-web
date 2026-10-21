@@ -1,7 +1,6 @@
 import { formatMoney, formatNumber, t } from "./i18n.js";
 import { esc } from "./ui.js";
-import { page } from "./motion.js";
-import { initialTier, webgl2 } from "./quality.js";
+import { mountStory, storyMarkup } from "./story.js";
 
 const PRICE_PER_KG = 9750;
 const RESCUED_SHARE = 0.5;
@@ -28,32 +27,6 @@ function stageFragment(stage) {
   return fragments[stage];
 }
 
-const SCENES = [
-  { image: "entrada-pasto", width: 1800, height: 1117, captions: ["landing.story.arrive", "landing.story.market-day"] },
-  { image: "mercado-bogota", width: 1800, height: 1231, captions: ["landing.story.heaps", "landing.story.oca"], label: "landing.story.bogota" },
-  { image: "calle-pasto", width: 880, height: 1409, captions: ["landing.story.today", "landing.story.fridge"] },
-];
-
-const FILM = [
-  ["landing.story.arrive", 0.02, 0.15, 0],
-  ["landing.story.market-day", 0.07, 0.15, 1],
-  ["landing.story.heaps", 0.17, 0.32, 0],
-  ["landing.story.oca", 0.22, 0.32, 1],
-  ["landing.story.today", 0.37, 0.5, 0],
-  ["landing.story.fridge", 0.48, 0.63, 1],
-  ["landing.story.weigh", 0.67, 0.81, 0],
-  ["landing.story.knows", 0.72, 0.81, 1],
-  ["landing.story.cook", 0.84, 0.99, 0],
-];
-
-function scene({ image, width, height, captions, label }, index) {
-  return `<figure class="story-frame" data-frame="${index}" style="--frame:${index}">
-    <img src="/brand/engravings/${image}.jpg" alt="" width="${width}" height="${height}" ${index ? 'loading="lazy"' : ""}>
-    ${captions.map((key, order) => `<p class="story-caption c${order}">${t(key)}</p>`).join("")}
-    ${label ? `<figcaption class="story-label">${t(label)}</figcaption>` : ""}
-  </figure>`;
-}
-
 function monthly(kilos) {
   return kilos * RESCUED_SHARE * WEEKS_PER_MONTH * PRICE_PER_KG;
 }
@@ -61,19 +34,11 @@ function monthly(kilos) {
 export function renderLanding(main) {
   main.innerHTML = `
     <div class="landing">
-      <section class="land-story" aria-labelledby="story-title" data-story>
-        <div class="story-intro" data-intro>
-          <h1 id="story-title">${t("landing.story.title")}</h1>
-          <p>${t("landing.story.scroll")}</p>
-          <a class="button" href="#land-answer" data-skip>${t("landing.story.skip")}</a>
-        </div>
-        <div class="story-stage">${SCENES.map(scene).join("")}</div>
-        <p class="story-credit">${t("landing.story.credit")}</p>
-      </section>
+      ${storyMarkup()}
 
       <section class="chapter chapter-papa land-hero" id="land-answer" aria-labelledby="land-title">
         <div class="land-hero-text">
-          <h2 id="land-title">${t("now.question")}</h2>
+          <h2 id="land-title" tabindex="-1">${t("now.question")}</h2>
           <p class="land-lead">${t("landing.lead")}</p>
           <div class="land-actions">
             <a class="button primary" href="#/register">${t("auth.create-account")}</a>
@@ -162,11 +127,6 @@ export function renderLanding(main) {
     });
   });
 
-  main.querySelector("[data-skip]").addEventListener("click", (event) => {
-    event.preventDefault();
-    main.querySelector("#land-answer").scrollIntoView({ behavior: still ? "auto" : "smooth" });
-  });
-
   const kilos = main.querySelector("[data-kilos]");
   kilos.addEventListener("input", () => {
     const value = Number(kilos.value);
@@ -174,69 +134,7 @@ export function renderLanding(main) {
     main.querySelector("[data-money]").textContent = formatMoney(monthly(value), "COP");
   });
 
-  const story = main.querySelector("[data-story]");
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let film = null;
-  if (!still && webgl2()) {
-    const canvas = document.createElement("canvas");
-    canvas.className = "story-canvas";
-    canvas.setAttribute("aria-hidden", "true");
-    story.querySelector(".story-stage").prepend(canvas);
-    canvas.insertAdjacentHTML(
-      "afterend",
-      `<div class="film-captions">${FILM.map(([key, from, to, corner]) => `<p class="story-caption c${corner}" data-from="${from}" data-to="${to}">${t(key)}</p>`).join("")}</div>`,
-    );
-    story.classList.add("filming");
-    const signal = page.signal;
-    const fallBack = () => {
-      film?.dispose();
-      film = null;
-      canvas.remove();
-      story.classList.remove("filming");
-    };
-    Promise.all([import("./story3d.js"), fetch("/app/story/story.json").then((response) => response.json())])
-      .then(([{ createStory }, timeline]) => createStory(canvas, timeline, { tier: initialTier(), onStills: fallBack }).then((created) => [created, timeline]))
-      .then(([created, timeline]) => {
-        if (signal.aborted) {
-          created.dispose();
-          return;
-        }
-        film = created;
-        page.defer(() => created.dispose());
-        playStory();
-        if (new URLSearchParams(location.search).get("dev") === "camera") import("./dev/editor.js").then(({ openEditor }) => openEditor(created, timeline));
-      })
-      .catch(fallBack);
-  }
-  const frames = [...story.querySelectorAll("[data-frame]")];
-  const playStory = () => {
-    if (!document.body.contains(story)) {
-      window.removeEventListener("scroll", playStory);
-      return;
-    }
-    const box = story.getBoundingClientRect();
-    const travel = Math.max(1, box.height - innerHeight);
-    const share = Math.min(0.9999, Math.max(0, -box.top / travel));
-    film?.seek(share);
-    story.querySelector("[data-intro]").classList.toggle("gone", share > 0.015);
-    story.querySelectorAll(".film-captions [data-from]").forEach((caption) =>
-      caption.classList.toggle("on", share >= Number(caption.dataset.from) && Number(caption.dataset.to) > share),
-    );
-    const progress = share * frames.length;
-    frames.forEach((frame, index) => {
-      const local = progress - index;
-      const reveal = index === 0 ? 1 : Math.min(1, Math.max(0, (local + 0.18) / 0.36));
-      frame.style.setProperty("--reveal", `${(reveal * 112).toFixed(1)}%`);
-      frame.style.setProperty("--zoom", (1 + Math.min(1, Math.max(0, local)) * 0.14).toFixed(4));
-      frame.classList.toggle("shown", local > -0.2);
-      frame.querySelectorAll(".story-caption").forEach((caption, order) => caption.classList.toggle("on", local - order * 0.32 >= 0.08 && 1.1 >= local));
-    });
-  };
-  if (!still) {
-    story.classList.add("playing");
-    window.addEventListener("scroll", playStory, { passive: true });
-    playStory();
-  }
+  mountStory(main);
 
   const kit = main.querySelector("[data-explode]");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
