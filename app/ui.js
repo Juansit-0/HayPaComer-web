@@ -6,6 +6,53 @@ export function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ESCAPES[char]);
 }
 
+const KEYED = "[data-key]";
+const onScreen = (rect) => rect.width > 0 && rect.bottom > 0 && innerHeight > rect.top;
+
+// Re-render in place: keyed items that moved slide from where they were, new ones grow in, removed ones fade out as inert copies, focus stays.
+export async function swap(root, update) {
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const active = root.contains(document.activeElement) ? document.activeElement : null;
+  const focusId = active?.id;
+  const focusKey = active?.closest(KEYED)?.dataset.key;
+  const before = new Map();
+  if (!still) {
+    for (const element of root.querySelectorAll(KEYED)) {
+      if (before.size >= 60) break;
+      const rect = element.getBoundingClientRect();
+      if (onScreen(rect)) before.set(element.dataset.key, { rect, ghost: element.cloneNode(true) });
+    }
+  }
+  await update();
+  const target = (focusId && document.getElementById(focusId)) || (focusKey && root.querySelector(`[data-key="${CSS.escape(focusKey)}"]`));
+  if (target && root.contains(target)) target.focus({ preventScroll: true });
+  if (still) return;
+  const easing = getComputedStyle(document.documentElement).getPropertyValue("--ease-spring").trim() || "ease-out";
+  const kept = new Set();
+  root.querySelectorAll(KEYED).forEach((element) => {
+    kept.add(element.dataset.key);
+    const old = before.get(element.dataset.key);
+    const rect = element.getBoundingClientRect();
+    if (!onScreen(rect)) return;
+    if (!old) {
+      element.animate([{ opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1 }], { duration: 240, easing });
+      return;
+    }
+    const dx = old.rect.left - rect.left;
+    const dy = old.rect.top - rect.top;
+    if (Math.abs(dx) + Math.abs(dy) >= 1) element.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration: 420, easing });
+  });
+  before.forEach(({ rect, ghost }, key) => {
+    if (kept.has(key)) return;
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.inert = true;
+    [ghost, ...ghost.querySelectorAll("[id]")].forEach((node) => node.removeAttribute("id"));
+    Object.assign(ghost.style, { position: "fixed", left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, margin: "0", pointerEvents: "none", zIndex: "5", listStyle: "none" });
+    document.body.append(ghost);
+    ghost.animate([{ opacity: 1 }, { opacity: 0, scale: 0.96 }], { duration: 180, easing: "cubic-bezier(.5,0,.9,.4)", fill: "forwards" }).finished.finally(() => ghost.remove());
+  });
+}
+
 const DIGITS = "0123456789";
 
 export function ticker(element, text) {

@@ -73,7 +73,7 @@ function skeletonCards() {
 }
 
 function todayCard(item) {
-  return `<li class="today-card">
+  return `<li class="today-card" data-key="${esc(item.id)}">
     <span class="today-grams">${grams(item.grams)}</span>
     <span class="item-name">${esc(foodName(item.name))}</span>
     <span class="item-meta">${statusPill(item.statuses)}<span>${expiryText(item)}</span></span>

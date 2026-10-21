@@ -66,7 +66,7 @@ function shelfChips(fridges) {
 function foodCard(item) {
   const hidden = item.name === "Private food";
   const days = daysLeft(item.expiresOn);
-  return `<li class="food-card" data-food-id="${esc(item.id)}" tabindex="-1">
+  return `<li class="food-card" data-food-id="${esc(item.id)}" data-key="${esc(item.id)}" tabindex="-1">
     <div class="food-card-top">
       <i class="${shapeClass(item.name)}" aria-hidden="true"></i>
       ${days === null || hidden ? "" : `<span class="days ${days <= 1 ? "attention" : ""}">${esc(whenText(item.expiresOn))}</span>`}
