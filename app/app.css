@@ -1638,3 +1638,9 @@ dialog.sheet :is(button, a.button):not(.primary) { background: transparent; colo
   .land-wordmark[data-reveal] span { display: inline-block; translate: 0 0.9em; transition: translate var(--duration-slow) var(--ease-emphasized); }
   :root[data-ready] .land-wordmark.shown span { translate: 0 0; transition-delay: calc(var(--i) * var(--stagger)); }
 }
+
+/* The ragged header edge bleeds sideways; on phones the column has no box to clip it, so the shell does and the page never widens */
+.shell { overflow-x: clip; }
+@media (max-width: 480px) {
+  .bar:has(.session:not([hidden])) .wordmark { display: none; }
+}
