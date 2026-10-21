@@ -1,5 +1,6 @@
 import { formatMoney, formatNumber, t } from "./i18n.js";
-import { esc } from "./ui.js";
+import { esc, ticker } from "./ui.js";
+import { reduced, token } from "./motion.js";
 import { mountStory, storyMarkup } from "./story.js";
 
 const PRICE_PER_KG = 9750;
@@ -51,7 +52,7 @@ export function renderLanding(main) {
         </figure>
       </section>
 
-      <section class="chapter chapter-cilantro land-kit" aria-labelledby="kit-title" data-explode>
+      <section class="chapter chapter-cilantro land-kit" aria-labelledby="kit-title">
         <h2 id="kit-title">${t("landing.kit.title")}</h2>
         <p class="land-text">${t("landing.kit.lead")}</p>
         <ul class="kit">${kitPart("door", "door")}${kitPart("probe", "probe")}${kitPart("brain", "board")}${kitPart("scale", "scale")}</ul>
@@ -78,7 +79,7 @@ export function renderLanding(main) {
         <label class="calc-control" for="calc-kilos">${t("landing.calc.label")}
           <span class="calc-row"><input id="calc-kilos" type="range" min="0.5" max="10" step="0.5" value="2" data-kilos><output class="data" data-kilos-out>${formatNumber(2, 1)} kg</output></span>
         </label>
-        <p class="calc-figure"><span class="data" data-money>${esc(formatMoney(monthly(2), "COP"))}</span><span>${t("landing.calc.unit")}</span></p>
+        <p class="calc-figure"><span class="data" data-money></span><span>${t("landing.calc.unit")}</span></p>
         <p class="calc-how">${t("landing.calc.how", { price: formatMoney(PRICE_PER_KG, "COP") })}</p>
       </section>
 
@@ -111,16 +112,34 @@ export function renderLanding(main) {
   main.querySelector(".landing").classList.add("drawn");
 
   const range = main.querySelector("[data-stage-range]");
+  const picture = main.querySelector("[data-how-scene]");
+  let blot = null;
+  const showScene = (source) => {
+    blot?.finish();
+    if (reduced()) {
+      picture.src = source;
+      return;
+    }
+    const next = picture.cloneNode();
+    next.classList.add("how-next");
+    next.src = source;
+    picture.after(next);
+    const grow = next.decode().catch(() => null).then(() => next.animate([{ "--blot": "0%" }, { "--blot": "340%" }], { duration: token("duration-slow") * 1.8, easing: "cubic-bezier(.45,0,.25,1)" }));
+    const current = { finish: () => grow.then((animation) => animation.finish()) };
+    blot = current;
+    grow.then((animation) => animation.finished).finally(() => {
+      picture.src = source;
+      next.remove();
+      if (blot === current) blot = null;
+    });
+  };
   range.addEventListener("input", () => {
     const stage = STAGES[Number(range.value)];
     const fragment = main.querySelector("[data-fragment]");
-    fragment.classList.remove("swap");
-    void fragment.offsetWidth;
-    fragment.classList.add("swap");
     fragment.innerHTML = stageFragment(stage);
+    fragment.animate([{ opacity: 0, translate: "0 var(--rise)" }, { opacity: 1, translate: "0 0" }], { duration: token("duration-base"), easing: "cubic-bezier(.16,.84,.3,1)" });
     main.querySelector("[data-clause]").textContent = t(`landing.how.${stage}`);
-    const picture = main.querySelector("[data-how-scene]");
-    picture.src = `/app/stills/${STAGE_SCENES[stage]}.webp`;
+    showScene(`/app/stills/${STAGE_SCENES[stage]}.webp`);
     main.querySelectorAll("[data-name]").forEach((name) => {
       if (name.dataset.name === range.value) name.setAttribute("aria-current", "step");
       else name.removeAttribute("aria-current");
@@ -128,25 +147,13 @@ export function renderLanding(main) {
   });
 
   const kilos = main.querySelector("[data-kilos]");
+  const money = main.querySelector("[data-money]");
+  ticker(money, formatMoney(monthly(Number(kilos.value)), "COP"));
   kilos.addEventListener("input", () => {
     const value = Number(kilos.value);
     main.querySelector("[data-kilos-out]").textContent = `${formatNumber(value, 1)} kg`;
-    main.querySelector("[data-money]").textContent = formatMoney(monthly(value), "COP");
+    ticker(money, formatMoney(monthly(value), "COP"));
   });
 
   mountStory(main);
-
-  const kit = main.querySelector("[data-explode]");
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const onScroll = () => {
-    if (!document.body.contains(kit)) {
-      window.removeEventListener("scroll", onScroll);
-      return;
-    }
-    const box = kit.getBoundingClientRect();
-    const progress = Math.min(1, Math.max(0, (innerHeight - box.top) / (innerHeight * 0.9)));
-    kit.style.setProperty("--open", reduced ? 1 : progress.toFixed(3));
-  };
-  window.addEventListener("scroll", onScroll, { passive: true });
-  onScroll();
 }

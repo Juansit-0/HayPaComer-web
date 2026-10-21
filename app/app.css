@@ -1264,33 +1264,16 @@ a.button:active { transform: scale(0.97); }
 .land-label.l3 { right: -10%; bottom: 14%; animation-delay: 1000ms; }
 @keyframes pop { from { opacity: 0; scale: 0.6; } }
 
-.land-kit { --open: 1; }
 .kit { list-style: none; margin: var(--space-l) 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-l); }
-.kit-part { display: grid; gap: var(--space-s); align-content: start; transform: translate(calc((1 - var(--open)) * var(--dx, 0%)), calc((1 - var(--open)) * 60px)) rotate(calc((1 - var(--open)) * var(--rot, 0deg))); opacity: calc(0.2 + var(--open) * 0.8); will-change: transform; }
-.kit-part:nth-child(1) { --dx: 150%; --rot: -8deg; }
-.kit-part:nth-child(2) { --dx: 50%; --rot: 6deg; }
-.kit-part:nth-child(3) { --dx: -50%; --rot: -5deg; }
-.kit-part:nth-child(4) { --dx: -150%; --rot: 7deg; }
+.kit-part { display: grid; gap: var(--space-s); align-content: start; }
 .kit-text { display: grid; gap: 6px; }
 .kit-text b { font: 400 clamp(26px, 2.4vw, 36px)/1 var(--font-display); text-transform: uppercase; }
 .kit-text span { font-size: 17px; line-height: 1.45; }
-.kit-shape { position: relative; display: block; height: 150px; }
-.kit-shape i { position: absolute; display: block; }
-.kit-shape-reed i { width: 44%; height: 34px; top: 58px; background: var(--color-white); border-radius: 8px; }
-.kit-shape-reed i:first-child { left: 0; }
-.kit-shape-reed i:last-child { right: 0; width: 34%; }
-.kit-shape-probe i:first-child { left: 10%; top: 64px; width: 46%; height: 18px; border-radius: 9px; background: #c9d0d3; }
-.kit-shape-probe i:last-child { left: 54%; top: 30px; width: 40%; height: 70px; border: 5px solid var(--color-tinta); border-left: 0; border-radius: 0 40px 40px 0; }
-.kit-shape-board i:first-child { inset: 30px 6% 30px 6%; background: #10261a; border-radius: 6px; box-shadow: inset 0 0 0 3px #e2c56b; }
-.kit-shape-board i:last-child { left: 34%; top: 56px; width: 32%; height: 38px; background: #c9d0d3; border-radius: 3px; }
-.kit-shape-scale i:first-child { left: 8%; right: 8%; top: 26px; height: 22px; border-radius: 50%; background: var(--color-white); }
-.kit-shape-scale i:last-child { left: 14%; right: 14%; top: 50px; height: 70px; background: var(--color-tinta); border-radius: 12px; box-shadow: inset 0 -26px 0 -18px #6fe3a1; }
 
 .land-how { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; column-gap: var(--space-xl); }
 .how-clause { font: 400 clamp(32px, 3.6vw, 60px)/1 var(--font-display); text-transform: uppercase; max-width: 16ch; margin: var(--space-m) 0 0; }
 .how-right { display: grid; place-items: center; min-height: 340px; border-radius: var(--radius-20); background: var(--color-papa); }
 .how-fragment { display: grid; gap: var(--space-xs); justify-items: start; min-width: min(320px, 80%); padding: var(--space-l); background: var(--color-white); border-radius: var(--radius-20); box-shadow: var(--shadow-raised); }
-.how-fragment.swap { animation: rise var(--duration-base) var(--ease-emphasized) both; }
 .ui-label { font-weight: 700; color: var(--color-text-weak); }
 .ui-figure { font: 700 clamp(48px, 5vw, 80px)/1 var(--font-body); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
 .how-slider { grid-column: 1 / -1; display: grid; gap: var(--space-s); margin-top: var(--space-l); }
@@ -1308,7 +1291,7 @@ a.button:active { transform: scale(0.97); }
 .calc-row input[type="range"] { accent-color: var(--color-papa); }
 .calc-figure { margin: 0; display: grid; gap: var(--space-xs); }
 .calc-figure .data { font: 700 clamp(72px, 13vw, 232px)/0.85 var(--font-body); letter-spacing: -0.05em; color: var(--color-papa); }
-.calc-figure span:last-child { font-size: clamp(20px, 2vw, 28px); font-weight: 600; }
+.calc-figure > span:last-child { font-size: clamp(20px, 2vw, 28px); font-weight: 600; }
 .calc-how { margin: 0; max-width: 60ch; font-size: 16px; color: color-mix(in oklab, var(--color-arroz) 82%, transparent); }
 
 .land-pasto { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: center; column-gap: var(--space-xl); }
@@ -1324,19 +1307,15 @@ a.button:active { transform: scale(0.97); }
   .land-hero, .land-how, .land-pasto { grid-template-columns: minmax(0, 1fr); row-gap: var(--space-l); }
   .land-fridge { width: min(70%, 300px); }
   .kit { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .kit-part:nth-child(1), .kit-part:nth-child(3) { --dx: 50%; }
-  .kit-part:nth-child(2), .kit-part:nth-child(4) { --dx: -50%; }
 }
 @media (max-width: 480px) {
   .kit { grid-template-columns: minmax(0, 1fr); }
-  .kit-part { --dx: 0% !important; }
   .land-label.l1 { left: -6%; }
   .land-label.l2 { right: -6%; }
   .land-label.l3 { right: -4%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .land-hero h1, .land-lead, .land-hero .land-actions, .land-fridge, .land-label, .how-fragment.swap { animation: none; }
-  .kit-part { transform: none; opacity: 1; }
+  .land-hero h1, .land-lead, .land-hero .land-actions, .land-fridge, .land-label { animation: none; }
 }
 .pasto-photo img { max-height: 70vh; }
 .password-field { display: flex; align-items: stretch; gap: var(--space-xs); }
@@ -1597,7 +1576,6 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 .kit-medallion img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 600ms var(--ease-standard); }
 .landing.drawn .kit-medallion img { opacity: 1; }
 .landing .kit { gap: var(--space-xl) var(--space-l); }
-.landing .kit-part { opacity: 1; transform: none; }
 .landing .kit-text span { font-size: 17px; }
 .landing .how-right { position: relative; min-height: 0; background: transparent; border-radius: 0; display: block; }
 .landing .how-right .how-scene { border: 3px solid var(--ink-color); }
@@ -1650,3 +1628,10 @@ dialog.sheet :is(button, a.button):not(.primary) { background: transparent; colo
 .bar .session[hidden] + .sound-toggle { margin-left: auto; }
 .bar .session:not([hidden]) ~ .sound-toggle { display: none; }
 .sound-toggle[aria-pressed="true"] { box-shadow: inset 0 -3px 0 var(--color-primary); }
+
+@property --blot { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+.landing .how-right .how-next { position: absolute; inset: 0; opacity: 1; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M88.2 50.0 L90.1 53.5 L93.8 57.7 L90.2 60.8 L98.8 67.8 L83.1 65.5 L80.6 67.6 L74.5 67.1 L73.0 69.3 L69.6 69.6 L68.3 71.8 L67.9 75.6 L67.0 79.5 L66.7 85.8 L60.8 79.8 L58.1 80.3 L54.8 77.3 L52.2 75.7 L50.0 79.1 L47.7 76.5 L44.1 83.6 L40.9 84.1 L34.1 93.8 L32.6 87.2 L28.0 88.2 L27.2 82.6 L24.5 80.4 L23.3 76.7 L23.4 72.3 L21.3 70.1 L21.4 66.5 L11.0 68.2 L14.5 62.9 L15.0 59.4 L16.4 55.9 L17.4 52.8 L21.3 50.0 L25.1 47.8 L24.7 45.5 L25.6 43.5 L16.5 37.8 L23.4 37.6 L20.0 32.7 L19.7 28.8 L22.0 26.5 L21.4 21.4 L27.2 22.8 L29.4 20.6 L31.6 18.1 L31.2 9.7 L38.2 17.5 L39.7 11.7 L42.7 8.6 L46.3 8.1 L50.0 6.9 L53.3 12.0 L56.4 13.9 L58.3 18.9 L63.3 13.5 L61.7 24.9 L63.9 26.0 L65.2 28.3 L69.0 27.4 L70.3 29.7 L75.8 28.4 L77.8 30.5 L80.5 32.4 L88.8 31.9 L78.7 39.5 L81.2 41.7 L80.1 44.7 L85.4 46.9Z'/%3E%3Ccircle cx='86.3' cy='74.8' r='3.2'/%3E%3Ccircle cx='24.1' cy='85.6' r='2.4'/%3E%3Ccircle cx='18.1' cy='19.7' r='3.6'/%3E%3Ccircle cx='74.4' cy='13.4' r='2.2'/%3E%3C/svg%3E") center / var(--blot) var(--blot) no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M88.2 50.0 L90.1 53.5 L93.8 57.7 L90.2 60.8 L98.8 67.8 L83.1 65.5 L80.6 67.6 L74.5 67.1 L73.0 69.3 L69.6 69.6 L68.3 71.8 L67.9 75.6 L67.0 79.5 L66.7 85.8 L60.8 79.8 L58.1 80.3 L54.8 77.3 L52.2 75.7 L50.0 79.1 L47.7 76.5 L44.1 83.6 L40.9 84.1 L34.1 93.8 L32.6 87.2 L28.0 88.2 L27.2 82.6 L24.5 80.4 L23.3 76.7 L23.4 72.3 L21.3 70.1 L21.4 66.5 L11.0 68.2 L14.5 62.9 L15.0 59.4 L16.4 55.9 L17.4 52.8 L21.3 50.0 L25.1 47.8 L24.7 45.5 L25.6 43.5 L16.5 37.8 L23.4 37.6 L20.0 32.7 L19.7 28.8 L22.0 26.5 L21.4 21.4 L27.2 22.8 L29.4 20.6 L31.6 18.1 L31.2 9.7 L38.2 17.5 L39.7 11.7 L42.7 8.6 L46.3 8.1 L50.0 6.9 L53.3 12.0 L56.4 13.9 L58.3 18.9 L63.3 13.5 L61.7 24.9 L63.9 26.0 L65.2 28.3 L69.0 27.4 L70.3 29.7 L75.8 28.4 L77.8 30.5 L80.5 32.4 L88.8 31.9 L78.7 39.5 L81.2 41.7 L80.1 44.7 L85.4 46.9Z'/%3E%3Ccircle cx='86.3' cy='74.8' r='3.2'/%3E%3Ccircle cx='24.1' cy='85.6' r='2.4'/%3E%3Ccircle cx='18.1' cy='19.7' r='3.6'/%3E%3Ccircle cx='74.4' cy='13.4' r='2.2'/%3E%3C/svg%3E") center / var(--blot) var(--blot) no-repeat; }
+.ticker { display: inline-flex; font-variant-numeric: tabular-nums; }
+.tick-digit { display: inline-block; height: 1em; overflow: hidden; }
+.tick-digit > span { display: block; line-height: 1; transition: translate var(--duration-slow) var(--ease-emphasized); }
+.calc-figure .data { line-height: 1; }

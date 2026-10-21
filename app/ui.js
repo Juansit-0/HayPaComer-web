@@ -6,6 +6,32 @@ export function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ESCAPES[char]);
 }
 
+const DIGITS = "0123456789";
+
+export function ticker(element, text) {
+  const value = String(text);
+  if (!element.querySelector(".ticker")) element.innerHTML = `<span class="visually-hidden"></span><span class="ticker" aria-hidden="true"></span>`;
+  element.querySelector(".visually-hidden").textContent = value;
+  const roll = element.querySelector(".ticker");
+  const chars = [...value];
+  const kept = roll.children.length === chars.length && chars.every((char, index) => DIGITS.includes(char) === roll.children[index].classList.contains("tick-digit"));
+  if (!kept) {
+    roll.innerHTML = chars
+      .map((char) => (DIGITS.includes(char) ? `<span class="tick-digit"><span>${[...DIGITS].join("<br>")}</span></span>` : `<span>${esc(char)}</span>`))
+      .join("");
+  }
+  [...roll.children].forEach((slot, index) => {
+    if (!slot.classList.contains("tick-digit")) {
+      slot.textContent = chars[index];
+      return;
+    }
+    const column = slot.firstElementChild;
+    const target = `0 ${-Number(chars[index])}em`;
+    if (!kept) column.animate([{ translate: "0 0" }, { translate: target }], { duration: 600, easing: "cubic-bezier(.16,.84,.3,1)" });
+    column.style.translate = target;
+  });
+}
+
 export function grams(value) {
   const number = Number(value);
   if (number >= 1000) return `${formatNumber(number / 1000, number % 1000 === 0 ? 0 : 2)} kg`;
