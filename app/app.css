@@ -757,7 +757,7 @@ dialog.sheet[open] { animation: sheet-in var(--duration-slow) var(--ease-standar
 .cooking .step-text { font-size: var(--size-h3); line-height: var(--leading-h3); }
 .cooking .row-form > button { flex: 1 1 auto; }
 .dish-row { display: grid; gap: var(--space-xs); padding: var(--space-s) 0; border-top: 1px solid var(--color-border); }
-.dish-row h3 { font-size: var(--size-h4); }
+.dish-row h2 { font-size: var(--size-h4); }
 .dish-meta { display: flex; flex-wrap: wrap; gap: var(--space-s); color: var(--color-text-weak); }
 .dish-foods { margin: 0; color: var(--color-text-weak); }
 .dish-foods .missing { color: var(--color-attention); font-weight: 600; }
@@ -1068,7 +1068,7 @@ html:has(.loader:not(.gone)) { overflow: hidden; }
 .dish-plate { aspect-ratio: 4 / 5; border-radius: var(--radius-20); background: var(--color-papa); display: grid; place-items: center; }
 .dish-plate .plate { width: 72%; aspect-ratio: 1; border-radius: 50%; background: var(--color-white); display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 8px; padding: 18%; box-shadow: inset 0 0 0 10px var(--color-meson); }
 .dish-body { display: grid; gap: var(--space-xs); justify-items: start; }
-.dish-body h3 { font: 400 clamp(26px, 2.4vw, 36px)/0.95 var(--font-display); text-transform: uppercase; letter-spacing: var(--tracking-display); }
+.dish-body h2 { font: 400 clamp(26px, 2.4vw, 36px)/0.95 var(--font-display); text-transform: uppercase; letter-spacing: var(--tracking-display); }
 .dish-meta { display: flex; flex-wrap: wrap; gap: var(--space-s); align-items: center; color: var(--color-text-weak); margin: 0; }
 .dish-meta .data { color: var(--color-text); font-weight: 700; }
 .dish-rescue { margin: 0; font-weight: 600; color: var(--color-cilantro); }
@@ -1394,7 +1394,7 @@ a.button:active { transform: scale(0.97); }
 .chef-dishes .dish-photo img, .chef-dishes .dish-plate { aspect-ratio: 1; }
 .chef-dishes .dish-photo figcaption { display: none; }
 .chef-dishes .dish-body { display: grid; gap: 4px; justify-items: start; }
-.chef-dishes .dish-card h3 { font-size: var(--size-h4); }
+.chef-dishes .dish-card h2 { font-size: var(--size-h4); }
 .chef-dishes .dish-foods { margin: 0; font-size: var(--size-small); }
 .chat .evidence summary { cursor: pointer; }
 .voice-options summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
@@ -1495,7 +1495,7 @@ a.button:active { transform: scale(0.97); }
   .dish-row .dish-card { grid-template-columns: 112px minmax(0, 1fr); align-items: center; }
   .dish-row .dish-photo img, .dish-row .dish-plate { aspect-ratio: 1; }
   .dish-row .dish-photo figcaption { display: none; }
-  .dish-row .dish-card h3 { font-size: var(--size-h3); }
+  .dish-row .dish-card h2 { font-size: var(--size-h3); }
   .summary-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .today-list { grid-template-columns: minmax(0, 1fr); }
   .fridge-hero, .market-hero { grid-template-columns: minmax(0, 1fr); }
@@ -1551,7 +1551,7 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 .fridge .note .part-name { font-size: 8.5px; }
 .freezer-text b { font-size: 19px; }
 .land-wordmark { font-size: 12vw; }
-:where(.fridge .part-name, .freezer-text b, .dish-body h3, .today h2, .summary-row h2, .shelf-tile > header h2, .notepad > h2, .cooking .cooking-step, .auth-question, .chapter h2, .kit-text b, .how-clause, .land-wordmark, .numbers-money, .wordmark) { font-weight: 900; font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1; }
+:where(.fridge .part-name, .freezer-text b, .dish-body h2, .today h2, .summary-row h2, .shelf-tile > header h2, .notepad > h2, .cooking .cooking-step, .auth-question, .chapter h2, .kit-text b, .how-clause, .land-wordmark, .numbers-money, .wordmark) { font-weight: 900; font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1; }
 
 /* Ink transitions: the panel is revealed and withdrawn behind a ragged ink-brush edge that starts at the fridge */
 @property --ink { syntax: "<percentage>"; inherits: false; initial-value: 112%; }
@@ -1612,7 +1612,7 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 .landing .chapter { position: relative; margin-top: -28px; padding-top: calc(clamp(56px, 8vw, 128px) + 28px); -webkit-mask: var(--edge) top / 100% 28px no-repeat, linear-gradient(#000, #000) 0 28px / 100% calc(100% - 28px) no-repeat; mask: var(--edge) top / 100% 28px no-repeat, linear-gradient(#000, #000) 0 28px / 100% calc(100% - 28px) no-repeat; }
 .landing .chapter-papa, .landing .chapter-arroz, .landing .chapter-tomate { background: var(--paper); color: var(--ink-color); }
 .landing .chapter-cilantro, .landing .chapter-tinta { background: var(--ink-color); color: var(--paper); }
-.landing .chapter-mora { background: #c8432a; color: var(--paper); }
+.landing .chapter-mora { background: #a8361f; color: var(--paper); }
 .landing .land-hero { min-height: 100svh; }
 .landing .land-text, .landing .land-lead, .landing .calc-how { justify-self: start; max-width: 46ch; color: inherit; font-weight: 500; }
 .landing .pasto-photo img { filter: grayscale(1) contrast(1.35) brightness(1.05); mix-blend-mode: multiply; }
@@ -1621,7 +1621,7 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 
 /* After the story: light on dark, dark on light, and engraved illustrations instead of drawn shapes */
 .landing .chapter-mora .calc-figure .data { color: var(--paper); }
-.landing .chapter-mora .calc-how, .landing .chapter-mora .calc-control { color: color-mix(in oklab, var(--paper) 88%, transparent); }
+.landing .chapter-mora .calc-how, .landing .chapter-mora .calc-control { color: var(--paper); }
 .landing .chapter-cilantro a.button:not(.primary), .landing .chapter-tinta a.button:not(.primary), .landing .chapter-mora a.button:not(.primary) { background: transparent; color: var(--paper); box-shadow: inset 0 0 0 2px var(--paper); }
 .landing .chapter-papa a.button:not(.primary), .landing .chapter-arroz a.button:not(.primary), .landing .chapter-tomate a.button:not(.primary) { background: transparent; color: var(--ink-color); box-shadow: inset 0 0 0 2px var(--ink-color); }
 .landing a.button.primary { background: var(--color-cobre); color: var(--paper); }
@@ -1643,7 +1643,7 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 .landing .how-right { position: relative; min-height: 0; background: transparent; border-radius: 0; display: block; }
 .landing .how-right .how-scene { border: 3px solid var(--ink-color); }
 .landing .how-fragment { position: absolute; left: -24px; bottom: -24px; min-width: 0; padding: var(--space-m); border-radius: 0; background: var(--paper); color: var(--ink-color); border: 3px solid var(--ink-color); box-shadow: 6px 6px 0 var(--ink-color); }
-.landing .how-names { color: color-mix(in oklab, var(--ink-color) 55%, transparent); }
+.landing .how-names { color: #5c554c; }
 .landing .how-names li[aria-current="step"] { color: var(--ink-color); }
 .landing .land-footer { gap: var(--space-m); }
 .landing .land-wordmark { color: var(--ink-color); }
@@ -1679,3 +1679,11 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 .shell:has(.stage:not([hidden])) .number-input { justify-self: start; width: max-content; border: 2px solid var(--line); border-radius: 4px; background: var(--card); overflow: hidden; }
 .shell:has(.stage:not([hidden])) .number-input :is(input, button, span) { border: 0; box-shadow: none; background: transparent; }
 .shell:has(.stage:not([hidden])) .number-input button + * , .shell:has(.stage:not([hidden])) .number-input * + button { border-left: 2px solid var(--line); }
+
+/* Sheets and the inbox: the same paper, ink edge and hard shadow as the cards, unread alerts marked in tomato */
+dialog.sheet { background: var(--sheet); color: var(--line); border: 2px solid var(--line); border-radius: 6px; box-shadow: 6px 6px 0 var(--line); }
+dialog.sheet .sheet-head h2 { font: 900 clamp(26px, 3vw, 34px)/1 var(--font-display); font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1; text-transform: uppercase; }
+dialog.sheet :is(button, a.button):not(.primary) { background: transparent; color: var(--line); box-shadow: inset 0 0 0 2px var(--line); }
+.inbox-item { background: var(--card); border: 2px solid var(--line); border-radius: 6px; box-shadow: 3px 3px 0 var(--line); }
+.inbox-item.inbox-unread { border-color: var(--line); box-shadow: 3px 3px 0 var(--color-tomate); border-left: 8px solid var(--color-tomate); }
+.inbox-when { color: color-mix(in oklab, var(--line) 70%, transparent); }

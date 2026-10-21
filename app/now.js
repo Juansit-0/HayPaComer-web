@@ -42,7 +42,7 @@ export function dishCard(dish, index) {
   return `<article class="dish-card" style="--i:${index}">
     ${dishPicture(dish.recipe, requirements.map((requirement) => requirement.food))}
     <div class="dish-body">
-      <h3>${esc(recipeName(dish.recipe))}</h3>
+      <h2>${esc(recipeName(dish.recipe))}</h2>
       <p class="dish-meta">
         <span class="data">${esc(t("now.dish.minutes", { n: dish.minutes }))}</span>
         <span>${plural("now.servings", dish.evaluation.requestedServings)}</span>
