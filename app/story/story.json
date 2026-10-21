@@ -342,6 +342,11 @@
       "corner": 0
     }
   ],
-  "gates": [],
+  "gates": [
+    {
+      "id": "door",
+      "at": 0.395
+    }
+  ],
   "sounds": []
 }

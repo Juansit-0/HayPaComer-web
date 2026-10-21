@@ -220,7 +220,7 @@ export function kitchen() {
     return model;
   });
   scene.userData.play = (k) => {
-    fridge.userData.door.rotation.y = -1.9 * THREE.MathUtils.smoothstep(k, 0.08, 0.35);
+    fridge.userData.door.rotation.y = -1.9 * THREE.MathUtils.smoothstep(k, 0.2, 0.42);
     travellers.forEach((model, index) => {
       const t = THREE.MathUtils.smoothstep(k, 0.36 + index * 0.07, 0.62 + index * 0.07);
       model.position.lerpVectors(model.userData.from, model.userData.to, t);
