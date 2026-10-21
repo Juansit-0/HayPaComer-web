@@ -54,28 +54,86 @@ Fraunces is set at its heaviest optical size with the soft, slightly wonky cut, 
 
 Spacing 8, 16, 24, 32, 48, 96 px. Radius 4, 8, 12, 16 px and full. Buttons and chips are pills; tiles are 16 px. Controls are at least 52 px tall (touch targets 48 px or more).
 
-## Motion
+## Motion v2
+
+Motion explains a change, answers an action, or tells the story; nothing moves to decorate. Every duration and curve comes from a token or a spring below, never from a literal in code. The parameters were set after studying how Santioni Spirits moves (`HayPaComer-docs/docs/design/santioni-motion-analysis.md`); the techniques are re-implemented from scratch.
+
+### Tokens
 
 | Token | Value | Use |
 |---|---|---|
-| `--duration-fast` | 140ms | Press, hover |
-| `--duration-base` | 240ms | Tabs, view transition cross-fade |
-| `--duration-slow` | 480ms | Entrances, chapter band |
-| `--duration-shutter` | 900ms | Loader shutter |
-| `--ease-emphasized` | cubic-bezier(0.3, 0, 0, 1) | Entrances and the shutter |
-| `--stagger` | 70ms | Delay between siblings |
-| `--rise` | 24px | Entrance travel |
+| `--duration-press` | 100ms | Press feedback |
+| `--duration-fast` | 160ms | Hover, small state changes |
+| `--duration-base` | 240ms | Tabs, chapter band, toasts |
+| `--duration-slow` | 420ms | Entrances, sheets |
+| `--duration-withdraw` | 180ms | Panel ink withdraws before a route change |
+| `--duration-spring` | 745ms | Length of the `surface` spring in CSS |
+| `--duration-shutter` | 600ms | Loader exit, Pasto photo shutter |
+| `--duration-caption` | 800ms | Story caption box opens |
+| `--duration-hold` | 800ms | Press and hold in the app (never zeroed) |
+| `--ease-standard` | cubic-bezier(0.2, 0, 0, 1) | Colour and opacity |
+| `--ease-emphasized` | cubic-bezier(0.3, 0, 0, 1) | Entrances |
+| `--ease-exit` | cubic-bezier(0.5, 0, 0.9, 0.4) | Things leaving |
+| `--ease-out-back` | cubic-bezier(0.34, 1.4, 0.64, 1) | Labels that pop |
+| `--ease-spring` | `linear()` of the `surface` spring | CSS that must land with JS springs |
+| `--stagger` | 40ms, at most 6 items | Delay between siblings |
+| `--rise` | 16px | Entrance travel |
 
-Patterns:
+### Springs (`app/motion.js`, Motion `visualDuration` and `bounce`)
 
-- **Loader.** The wordmark at full width fills from the bottom with real progress (texts, fonts, session, first data), then the destination chapter rises as a shutter and the page slides away.
-- **Skeleton.** On every route change `skeleton(route, title)` in `ui.js` paints the chapter band with the real title and pulsing blocks shaped like that screen's tiles; `main` carries `aria-busy` until data arrives.
-- **Entrance.** When a view renders, its header and tiles rise in sequence (`data-enter`, `--i`, `--stagger`).
-- **Tab transition.** With the 3D fridge (desktop), the panel is withdrawn toward the fridge and revealed again behind a ragged ink-brush mask (`--ink`, 240ms out, 620ms in) while the fridge keeps moving. Without it, View Transitions cross-fade the column.
-- **Press and hold.** Actions that cannot be taken back lightly (throwing food away, approving what the Chef proposes) carry `data-hold`: the button fills like ink for 800ms and acts only when full; a quick tap explains the gesture. Holding Space or Enter works the same, and the hint is read by screen readers.
-- **Busy buttons.** `busy(button, task)` disables the button and shows a spinner while the request runs.
+| Spring | Duration | Bounce | Settles | Use |
+|---|---|---|---|---|
+| `snappy` | 0.24 s | 0 | 425 ms | Tab indicator, list moves, kit stamps |
+| `surface` | 0.42 s | 0 | 745 ms | Panel reveal, sheets |
+| `camera` | 0.6 s | 0 | 1060 ms | 3D camera between routes |
+| `door` | 0.7 s | 0.25 | 1070 ms | Fridge door and freezer |
+| `drop` | 0.45 s | 0.2 | 730 ms | A food flying to the pot, bin or shelf |
 
-All of it collapses to instant changes under `prefers-reduced-motion: reduce` (durations, stagger and rise are zero).
+The 3D integrator uses the same stiffness and damping as the DOM springs, so the camera and the panel settle together.
+
+### Story parameters (`app/story/story.json`)
+
+| Parameter | Value |
+|---|---|
+| Wheel | 0.3 x pixel delta on every device, 16 to 40 px per line in line mode |
+| Smoothing | time-based, about 140 ms to follow on desktop and 60 ms on phones; one notch settles within about 1.2 s |
+| Inertia | 0.9 per 60 Hz frame, scaled by time; touch release glides 1.5 to 2.5 s |
+| Momentum block | 200 ms after a jump |
+| Keys | arrows 150 px, Page and Space one caption, 400 ms |
+| Camera | fov 35; parallax 0.5 world units on desktop only, lerp 0.05; pitch from scroll speed 0.002 rad per px, at most 0.2 rad |
+| Hatching boil | 8 steps per second, frozen 5 s after the last interaction |
+| Ink cover | 2 screens (1.5 on phones), threshold 0.4, edge drift 0.1 per second |
+| Captions | box opens in 800 ms; lines come in over 1.2 to 2 s, 100 to 200 ms apart |
+| Door gate | hold 3 s to open the fridge, rewinds three times faster when released |
+
+### Choreography
+
+| Where | Trigger | What moves | Motion | Reduced motion |
+|---|---|---|---|---|
+| Story | Loader exits | Intro title and hint | Words rise, `--duration-slow`, stagger | Shown at once |
+| Story | Scroll | Camera along its keys, worlds, hatching | Virtual scroll, smoothing above | Not mounted: engravings and captions on native scroll |
+| Story | Chapter cut | Ink cover sweeps the screen | Scrubbed by progress | None |
+| Story | Caption cue | Caption box, then its words | `--duration-caption`, words by progress | Plain text |
+| Story | Kitchen door | Hold button fills; door opens | 3 s hold, `door` spring | Hold kept, door jumps |
+| Story | End | Header returns, page scroll released | `--duration-base` | Instant |
+| Landing | In view | Hero lines, stills, kit medallions, Pasto photo, wordmark | Mask reveal, ink fade, `snappy` stamp, shutter | Final state |
+| Landing | How it works step | Scene image | Ink blot mask, `--duration-slow` | Swap |
+| Landing | Calculator input | Money digits | Digits slide, at most 800 ms | Swap |
+| Shell | Ready | Loader | Exit `--duration-shutter`, never blocks clicks | Gone at once |
+| Shell | Route change | Camera and panel ink | `camera` spring plus withdraw then `surface` reveal, interruptible | Instant swap |
+| Shell | View renders | Header and up to 6 tiles | Rise, `--stagger` | Shown at once |
+| Shell | Live refresh | Only the items that changed | Keyed FLIP, `snappy` | Swap |
+| Screens | Market check | The item moves to the cart | FLIP `snappy`, undone if the request fails | Swap |
+| Screens | Numbers change | Grams, money, rings | Count from the previous value, at most 800 ms | Swap |
+| Screens | Chat | Only the new message | Rise | Shown at once |
+| Screens | Sheet | Sheet and backdrop | `surface` in, `--ease-exit` out | Instant |
+| Screens | Press and hold | Fill, then a stamp | `--duration-hold`, stamp `snappy` | Fill kept, stamp becomes a colour |
+| 3D fridge | Drop | The food flies to its target, or back if the drop fails | `drop` spring | Jumps |
+| 3D fridge | New food | Pops in | `snappy`, 40 ms apart | Appears |
+| 3D fridge | Pointer | Camera parallax | Damped, eases back on leave | Off |
+| Everywhere | 5 s idle | Hatching boil, vapor, pulses | Freeze | Never start |
+
+Rules: only `transform`, `opacity`, `clip-path`, masks and filters animate; one WebGL context per area; rendering pauses off screen and while idle; sound is off until the visitor turns it on.
 
 ## Accessibility
 
