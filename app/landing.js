@@ -1,6 +1,6 @@
 import { formatMoney, formatNumber, t } from "./i18n.js";
 import { esc, ticker } from "./ui.js";
-import { reduced, token } from "./motion.js";
+import { inView, page, reduced, token } from "./motion.js";
 import { mountStory, storyMarkup } from "./story.js";
 
 const PRICE_PER_KG = 9750;
@@ -37,7 +37,7 @@ export function renderLanding(main) {
     <div class="landing">
       ${storyMarkup()}
 
-      <section class="chapter chapter-papa land-hero" id="land-answer" aria-labelledby="land-title">
+      <section class="chapter chapter-papa land-hero" id="land-answer" aria-labelledby="land-title" data-reveal>
         <div class="land-hero-text">
           <h2 id="land-title" tabindex="-1">${t("now.question")}</h2>
           <p class="land-lead">${t("landing.lead")}</p>
@@ -46,7 +46,7 @@ export function renderLanding(main) {
             <a class="button" href="#/signin">${t("auth.signin")}</a>
           </div>
         </div>
-        <figure class="land-vignette" aria-hidden="true">
+        <figure class="land-vignette" aria-hidden="true" data-reveal>
           <img src="/app/stills/fridge.webp" alt="" width="768" height="960" loading="lazy">
           <span class="land-label l1">842 g</span><span class="land-label l2">${t("landing.ui.expires")}</span><span class="land-label l3">4,2 °C</span>
         </figure>
@@ -55,7 +55,7 @@ export function renderLanding(main) {
       <section class="chapter chapter-cilantro land-kit" aria-labelledby="kit-title">
         <h2 id="kit-title">${t("landing.kit.title")}</h2>
         <p class="land-text">${t("landing.kit.lead")}</p>
-        <ul class="kit">${kitPart("door", "door")}${kitPart("probe", "probe")}${kitPart("brain", "board")}${kitPart("scale", "scale")}</ul>
+        <ul class="kit" data-reveal>${kitPart("door", "door")}${kitPart("probe", "probe")}${kitPart("brain", "board")}${kitPart("scale", "scale")}</ul>
       </section>
 
       <section class="chapter chapter-arroz land-how" aria-labelledby="how-title">
@@ -63,7 +63,7 @@ export function renderLanding(main) {
           <h2 id="how-title">${t("landing.how.title")}</h2>
           <p class="how-clause" data-clause aria-live="polite">${t(`landing.how.${STAGES[0]}`)}</p>
         </div>
-        <div class="how-right">
+        <div class="how-right" data-reveal>
           <img class="how-scene" src="/app/stills/${STAGE_SCENES[STAGES[0]]}.webp" data-how-scene alt="" width="960" height="960" loading="lazy" aria-hidden="true">
           <div class="how-fragment" data-ui data-fragment>${stageFragment(STAGES[0])}</div>
         </div>
@@ -84,7 +84,7 @@ export function renderLanding(main) {
       </section>
 
       <section class="chapter chapter-tomate land-pasto" aria-labelledby="pasto-title">
-        <figure class="pasto-photo">
+        <figure class="pasto-photo" data-reveal>
           <img src="/brand/photos/potrerillo.jpg" alt="${esc(t("landing.pasto.alt"))}" loading="lazy" width="1200" height="900">
           <figcaption>${esc(t("photo.credit", { credit: "El Potrerillo, Pasto. Υ.Γ., CC BY-SA 4.0" }))}</figcaption>
         </figure>
@@ -105,11 +105,17 @@ export function renderLanding(main) {
 
       <footer class="chapter chapter-papa land-footer">
         <p class="land-credits">${t("landing.credits")}</p>
-        <p class="land-wordmark" aria-hidden="true">${WORDMARK}</p>
+        <p class="land-wordmark" aria-hidden="true" data-reveal>${[...WORDMARK].map((letter, index) => `<span style="--i:${index}">${letter}</span>`).join("")}</p>
       </footer>
     </div>`;
 
-  main.querySelector(".landing").classList.add("drawn");
+  main.querySelectorAll("[data-reveal]").forEach((element) => {
+    const stop = inView(element, () => {
+      element.classList.add("shown");
+      stop();
+    }, { amount: 0.25 });
+    page.defer(stop);
+  });
 
   const range = main.querySelector("[data-stage-range]");
   const picture = main.querySelector("[data-how-scene]");
