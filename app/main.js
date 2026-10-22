@@ -1,5 +1,5 @@
 import { newPage, reduced, token } from "./motion.js";
-import { setSound, soundOn } from "./sound.js";
+import { play, setSound, soundOn } from "./sound.js";
 import { api, session } from "./api.js";
 import { chooseHousehold, householdLabel, renderSignIn } from "./auth.js";
 import { renderFridge } from "./fridge.js";
@@ -20,13 +20,17 @@ const loader = document.querySelector("[data-loader]");
 const tabs = document.querySelector(".tabs");
 const stageBox = document.querySelector("[data-stage-box]");
 const sessionBar = document.querySelector(".session");
-const soundButton = document.querySelector("[data-sound]");
-soundButton.setAttribute("aria-pressed", String(soundOn()));
-soundButton.addEventListener("click", () => {
-  const on = !soundOn();
-  setSound(on);
-  soundButton.setAttribute("aria-pressed", String(on));
+const syncSound = () => document.querySelectorAll("[data-sound]").forEach((button) => button.setAttribute("aria-pressed", String(soundOn())));
+syncSound();
+document.addEventListener("click", (event) => {
+  if (event.target.closest("[data-sound]")) {
+    setSound(!soundOn());
+    syncSound();
+    return;
+  }
+  if (event.target.closest("button, a.button, .chip, .palette-chip")) play("click");
 });
+document.addEventListener("change", (event) => event.target.matches("input[type=checkbox], input[type=radio]") && play("tick"));
 ["pointerdown", "keydown"].forEach((type) => window.addEventListener(type, () => soundOn() && setSound(true), { once: true }));
 const views = {
   now: renderNow,

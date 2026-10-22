@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { soundOn } from "./sound.js";
 import { currentLocale, formatNumber, loadLocale, locales, t } from "./i18n.js";
 import { esc, formData, numberField, showError, toast, wireSteppers } from "./ui.js";
 
@@ -44,6 +45,7 @@ function languageTile() {
         )
         .join("")}</fieldset>
     </form>
+    <button class="ghost sound-setting" type="button" data-sound aria-pressed="${soundOn()}">${t("sound.toggle")}</button>
   </section>`;
 }
 

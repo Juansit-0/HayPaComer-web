@@ -1,4 +1,6 @@
 import { foodName, formatNumber, plural, t } from "./i18n.js";
+import { reduced, token } from "./motion.js";
+import { play } from "./sound.js";
 
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
@@ -145,6 +147,7 @@ export function toast(message, action) {
   }
   element.classList.toggle("has-action", Boolean(action));
   element.classList.add("visible");
+  play("pop");
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => element.classList.remove("visible"), action ? 6000 : 3200);
 }
@@ -366,27 +369,42 @@ export async function busy(button, task) {
   }
 }
 
-const HOLD_MS = 800;
 const holding = new WeakMap();
+const holdValue = (button) => parseFloat(getComputedStyle(button).getPropertyValue("--hold")) || 0;
 
+// The fill runs on --duration-hold, which reduced motion never zeroes; the press completes only when it finishes.
 function startHold(button) {
   if (button.disabled || holding.has(button)) return;
-  button.classList.add("holding");
-  holding.set(
-    button,
-    setTimeout(() => {
+  const from = holdValue(button);
+  const run = button.animate([{ "--hold": from }, { "--hold": 1 }], { duration: token("duration-hold") * (1 - from), easing: "linear", fill: "forwards" });
+  holding.set(button, run);
+  run.finished.then(
+    () => {
+      if (holding.get(button) !== run) return;
       holding.delete(button);
-      button.classList.remove("holding");
+      run.cancel();
+      stamp(button);
       button.dataset.held = "true";
       button.click();
-    }, HOLD_MS),
+    },
+    () => null,
   );
 }
 
 function stopHold(button) {
-  clearTimeout(holding.get(button));
+  const run = holding.get(button);
+  if (!run) return;
   holding.delete(button);
-  button.classList.remove("holding");
+  const from = holdValue(button);
+  run.cancel();
+  if (from > 0) button.animate([{ "--hold": from }, { "--hold": 0 }], { duration: token("duration-withdraw") || 1, easing: "ease-out" });
+}
+
+function stamp(button) {
+  navigator.vibrate?.(12);
+  play("stamp");
+  if (reduced()) button.animate([{ filter: "none" }, { filter: "brightness(0.82)" }, { filter: "none" }], { duration: 400 });
+  else button.animate([{ scale: 1 }, { scale: 0.94 }, { scale: 1.04 }, { scale: 1 }], { duration: 320, easing: "ease-out" });
 }
 
 const holdTarget = (event) => event.target.closest?.("[data-hold]");
