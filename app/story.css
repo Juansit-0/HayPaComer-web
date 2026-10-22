@@ -50,6 +50,13 @@ html:has(.land-story[data-captured]) { overscroll-behavior: none; }
 .story-hold { position: absolute; z-index: 3; left: 50%; bottom: 18%; translate: -50% 0; overflow: hidden; isolation: isolate; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; background: var(--color-white); box-shadow: 0 0 0 2px var(--color-tinta); }
 .story-hold::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--color-primary); opacity: 0.35; transform: scaleX(var(--held, 0)); transform-origin: left center; }
 .story-hold[hidden] { display: none; }
+.story-hold { display: inline-flex; align-items: center; gap: 10px; }
+.hold-ring { width: 22px; height: 22px; flex: none; border-radius: 50%; background: conic-gradient(var(--color-tinta) calc(var(--held, 0) * 1turn), color-mix(in srgb, var(--color-tinta) 15%, transparent) 0); -webkit-mask: radial-gradient(circle, transparent 52%, #000 54%); mask: radial-gradient(circle, transparent 52%, #000 54%); }
+@media (prefers-reduced-motion: no-preference) {
+  .story-hold.holding { animation: hold-tremble 90ms linear infinite; }
+  .story-hold.holding .hold-ring { scale: calc(1 + var(--held, 0) * 0.25); }
+}
+@keyframes hold-tremble { 25% { translate: calc(-50% - 1.5px) 0; } 75% { translate: calc(-50% + 1.5px) 0.5px; } }
 
 @media (max-width: 700px) {
   .story-caption.c0 { top: 8%; }

@@ -14,8 +14,8 @@ const SCENES = [
 ];
 
 const STORY_SCREENS = 3.2;
-const HOLD_SECONDS = 3;
-const REWIND = 3;
+const HOLD_SECONDS = 1.2;
+const REWIND = 2.5;
 const TAP = 250;
 
 function chapterName(id) {
@@ -111,7 +111,7 @@ export function mountStory(main) {
         <nav class="story-chapters" data-film aria-label="${t("landing.story.chapters")}">${timeline.chapters
           .map((chapter, index) => `<button type="button" data-chapter="${index}">${chapterName(chapter.id)}</button>`)
           .join("")}</nav>
-        <button class="button story-hold" type="button" data-film data-story-hold hidden>${t("landing.story.hold")}</button>`,
+        <button class="button story-hold" type="button" data-film data-story-hold hidden><span class="hold-ring" aria-hidden="true"></span>${t("landing.story.hold")}</button>`,
       );
       const captions = [...stage.querySelectorAll(".film-captions [data-from]")];
       const rail = stage.querySelector(".story-rail span");
@@ -203,6 +203,7 @@ export function mountStory(main) {
         last = now;
         held = Math.min(1, Math.max(0, held + (pressing ? dt / HOLD_SECONDS : -dt * REWIND / HOLD_SECONDS)));
         holdButton.style.setProperty("--held", held.toFixed(4));
+        holdButton.classList.toggle("holding", pressing);
         film?.setHeld(held);
         if (held >= 1) {
           pressing = false;

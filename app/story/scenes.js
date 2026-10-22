@@ -300,6 +300,36 @@ function fridgeBody() {
   return outline(body);
 }
 
+// Cold air: soft puffs that leak through the door gap while the visitor holds, and burst out when the fridge opens.
+function coldMist() {
+  const count = 36;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 64;
+  const context = canvas.getContext("2d");
+  const fade = context.createRadialGradient(32, 32, 0, 32, 32, 32);
+  fade.addColorStop(0, "rgba(255,255,255,0.9)");
+  fade.addColorStop(1, "rgba(255,255,255,0)");
+  context.fillStyle = fade;
+  context.fillRect(0, 0, 64, 64);
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const material = new THREE.PointsMaterial({ size: 0.34, map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false, opacity: 0, color: "#b9d6dc" });
+  const points = new THREE.Points(geometry, material);
+  points.userData.play = (amount, drift) => {
+    material.opacity = Math.min(1, amount * 1.1);
+    for (let index = 0; count > index; index++) {
+      const seed = random(index * 3.7);
+      const age = (seed + drift * (0.2 + seed * 0.3)) % 1;
+      positions[index * 3] = FRIDGE.W / 2 - 0.02 + age * (0.15 + seed * 0.35);
+      positions[index * 3 + 1] = 0.15 + random(index * 1.9) * 0.95 - age * 0.25;
+      positions[index * 3 + 2] = FRIDGE.D / 2 + 0.03 + age * (0.1 + random(index * 5.1) * 0.3);
+    }
+    geometry.attributes.position.needsUpdate = true;
+  };
+  return points;
+}
+
 // A hand in a red ruana sleeve that reaches for the handle, grips it while the visitor holds, and lets go once the door is open.
 function hand() {
   const skin = paint("#c98d68");
@@ -360,10 +390,20 @@ export function kitchen() {
     scene.add(model);
     return model;
   });
+  const glow = new THREE.PointLight("#ffd98a", 0, 2.4, 1.2);
+  glow.position.set(0, 0.75, 0.05);
+  scene.add(glow);
+  const mist = coldMist();
+  scene.add(mist);
   scene.userData.held = 0;
   scene.userData.play = (k) => {
     const held = scene.userData.held;
-    fridge.userData.door.rotation.y = -1.9 * Math.max(held * 0.3, THREE.MathUtils.smoothstep(k, 0.2, 0.42));
+    const opening = THREE.MathUtils.smoothstep(k, 0.2, 0.42);
+    const tremble = opening > 0 ? 0 : Math.sin(held * 70) * 0.025 * held;
+    fridge.userData.door.rotation.y = -1.9 * Math.max(held * 0.22, opening) + tremble;
+    const burst = k > 0.19 ? 1 - THREE.MathUtils.smoothstep(k, 0.24, 0.4) : 0;
+    glow.intensity = Math.max(held * 5, opening * 3);
+    mist.userData.play(Math.max(held, burst), held + k * 3);
     const out = 1 - THREE.MathUtils.smoothstep(k, 0.06, 0.16) + THREE.MathUtils.smoothstep(k, 0.42, 0.56);
     reach.visible = 1 > out;
     reach.position.copy(grip).add(away.set(0.5, -0.1, 0.25).multiplyScalar(Math.min(1, out)));
