@@ -228,20 +228,28 @@ document.querySelector("[data-inbox]").addEventListener("click", (event) => {
   openInbox(refreshInbox);
 });
 
-const languageSelect = document.querySelector("[data-language]");
+const languageSwitch = document.querySelector("[data-language]");
 
+// A pill of short codes with an ink blot behind the chosen one; each button carries the full language name for screen readers.
 function drawLanguages() {
-  languageSelect.innerHTML = locales()
+  const options = locales();
+  const chosen = Math.max(0, options.findIndex((option) => option.code === currentLocale()));
+  languageSwitch.style.setProperty("--count", options.length);
+  languageSwitch.style.setProperty("--chosen", chosen);
+  languageSwitch.innerHTML = `<span class="language-blot" aria-hidden="true"></span>${options
     .map(
       (option) =>
-        `<option value="${esc(option.code)}" ${option.code === currentLocale() ? "selected" : ""}>${esc(option.name)}</option>`,
+        `<button type="button" data-locale="${esc(option.code)}" lang="${esc(option.code)}" aria-label="${esc(option.name)}" aria-pressed="${option.code === currentLocale()}">${esc(option.code.split("-")[0].toUpperCase())}</button>`,
     )
-    .join("");
+    .join("")}`;
 }
 
-languageSelect.addEventListener("change", async () => {
-  await loadLocale(languageSelect.value);
+languageSwitch.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-locale]");
+  if (!button || button.getAttribute("aria-pressed") === "true") return;
+  await loadLocale(button.dataset.locale);
   drawLanguages();
+  languageSwitch.querySelector(`[data-locale="${CSS.escape(button.dataset.locale)}"]`)?.focus();
   if (session.signedIn) {
     await api("/me/locale", { method: "PUT", body: { locale: currentLocale() } }).catch(() => null);
   }

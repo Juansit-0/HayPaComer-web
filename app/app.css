@@ -647,7 +647,12 @@ dialog.sheet .sheet-head { display: flex; justify-content: space-between; align-
 .row-form > button { min-height: var(--control-height-large); }
 
 .language { display: inline-flex; }
-.language select { min-height: 44px; font-size: var(--size-body); padding: 0 var(--space-xs); }
+.language { position: relative; isolation: isolate; padding: 4px; gap: 0; border-radius: var(--radius-full); box-shadow: inset 0 0 0 2px currentColor; }
+.language button { position: relative; z-index: 1; min-width: 44px; min-height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-full); background: transparent; color: inherit; font: 700 14px/1 var(--font-body); letter-spacing: 0.06em; cursor: pointer; transition: color var(--duration-base) var(--ease-standard); }
+.language button[aria-pressed="true"] { color: var(--color-bg); }
+.language-blot { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / var(--count, 2)); border-radius: 46% 54% 52% 48% / 58% 44% 56% 42%; background: var(--color-text); translate: calc(100% * var(--chosen, 0)) 0; transition: translate var(--duration-spring) var(--ease-spring), border-radius var(--duration-spring) var(--ease-spring); }
+.language:hover .language-blot { border-radius: 54% 46% 44% 56% / 42% 58% 46% 54%; }
+.column:has(.landing) .bar .language { display: inline-flex; }
 .session + .language, .tabs + .language { margin-left: 0; }
 .bar > .language:last-child { margin-left: var(--space-s); }
 .bar .tabs[hidden] ~ .language { margin-left: auto; }
@@ -1625,3 +1630,17 @@ dialog.sheet :is(button, a.button):not(.primary) { background: transparent; colo
 @media (prefers-reduced-motion: reduce) {
   button[aria-busy="true"]::after { animation: none; border-color: var(--spin, var(--color-text)); opacity: 0.6; }
 }
+
+/* Landing title letter by letter, and a wordmark that ripples under the pointer */
+.title-word { display: inline-block; white-space: nowrap; }
+.title-letters span span { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) {
+  .land-hero[data-reveal] .title-letters span span { opacity: 0; translate: 0 0.5em; rotate: 6deg; transition: opacity var(--duration-base) var(--ease-standard), translate var(--duration-slow) var(--ease-spring), rotate var(--duration-slow) var(--ease-spring); transition-delay: calc(var(--i) * 28ms); }
+  :root[data-ready] .land-hero.shown .title-letters span span { opacity: 1; translate: 0 0; rotate: 0deg; }
+  .land-wordmark span { transition: translate var(--duration-base) var(--ease-spring), color var(--duration-base) var(--ease-standard); }
+  .land-wordmark:hover span { translate: 0 -0.08em; }
+  .land-wordmark span:hover { translate: 0 -0.22em; color: #a8361f; }
+  .kit-medallion { transition: scale var(--duration-base) var(--ease-spring), box-shadow var(--duration-base) var(--ease-standard); }
+  .kit-part:hover .kit-medallion { scale: 1.06; box-shadow: 0 0 0 3px var(--paper), 0 0 0 7px var(--ink-color), 0 0 0 9px var(--paper); }
+}
+.landing .land-vignette img { mix-blend-mode: darken; }
