@@ -1,6 +1,6 @@
 import { t } from "./i18n.js";
 import { toast } from "./ui.js";
-import { page, reduced } from "./motion.js";
+import { page, reduced, token } from "./motion.js";
 import { initialTier, webgl2 } from "./quality.js";
 import { ambienceLevel, inkSweep, play, quiet } from "./sound.js";
 import { createScroller } from "./story/scroller.js";
@@ -157,7 +157,7 @@ export function mountStory(main) {
           holdButton.hidden = false;
           blocked += 1;
           if (blocked >= 2) {
-            holdButton.animate([{ scale: 1 }, { scale: 1.08 }, { scale: 1 }], { duration: 420, easing: "ease-out" });
+            holdButton.animate([{ scale: 1 }, { scale: 1.08 }, { scale: 1 }], { duration: token("duration-slow"), easing: "ease-out" });
             if (blocked === 2) toast(t("landing.story.nudge"));
           }
           if (!document.activeElement || document.activeElement === document.body) holdButton.focus({ preventScroll: true });

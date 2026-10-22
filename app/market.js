@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { foodName, formatMoney, plural, t } from "./i18n.js";
-import { page, reduced } from "./motion.js";
+import { easing, page, reduced, token } from "./motion.js";
 import {
   esc,
   foodOptions,
@@ -68,21 +68,10 @@ function budgetTile(budget, currency) {
   const spent = Number(budget.spent);
   const planned = Number(budget.plannedCost);
   const remaining = Number(budget.remaining);
-  const share = (value) => (monthly > 0 ? Math.min(100, Math.max(0, (value / monthly) * 100)) : 0);
   const over = budget.lines.filter((line) => line.estimatedCost !== null && !line.withinBudget);
   return `<section class="tile budget-tile" aria-labelledby="budget-title">
     <h2 id="budget-title">${t("market.budget")}</h2>
     <div class="budget-head">${budgetRing(spent, planned, monthly)}${kpi(formatMoney(remaining, budget.currency), t("market.left"), remaining > 0 ? "positive" : "attention")}</div>
-    <div class="budget-bar" role="img" aria-label="${esc(
-      t("market.bar-label", {
-        spent: formatMoney(spent, budget.currency),
-        planned: formatMoney(planned, budget.currency),
-        monthly: formatMoney(monthly, budget.currency),
-      }),
-    )}">
-      <span class="spent" style="width:${share(spent).toFixed(1)}%"></span>
-      <span class="planned" style="width:${share(planned).toFixed(1)}%"></span>
-    </div>
     <dl class="budget-figures">
       <div><dt><span class="key spent"></span>${t("market.spent")}</dt><dd class="data">${formatMoney(spent, budget.currency)}</dd></div>
       <div><dt><span class="key planned"></span>${t("market.planned")}</dt><dd class="data">${formatMoney(planned, budget.currency)}</dd></div>
@@ -205,7 +194,7 @@ export async function renderMarket(main, household) {
     shown.set(circle.dataset.ring, to);
     if (first || from === undefined || from === to) return;
     circle.style.animation = "none";
-    if (!reduced()) circle.animate([{ strokeDashoffset: from }, { strokeDashoffset: to }], { duration: 600, easing: "cubic-bezier(.16,.84,.3,1)" });
+    if (!reduced()) circle.animate([{ strokeDashoffset: from }, { strokeDashoffset: to }], { duration: token("duration-shutter"), easing: easing("ease-emphasized") });
   });
   main.querySelectorAll("[data-budget]").forEach((budgetForm) =>
     budgetForm.addEventListener("submit", async (event) => {

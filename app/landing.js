@@ -1,6 +1,6 @@
 import { formatMoney, formatNumber, t } from "./i18n.js";
 import { esc, ticker } from "./ui.js";
-import { inView, page, reduced, token } from "./motion.js";
+import { easing, inView, page, reduced, token } from "./motion.js";
 import { mountStory, storyMarkup } from "./story.js";
 
 const PRICE_PER_KG = 9750;
@@ -130,6 +130,7 @@ export function renderLanding(main) {
     next.classList.add("how-next");
     next.src = source;
     picture.after(next);
+    // An in-out curve of its own: the blot has to start slowly to read as ink spreading, which none of the tokens does.
     const grow = next.decode().catch(() => null).then(() => next.animate([{ "--blot": "0%" }, { "--blot": "340%" }], { duration: token("duration-slow") * 1.8, easing: "cubic-bezier(.45,0,.25,1)" }));
     const current = { finish: () => grow.then((animation) => animation.finish()) };
     blot = current;
@@ -143,7 +144,7 @@ export function renderLanding(main) {
     const stage = STAGES[Number(range.value)];
     const fragment = main.querySelector("[data-fragment]");
     fragment.innerHTML = stageFragment(stage);
-    fragment.animate([{ opacity: 0, translate: "0 var(--rise)" }, { opacity: 1, translate: "0 0" }], { duration: token("duration-base"), easing: "cubic-bezier(.16,.84,.3,1)" });
+    fragment.animate([{ opacity: 0, translate: "0 var(--rise)" }, { opacity: 1, translate: "0 0" }], { duration: token("duration-base"), easing: easing("ease-emphasized") });
     main.querySelector("[data-clause]").textContent = t(`landing.how.${stage}`);
     showScene(`/app/stills/${STAGE_SCENES[stage]}.webp`);
     main.querySelectorAll("[data-name]").forEach((name) => {

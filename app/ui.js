@@ -1,5 +1,5 @@
 import { foodName, formatNumber, plural, t } from "./i18n.js";
-import { reduced, token } from "./motion.js";
+import { easing, reduced, token } from "./motion.js";
 import { play } from "./sound.js";
 
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -29,7 +29,7 @@ export async function swap(root, update) {
   const target = (focusId && document.getElementById(focusId)) || (focusKey && root.querySelector(`[data-key="${CSS.escape(focusKey)}"]`));
   if (target && root.contains(target)) target.focus({ preventScroll: true });
   if (still) return;
-  const easing = getComputedStyle(document.documentElement).getPropertyValue("--ease-spring").trim() || "ease-out";
+  const spring = easing("ease-spring");
   const kept = new Set();
   root.querySelectorAll(KEYED).forEach((element) => {
     kept.add(element.dataset.key);
@@ -37,12 +37,12 @@ export async function swap(root, update) {
     const rect = element.getBoundingClientRect();
     if (!onScreen(rect)) return;
     if (!old) {
-      element.animate([{ opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1 }], { duration: 240, easing });
+      element.animate([{ opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1 }], { duration: token("duration-base"), easing: spring });
       return;
     }
     const dx = old.rect.left - rect.left;
     const dy = old.rect.top - rect.top;
-    if (Math.abs(dx) + Math.abs(dy) >= 1) element.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration: 420, easing });
+    if (Math.abs(dx) + Math.abs(dy) >= 1) element.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration: token("duration-slow"), easing: spring });
   });
   before.forEach(({ rect, ghost }, key) => {
     if (kept.has(key)) return;
@@ -51,7 +51,7 @@ export async function swap(root, update) {
     [ghost, ...ghost.querySelectorAll("[id]")].forEach((node) => node.removeAttribute("id"));
     Object.assign(ghost.style, { position: "fixed", left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, margin: "0", pointerEvents: "none", zIndex: "5", listStyle: "none" });
     document.body.append(ghost);
-    ghost.animate([{ opacity: 1 }, { opacity: 0, scale: 0.96 }], { duration: 180, easing: "cubic-bezier(.5,0,.9,.4)", fill: "forwards" }).finished.finally(() => ghost.remove());
+    ghost.animate([{ opacity: 1 }, { opacity: 0, scale: 0.96 }], { duration: token("duration-withdraw"), easing: easing("ease-exit"), fill: "forwards" }).finished.finally(() => ghost.remove());
   });
 }
 
@@ -76,7 +76,7 @@ export function ticker(element, text) {
     }
     const column = slot.firstElementChild;
     const target = `0 ${-Number(chars[index])}em`;
-    if (!kept) column.animate([{ translate: "0 0" }, { translate: target }], { duration: 600, easing: "cubic-bezier(.16,.84,.3,1)" });
+    if (!kept) column.animate([{ translate: "0 0" }, { translate: target }], { duration: token("duration-shutter"), easing: easing("ease-emphasized") });
     column.style.translate = target;
   });
 }
@@ -403,8 +403,8 @@ function stopHold(button) {
 function stamp(button) {
   navigator.vibrate?.(12);
   play("stamp");
-  if (reduced()) button.animate([{ filter: "none" }, { filter: "brightness(0.82)" }, { filter: "none" }], { duration: 400 });
-  else button.animate([{ scale: 1 }, { scale: 0.94 }, { scale: 1.04 }, { scale: 1 }], { duration: 320, easing: "ease-out" });
+  if (reduced()) button.animate([{ filter: "none" }, { filter: "brightness(0.82)" }, { filter: "none" }], { duration: token("duration-slow") || 1 });
+  else button.animate([{ scale: 1 }, { scale: 0.94 }, { scale: 1.04 }, { scale: 1 }], { duration: token("duration-slow"), easing: easing("ease-spring") });
 }
 
 const holdTarget = (event) => event.target.closest?.("[data-hold]");

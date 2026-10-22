@@ -181,7 +181,6 @@
   --scrim: rgb(18 18 18 / 0.5);
 
   --skeleton: var(--color-meson);
-  --skeleton-shine: var(--color-arroz);
 }
 
 @media (prefers-reduced-motion: reduce) {

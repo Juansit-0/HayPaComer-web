@@ -3,12 +3,12 @@ import { currentLocale, foodName, locales, plural, recipeName, t } from "./i18n.
 import { candidate, dishCard, kitchenRecipes } from "./now.js";
 import { highlightFoods, shapeClass } from "./stage.js";
 import { daysLeft, esc, grams, toast, whenText } from "./ui.js";
-import { reduced } from "./motion.js";
+import { easing, reduced, token } from "./motion.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
 const state = { conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, shown: null };
 
-const arrive = (element) => element?.animate([{ opacity: 0, translate: "0 var(--rise)" }, { opacity: 1, translate: "0 0" }], { duration: 420, easing: "cubic-bezier(.16,.84,.3,1)" });
+const arrive = (element) => element?.animate([{ opacity: 0, translate: "0 var(--rise)" }, { opacity: 1, translate: "0 0" }], { duration: token("duration-slow"), easing: easing("ease-emphasized") });
 const scrollBehavior = () => (reduced() ? "auto" : "smooth");
 const TOOLS = ["query_inventory", "view_expiries", "view_market_list", "view_cold_chain", "view_weekly_plan", "recall_memory", "review_budget", "investigate_cold", "waste_patterns"];
 const SOON_DAYS = 2;

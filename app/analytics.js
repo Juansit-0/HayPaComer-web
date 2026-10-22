@@ -1,7 +1,7 @@
 import { api, freshAccess } from "./api.js";
 import { foodName, formatDay, formatMoney, formatNumber, t } from "./i18n.js";
 import { esc, foodOptions, formData, grams, moneyField, moneyValue, showError, ticker, toast, wireFoodSearch, wireSteppers } from "./ui.js";
-import { reduced, token } from "./motion.js";
+import { easing, reduced, token } from "./motion.js";
 
 const PERIODS = [7, 30, 90];
 let chosenDays = 30;
@@ -242,7 +242,7 @@ export async function renderAnalytics(main, household) {
   wireSteppers(main);
   main.querySelectorAll("[data-figure]").forEach((element) => ticker(element, element.dataset.figure));
   const still = reduced();
-  const easing = "cubic-bezier(.16,.84,.3,1)";
+  const curve = easing("ease-emphasized");
   const now = { rings: {}, members: {} };
   main.querySelectorAll("[data-ring]").forEach((circle) => {
     const to = circle.getAttribute("stroke-dasharray");
@@ -250,13 +250,13 @@ export async function renderAnalytics(main, household) {
     const from = shown?.rings[circle.dataset.ring];
     if (!from || still) return;
     circle.style.animation = "none";
-    circle.animate([{ strokeDasharray: from }, { strokeDasharray: to }], { duration: 700, easing });
+    circle.animate([{ strokeDasharray: from }, { strokeDasharray: to }], { duration: token("duration-spring"), easing: curve });
   });
   main.querySelectorAll("[data-member]").forEach((bar, index) => {
     const to = bar.style.width;
     now.members[bar.dataset.member] = to;
     if (still) return;
-    bar.animate([{ width: shown?.members[bar.dataset.member] ?? "0%" }, { width: to }], { duration: 600, delay: index * token("stagger"), easing, fill: "backwards" });
+    bar.animate([{ width: shown?.members[bar.dataset.member] ?? "0%" }, { width: to }], { duration: token("duration-shutter"), delay: index * token("stagger"), easing: curve, fill: "backwards" });
   });
   shown = now;
 

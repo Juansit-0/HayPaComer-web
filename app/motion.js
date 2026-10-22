@@ -52,6 +52,12 @@ export function onReduced(listener) {
 
 const tokens = new Map();
 
+export function easing(name) {
+  const key = `ease:${name}`;
+  if (!tokens.has(key)) tokens.set(key, getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim() || "ease");
+  return tokens.get(key);
+}
+
 export function token(name) {
   if (!tokens.has(name)) {
     const raw = getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim();
