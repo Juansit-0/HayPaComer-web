@@ -1,10 +1,13 @@
 import { api, freshAccess } from "./api.js";
 import { foodName, formatDay, formatMoney, formatNumber, t } from "./i18n.js";
-import { esc, foodOptions, formData, grams, moneyField, moneyValue, showError, toast, wireFoodSearch, wireSteppers } from "./ui.js";
+import { esc, foodOptions, formData, grams, moneyField, moneyValue, showError, ticker, toast, wireFoodSearch, wireSteppers } from "./ui.js";
+import { reduced, token } from "./motion.js";
 
 const PERIODS = [7, 30, 90];
 let chosenDays = 30;
 let me = null;
+// What the last render showed, so a new period grows the rings and bars from there instead of from zero.
+let shown = null;
 
 function money(value, currency) {
   return formatMoney(value, currency);
@@ -76,7 +79,7 @@ function ranking(members) {
     .map(
       (member) => `<li>
         <span class="item-name">${esc(member.name)}${member.userId === me ? ` <span class="status quiet">${t("numbers.you")}</span>` : ""}</span>
-        <span class="meter" aria-hidden="true"><span style="width:${((Number(member.tally.rescuedGrams) / best) * 100).toFixed(0)}%"></span></span>
+        <span class="meter" aria-hidden="true"><span data-member="${esc(member.userId)}" style="width:${((Number(member.tally.rescuedGrams) / best) * 100).toFixed(0)}%"></span></span>
         <span class="data">${t("numbers.rescued-grams", { grams: grams(member.tally.rescuedGrams) })}</span>
         <span class="item-meta">${t("numbers.member-detail", { eaten: grams(member.tally.consumedGrams), wasted: grams(member.tally.discardedGrams) })}</span>
       </li>`,
@@ -105,11 +108,11 @@ function ring({ key, grams: amount, rate }) {
   return `<figure class="ring ring-${key}">
     <svg viewBox="0 0 100 100" aria-hidden="true">
       <circle class="ring-track" cx="50" cy="50" r="42"/>
-      <circle class="ring-fill" cx="50" cy="50" r="42" stroke-dasharray="${(Math.min(1, rate) * length).toFixed(1)} ${length.toFixed(1)}"/>
+      <circle class="ring-fill" data-ring="${key}" cx="50" cy="50" r="42" stroke-dasharray="${(Math.min(1, rate) * length).toFixed(1)} ${length.toFixed(1)}"/>
     </svg>
     <figcaption>
       <span class="ring-name">${t(`numbers.ring.${key}`)}</span>
-      <span class="ring-grams data">${grams(amount)}</span>
+      <span class="ring-grams data" data-figure="${grams(amount)}"></span>
       <span class="ring-hint">${t(`numbers.ring.${key}-hint`, { rate: percent(rate) })}</span>
     </figcaption>
   </figure>`;
@@ -166,7 +169,7 @@ export async function renderAnalytics(main, household) {
     </header>
 
     <section class="numbers-hero" aria-label="${esc(t("numbers.saved"))}">
-      <p class="numbers-money">${esc(money(metrics.moneySaved, metrics.currency))}</p>
+      <p class="numbers-money" data-figure="${esc(money(metrics.moneySaved, metrics.currency))}"></p>
       <p class="numbers-line">${
         moved === 0 ? t("numbers.empty-lead") : t("numbers.hero-line", { grams: `<b>${grams(total.rescuedGrams)}</b>` })
       }</p>
@@ -237,6 +240,25 @@ export async function renderAnalytics(main, household) {
       </section>
     </details>`;
   wireSteppers(main);
+  main.querySelectorAll("[data-figure]").forEach((element) => ticker(element, element.dataset.figure));
+  const still = reduced();
+  const easing = "cubic-bezier(.16,.84,.3,1)";
+  const now = { rings: {}, members: {} };
+  main.querySelectorAll("[data-ring]").forEach((circle) => {
+    const to = circle.getAttribute("stroke-dasharray");
+    now.rings[circle.dataset.ring] = to;
+    const from = shown?.rings[circle.dataset.ring];
+    if (!from || still) return;
+    circle.style.animation = "none";
+    circle.animate([{ strokeDasharray: from }, { strokeDasharray: to }], { duration: 700, easing });
+  });
+  main.querySelectorAll("[data-member]").forEach((bar, index) => {
+    const to = bar.style.width;
+    now.members[bar.dataset.member] = to;
+    if (still) return;
+    bar.animate([{ width: shown?.members[bar.dataset.member] ?? "0%" }, { width: to }], { duration: 600, delay: index * token("stagger"), easing, fill: "backwards" });
+  });
+  shown = now;
 
   main.querySelectorAll("[data-days]").forEach((button) =>
     button.addEventListener("click", () => {
