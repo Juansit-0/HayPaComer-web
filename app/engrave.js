@@ -213,15 +213,30 @@ function bottle(color) {
   );
 }
 
+// A natural pile: a loose base spiralling out on the golden angle, the rest resting in the hollows between the pieces below, each piece tilted and
+// sized a little differently, so a few tomatoes never stand in a row.
 function cluster(make, count, spacing) {
   const result = new THREE.Group();
+  const base = 3 >= count ? count : Math.ceil(count * 0.62);
+  const spots = [];
   for (let index = 0; index < count; index++) {
     const piece = make(index);
-    const row = index % 3;
-    const layer = Math.floor(index / 3);
-    piece.position.x += (row - (Math.min(count, 3) - 1) / 2) * spacing;
-    piece.position.z += layer * spacing * 0.8 - 0.01;
-    piece.rotation.y += (hash(index, count, spacing) - 0.5) * 1.2;
+    const jitter = (salt) => hash(index, count + salt, spacing) - 0.5;
+    if (base > index) {
+      const angle = index * 2.39996 + jitter(1) * 0.6;
+      const reach = spacing * 0.58 * Math.sqrt(index + 0.35) * (1 + jitter(2) * 0.25);
+      spots.push([Math.cos(angle) * reach, Math.sin(angle) * reach * 0.85]);
+      piece.position.x += spots[index][0];
+      piece.position.z += spots[index][1];
+    } else {
+      const first = spots[(index - base) % base];
+      const second = spots[(index - base + 1) % base];
+      piece.position.x += (first[0] + second[0]) / 2 + jitter(3) * spacing * 0.2;
+      piece.position.z += (first[1] + second[1]) / 2 + jitter(4) * spacing * 0.2;
+      piece.position.y += spacing * 0.5;
+    }
+    piece.rotation.set(piece.rotation.x + jitter(5) * 0.6, piece.rotation.y + jitter(6) * 6.28, piece.rotation.z + jitter(7) * 0.6);
+    piece.scale.multiplyScalar(0.9 + (jitter(8) + 0.5) * 0.18);
     result.add(piece);
   }
   return result;
@@ -249,11 +264,11 @@ const DETAILED = {
     }
     return carton;
   },
-  Tomato: (grams) => cluster(() => FOODS.Tomato(), count(grams, 120, 4), 0.07),
-  Potato: (grams) => cluster(() => FOODS.Potato(), count(grams, 180, 3), 0.075),
+  Tomato: (grams) => cluster(() => FOODS.Tomato(), count(grams, 100, 6), 0.07),
+  Potato: (grams) => cluster(() => FOODS.Potato(), count(grams, 160, 6), 0.075),
   Carrot: (grams) => cluster(() => FOODS.Carrot(), count(grams, 70, 3), 0.035),
-  Onion: (grams) => cluster(() => FOODS.Onion(), count(grams, 150, 3), 0.07),
-  Avocado: (grams) => cluster(() => FOODS.Avocado(), count(grams, 200, 2), 0.07),
+  Onion: (grams) => cluster(() => FOODS.Onion(), count(grams, 130, 5), 0.07),
+  Avocado: (grams) => cluster(() => FOODS.Avocado(), count(grams, 180, 4), 0.07),
   Banana: (grams) => {
     const bunch = new THREE.Group();
     const bananas = count(grams, 120, 4);
