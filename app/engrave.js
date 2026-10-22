@@ -144,6 +144,41 @@ export function outline(root) {
   return root;
 }
 
+// One mesh per colour for a whole set of props, so a street of detailed houses costs a handful of draw calls instead of hundreds.
+export function merged(root) {
+  root.updateMatrixWorld(true);
+  const inverse = root.matrixWorld.clone().invert();
+  const relative = new THREE.Matrix4();
+  const buckets = new Map();
+  root.traverse((child) => {
+    if (!child.isMesh || child.userData.outline) return;
+    const key = `${child.material.color.getHexString()}:${child.material.side}`;
+    if (!buckets.has(key)) buckets.set(key, { material: child.material, parts: [] });
+    const geometry = child.geometry.index ? child.geometry.toNonIndexed() : child.geometry.clone();
+    if (!geometry.attributes.normal) geometry.computeVertexNormals();
+    geometry.applyMatrix4(relative.multiplyMatrices(inverse, child.matrixWorld));
+    buckets.get(key).parts.push(geometry);
+  });
+  const result = new THREE.Group();
+  buckets.forEach(({ material, parts }) => {
+    const total = parts.reduce((count, part) => count + part.attributes.position.array.length, 0);
+    const geometry = new THREE.BufferGeometry();
+    ["position", "normal"].forEach((name) => {
+      const array = new Float32Array(total);
+      let offset = 0;
+      parts.forEach((part) => {
+        array.set(part.attributes[name].array, offset);
+        offset += part.attributes[name].array.length;
+      });
+      geometry.setAttribute(name, new THREE.BufferAttribute(array, 3));
+    });
+    parts.forEach((part) => part.dispose());
+    geometry.computeBoundingSphere();
+    result.add(new THREE.Mesh(geometry, material));
+  });
+  return result;
+}
+
 export function mesh(geometry, material, setup) {
   const result = new THREE.Mesh(geometry, material);
   setup?.(result);

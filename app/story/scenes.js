@@ -1,6 +1,6 @@
 import * as THREE from "../vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "../vendor/RoundedBoxGeometry.js";
-import { foodModel, group, hash, instance, lumpy, mesh, outline, paint } from "../engrave.js";
+import { foodModel, group, hash, instance, lumpy, merged, mesh, outline, paint } from "../engrave.js";
 
 export const PAPER = "#f3ecdf";
 const random = (seed) => hash(seed, seed * 1.7, seed * 2.3);
@@ -76,19 +76,49 @@ function stall(seed, produce) {
     pile.position.set(-0.45 + index * 0.45, 0.66, 0);
     goods.add(pile);
   });
-  return group(outline(table), cloth, goods, outline(umbrella(seed % 2 ? "#d2492f" : "#f3c443", seed)));
+  return { props: group(table, cloth, umbrella(seed % 2 ? "#d2492f" : "#f3c443", seed)), goods };
 }
 
-function house(seed) {
-  const width = 1.4 + random(seed) * 1.2;
-  const body = mesh(new THREE.BoxGeometry(width, 1.1, 1.2), paint("#f1ebdd"), (m) => (m.position.y = 0.55));
-  const roof = mesh(new THREE.ConeGeometry(Math.max(width, 1.2) * 0.78, 0.6, 4), paint("#a4502f"), (m) => {
-    m.position.y = 1.4;
-    m.rotation.y = Math.PI / 4;
-    m.scale.set(1, 1, 0.75);
-  });
-  const door = mesh(new THREE.PlaneGeometry(0.28, 0.5), paint("#4b2c1c"), (m) => m.position.set(0, 0.25, 0.601));
-  return outline(group(body, roof, door));
+const PLINTHS = ["#3f6f8f", "#4f7a4a", "#b8862f", "#a8361f", "#6b5a8e"];
+const SHUTTERS = ["#2f5d4a", "#3d5f86", "#7a3b26"];
+
+// A whitewashed Pasto house: painted plinth, gabled tile roof with eaves, barred windows, a wooden door, and on two floors a balcony.
+export function house(seed, { floors = 1 + Math.round(random(seed * 5)), width = 1.6 + random(seed) * 1.4 } = {}) {
+  const height = floors * 1.15;
+  const depth = 1.3;
+  const wall = paint(random(seed * 3) > 0.25 ? "#f4efe3" : "#efe0c4");
+  const plinthColor = PLINTHS[Math.floor(random(seed * 7) * PLINTHS.length)];
+  const shutter = paint(SHUTTERS[Math.floor(random(seed * 11) * SHUTTERS.length)]);
+  const dark = paint("#2b1d14");
+  const wood = paint("#6b4a2a");
+  const parts = [
+    mesh(new THREE.BoxGeometry(width, height, depth), wall, (m) => (m.position.y = height / 2)),
+    mesh(new THREE.BoxGeometry(width + 0.02, 0.32, depth + 0.02), paint(plinthColor), (m) => (m.position.y = 0.16)),
+    mesh(new THREE.CylinderGeometry(depth * 0.62, depth * 0.62, width + 0.36, 3), paint("#a4502f"), (m) => {
+      m.rotation.z = Math.PI / 2;
+      m.rotation.x = Math.PI;
+      m.scale.set(0.42, 1, 1);
+      m.position.y = height + 0.14;
+    }),
+    mesh(new THREE.BoxGeometry(0.34, 0.66, 0.04), wood, (m) => m.position.set((random(seed * 13) - 0.5) * (width - 0.6), 0.33, depth / 2 + 0.02)),
+  ];
+  const windows = Math.max(1, Math.floor(width / 0.9));
+  for (let floor = 0; floors > floor; floor++) {
+    for (let index = 0; windows > index; index++) {
+      const x = -width / 2 + (width / windows) * (index + 0.5);
+      const y = floor * 1.15 + 0.72;
+      parts.push(mesh(new THREE.BoxGeometry(0.3, 0.38, 0.03), dark, (m) => m.position.set(x, y, depth / 2 + 0.015)));
+      [-0.21, 0.21].forEach((side) => parts.push(mesh(new THREE.BoxGeometry(0.12, 0.38, 0.03), shutter, (m) => m.position.set(x + side, y, depth / 2 + 0.03))));
+      for (let bar = 0; 3 > bar; bar++) parts.push(mesh(new THREE.BoxGeometry(0.012, 0.38, 0.02), wood, (m) => m.position.set(x - 0.08 + bar * 0.08, y, depth / 2 + 0.04)));
+    }
+  }
+  if (floors > 1) {
+    const span = width * 0.7;
+    parts.push(mesh(new THREE.BoxGeometry(span, 0.05, 0.36), wood, (m) => m.position.set(0, 1.15, depth / 2 + 0.18)));
+    parts.push(mesh(new THREE.BoxGeometry(span, 0.04, 0.03), wood, (m) => m.position.set(0, 1.5, depth / 2 + 0.35)));
+    for (let post = 0; 9 > post; post++) parts.push(mesh(new THREE.BoxGeometry(0.02, 0.34, 0.02), wood, (m) => m.position.set(-span / 2 + (span / 8) * post, 1.33, depth / 2 + 0.35)));
+  }
+  return group(...parts);
 }
 
 function volcano() {
@@ -116,12 +146,14 @@ export function market() {
   const ground = mesh(new THREE.PlaneGeometry(60, 60, 1, 1), paint("#e7dfcd"), (m) => (m.rotation.x = -Math.PI / 2));
   scene.add(ground);
   scene.add(volcano());
+  const street = new THREE.Group();
   for (let index = 0; 9 > index; index++) {
-    const item = house(index);
+    const item = house(index, { floors: 1 + (index % 3 === 1 ? 1 : 0) });
     item.position.set(-9 + index * 2.3 + random(index) * 0.6, 0, -8 - random(index * 4) * 3);
     item.rotation.y = (random(index * 9) - 0.5) * 0.4;
-    scene.add(item);
+    street.add(item);
   }
+
   const potato = () => foodModel("Potato");
   const tomatoes = () => treeTomato();
   const ocas = (variant) => oca(["#d98a9b", "#f0d27a", "#f4ece0"][variant]);
@@ -138,11 +170,15 @@ export function market() {
     [1.6, 0, -4.2, [[potato, 18, 0.2], [ocas, 16, 0.18], [() => naranjilla(), 12, 0.15]]],
   ];
   layout.forEach(([x, y, z, produce], index) => {
-    const item = stall(index + 1, produce);
-    item.position.set(x, y, z);
-    item.rotation.y = (random(index * 13) - 0.5) * 0.5;
-    scene.add(item);
+    const { props, goods } = stall(index + 1, produce);
+    [props, goods].forEach((part) => {
+      part.position.set(x, y, z);
+      part.rotation.y = (random(index * 13) - 0.5) * 0.5;
+    });
+    street.add(props);
+    scene.add(goods);
   });
+  scene.add(outline(merged(street)));
   return scene;
 }
 
@@ -191,9 +227,42 @@ function fridgeBody() {
   const hinge = new THREE.Group();
   hinge.position.set(-W / 2, 0.04, D / 2);
   hinge.add(box(W, 1.09, 0.06, W / 2, 0.545, 0.03));
+  hinge.add(box(0.022, 0.26, 0.022, W - 0.06, 0.74, 0.085, paint("#b9b4a6")));
+  [0.64, 0.84].forEach((y) => hinge.add(box(0.016, 0.016, 0.03, W - 0.06, y, 0.07, paint("#b9b4a6"))));
   body.add(hinge);
   body.userData.door = hinge;
   return outline(body);
+}
+
+// A hand in a red ruana sleeve that reaches for the handle, grips it while the visitor holds, and lets go once the door is open.
+function hand() {
+  const skin = paint("#c98d68");
+  const palm = mesh(new RoundedBoxGeometry(0.05, 0.1, 0.035, 2, 0.014), skin, (m) => m.position.set(0.012, 0, 0.012));
+  const fingers = [0.033, 0.011, -0.011, -0.033].map((y, index) => {
+    const finger = new THREE.Group();
+    finger.position.set(-0.012, y, 0.03);
+    finger.add(mesh(new THREE.CapsuleGeometry(0.0095, 0.04 - index * 0.003, 4, 8), skin, (m) => {
+      m.rotation.z = Math.PI / 2;
+      m.position.x = -0.026;
+    }));
+    return finger;
+  });
+  const thumb = mesh(new THREE.CapsuleGeometry(0.01, 0.034, 4, 8), skin, (m) => {
+    m.position.set(-0.006, 0.058, 0.03);
+    m.rotation.set(0, 0, 0.9);
+  });
+  const cuff = mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 12), paint("#e8c35a"), (m) => {
+    m.rotation.z = Math.PI / 2;
+    m.position.set(0.05, 0, 0.012);
+  });
+  const sleeve = mesh(new THREE.CylinderGeometry(0.038, 0.046, 0.42, 12), paint("#a8361f"), (m) => {
+    m.rotation.z = Math.PI / 2;
+    m.position.set(0.27, 0, 0.012);
+  });
+  const root = group(palm, ...fingers, thumb, cuff, sleeve);
+  root.scale.setScalar(1.35);
+  root.userData.fingers = fingers;
+  return outline(root);
 }
 
 export function kitchen() {
@@ -206,6 +275,10 @@ export function kitchen() {
   const tote = bag();
   tote.position.set(-1.0, 0.93, 0);
   scene.add(tote);
+  const reach = hand();
+  fridge.userData.door.add(reach);
+  const grip = new THREE.Vector3(FRIDGE.W - 0.06 + 0.045, 0.74, 0.085);
+  const away = new THREE.Vector3();
   const travellers = [
     ["Potato", [-1.05, 1.18, 0], [-0.2, FRIDGE.SHELVES[1] + 0.012, 0.05]],
     ["Potato", [-0.98, 1.2, 0.02], [-0.08, FRIDGE.SHELVES[1] + 0.012, 0.06]],
@@ -214,17 +287,24 @@ export function kitchen() {
     ["tree", [-1.06, 1.21, 0.02], [0.2, FRIDGE.SHELVES[0] + 0.012, 0.04]],
   ].map(([name, from, to]) => {
     const model = outline(group(name === "tree" ? treeTomato() : name === "oca" ? oca("#d98a9b") : foodModel(name)));
-    model.userData.from = new THREE.Vector3(...from);
-    model.userData.to = new THREE.Vector3(...to);
+    const start = new THREE.Vector3(...from);
+    const end = new THREE.Vector3(...to);
+    // Up over the open door, round to the front of the fridge, then straight in between the shelves: never through a wall.
+    model.userData.path = new THREE.CatmullRomCurve3([start, new THREE.Vector3(-0.62, 1.42, 0.55), new THREE.Vector3(end.x, end.y + 0.06, FRIDGE.D / 2 + 0.32), new THREE.Vector3(end.x, end.y + 0.02, FRIDGE.D / 2 - 0.02), end], false, "centripetal");
     scene.add(model);
     return model;
   });
+  scene.userData.held = 0;
   scene.userData.play = (k) => {
-    fridge.userData.door.rotation.y = -1.9 * THREE.MathUtils.smoothstep(k, 0.2, 0.42);
+    const held = scene.userData.held;
+    fridge.userData.door.rotation.y = -1.9 * Math.max(held * 0.3, THREE.MathUtils.smoothstep(k, 0.2, 0.42));
+    const out = 1 - THREE.MathUtils.smoothstep(k, 0.06, 0.16) + THREE.MathUtils.smoothstep(k, 0.42, 0.56);
+    reach.visible = 1 > out;
+    reach.position.copy(grip).add(away.set(0.5, -0.1, 0.25).multiplyScalar(Math.min(1, out)));
+    reach.userData.fingers.forEach((finger, index) => (finger.rotation.y = -(0.5 + held * 0.6) - index * 0.06));
     travellers.forEach((model, index) => {
       const t = THREE.MathUtils.smoothstep(k, 0.36 + index * 0.07, 0.62 + index * 0.07);
-      model.position.lerpVectors(model.userData.from, model.userData.to, t);
-      model.position.y += Math.sin(Math.PI * t) * 0.32;
+      model.position.copy(model.userData.path.getPoint(t));
       model.rotation.y = t * 4;
     });
   };
