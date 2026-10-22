@@ -3,6 +3,7 @@ import { esc, ticker } from "./ui.js";
 import { animate, easing, inView, page, reduced, scroll, SPRINGS, token } from "./motion.js";
 import { mountStory, storyMarkup } from "./story.js";
 import { createInkCursor } from "./story/ink-cursor.js";
+import { inkImage, releaseInk } from "./story/ink-reveal.js";
 
 const PRICE_PER_KG = 9750;
 const RESCUED_SHARE = 0.5;
@@ -127,10 +128,48 @@ export function renderLanding(main) {
     page.defer(stop);
   });
 
+  // Pictures develop like ink soaking into paper as they come into view, from below or from the middle, through one shared WebGL context.
+  const inks = new Map();
+  let inking = null;
+  const develop = (ink, origin, delay = 0) =>
+    animate(0, 1, { duration: (token("duration-slow") * 3) / 1000, delay, ease: [0.7, 0, 0.2, 1], onUpdate: (value) => ink.set(value, origin) });
+  if (!reduced()) {
+    page.defer(() => {
+      inks.forEach((ink) => ink.dispose());
+      releaseInk();
+    });
+    [
+      [".land-vignette img", "bottom", 0],
+      [".kit-medallion img", [0.5, 0.5], 0.15],
+      [".how-scene", "bottom", 0],
+    ].forEach(([selector, origin, stagger]) =>
+      main.querySelectorAll(selector).forEach((img, index) => {
+        const stop = inView(img, () => {
+          stop();
+          const ink = inkImage(img);
+          if (!ink) return;
+          inks.set(img, ink);
+          ink.set(0, origin);
+          ink.ready.then(() => develop(ink, origin, index * stagger));
+        }, { amount: 0.35 });
+        page.defer(stop);
+      }),
+    );
+  }
+
   const range = main.querySelector("[data-stage-range]");
   const picture = main.querySelector("[data-how-scene]");
   let blot = null;
   const showScene = (source) => {
+    const ink = inks.get(picture);
+    if (ink) {
+      ink.swap(source).then(() => {
+        inking?.stop();
+        inking = develop(ink, [0.5, 0.5]);
+        picture.src = source;
+      });
+      return;
+    }
     blot?.finish();
     if (reduced()) {
       picture.src = source;
@@ -187,9 +226,9 @@ export function renderLanding(main) {
     });
   }
   const linked = [
-    [".land-vignette img", { y: [-36, 36] }],
+    [".land-vignette", { y: [-36, 36] }],
     [".pasto-photo img", { scale: [1.16, 1] }],
-    [".kit-medallion img", { rotate: [-8, 8] }],
+    [".kit-medallion", { rotate: [-8, 8] }],
     [".land-wordmark", { x: ["6%", "-6%"] }],
   ];
   linked.forEach(([selector, keyframes]) =>

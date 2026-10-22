@@ -1644,3 +1644,10 @@ dialog.sheet :is(button, a.button):not(.primary) { background: transparent; colo
   .kit-part:hover .kit-medallion { scale: 1.06; box-shadow: 0 0 0 3px var(--paper), 0 0 0 7px var(--ink-color), 0 0 0 9px var(--paper); }
 }
 .landing .land-vignette img { mix-blend-mode: darken; }
+
+/* Ink reveal canvases laid over their pictures; the picture keeps its place and its text underneath */
+.ink-reveal { position: absolute; z-index: 0; display: block; pointer-events: none; }
+img.inked { opacity: 0; }
+.kit-medallion { position: relative; }
+.land-vignette .land-label { z-index: 1; }
+.landing .how-right .ink-reveal { box-shadow: 0 0 0 3px var(--ink-color); }
