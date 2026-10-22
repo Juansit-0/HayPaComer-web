@@ -338,7 +338,17 @@ export function mountStage(element) {
   };
   new ResizeObserver(resize).observe(root);
   const box = root.closest(".stage");
-  window.addEventListener("scroll", () => box.classList.toggle("compact", window.scrollY > 160), { passive: true });
+  // Folds up by sliding, not by shrinking, so the page below never moves; the gap between 80 and 200 px keeps it from flickering.
+  const fold = () => box.style.setProperty("--fold", `${Math.max(0, (box.querySelector(".tabs")?.offsetTop ?? 0) - 8)}px`);
+  new ResizeObserver(fold).observe(box);
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (window.scrollY > 200) box.classList.add("compact");
+      else if (80 > window.scrollY) box.classList.remove("compact");
+    },
+    { passive: true },
+  );
   if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
     root.addEventListener("pointermove", (event) => {
       const box = root.getBoundingClientRect();

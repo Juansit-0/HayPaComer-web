@@ -885,10 +885,10 @@ html:has(.loader:not(.done)) { overflow: hidden; }
   .bar .wordmark { font-size: 22px; }
   .bar .session { font-size: 13px; }
   .bar .session { gap: 4px; }
-  .stage { transition: background-color var(--duration-slow) var(--ease-standard), padding var(--duration-base) var(--ease-standard); }
-  .stage-fridge { transition: height var(--duration-base) var(--ease-emphasized), opacity var(--duration-base); }
-  .stage.compact { padding-block: var(--space-xs); }
-  .stage.compact .stage-fridge { height: 0; opacity: 0; pointer-events: none; }
+  .stage { transition: background-color var(--duration-slow) var(--ease-standard), translate var(--duration-base) var(--ease-emphasized); }
+  .stage-fridge { transition: opacity var(--duration-base) var(--ease-standard); }
+  .stage.compact { translate: 0 calc(-1 * var(--fold, 0px)); }
+  .stage.compact .stage-fridge { opacity: 0; pointer-events: none; }
   .stage .tabs { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
   .stage .tabs a { flex: none; }
 }
