@@ -1,6 +1,7 @@
 import { api } from "./api.js";
 import { formatDay, formatTime, t } from "./i18n.js";
 import { esc, openSheet } from "./ui.js";
+import { grow } from "./motion.js";
 
 function item(notification) {
   const unread = !notification.readAt;
@@ -29,6 +30,7 @@ export async function openInbox(onChange) {
         await api(`/notifications/${id}/read`, { method: "PATCH" }).catch(() => null);
       }
       await draw();
+      if (!sheet.contains(document.activeElement)) (sheet.querySelector("[data-read], [data-read-all]") ?? sheet.querySelector("[data-close]")).focus();
       onChange?.();
     });
   });
@@ -36,14 +38,13 @@ export async function openInbox(onChange) {
 
   async function draw() {
     const notifications = await api("/notifications").catch(() => []);
-    if (!notifications.length) {
-      body.innerHTML = `<p class="inbox-empty">${t("inbox.empty")}</p>`;
-      return;
-    }
     const unread = notifications.filter((note) => !note.readAt).length;
-    body.innerHTML = `
-      ${unread ? `<button type="button" class="ghost" data-read-all>${t("inbox.mark-all")}</button>` : ""}
-      <ul class="inbox-list">${notifications.map(item).join("")}</ul>`;
+    await grow(body, () => {
+      body.innerHTML = notifications.length
+        ? `${unread ? `<button type="button" class="ghost" data-read-all>${t("inbox.mark-all")}</button>` : ""}
+          <ul class="inbox-list">${notifications.map(item).join("")}</ul>`
+        : `<p class="inbox-empty">${t("inbox.empty")}</p>`;
+    });
   }
 
   await draw();
