@@ -99,8 +99,16 @@ const INK = [0.11, 0.09, 0.07];
 
 let surface = null;
 
+// Each picture gets its own fixed cell of the shared canvas. Safari copies a WebGL canvas into a 2D one as it was last presented, so if every
+// picture drew into the same corner they would all show whichever was drawn last.
+const CELL = 1024;
+const COLUMNS = 3;
+
 function createSurface() {
   const canvas = document.createElement("canvas");
+  canvas.width = CELL * COLUMNS;
+  canvas.height = CELL * 2;
+  let cells = 0;
   const gl = canvas.getContext("webgl2", { alpha: true, antialias: false, premultipliedAlpha: true, preserveDrawingBuffer: true, powerPreference: "low-power" });
   if (!gl) return null;
   const compile = (type, source) => {
@@ -131,6 +139,12 @@ function createSurface() {
   gl.enable(gl.SCISSOR_TEST);
   const textures = new Set();
   return {
+    cell() {
+      const index = cells++;
+      const row = Math.floor(index / COLUMNS);
+      if ((row + 1) * CELL > canvas.height) canvas.height = (row + 1) * CELL;
+      return { x: (index % COLUMNS) * CELL, y: row * CELL };
+    },
     texture(image) {
       const texture = gl.createTexture();
       gl.activeTexture(gl.TEXTURE0);
@@ -144,15 +158,11 @@ function createSurface() {
     drop(texture) {
       if (textures.delete(texture)) gl.deleteTexture(texture);
     },
-    draw(target, width, height, uniforms) {
+    draw(target, cell, width, height, uniforms) {
       if (gl.isContextLost()) return;
-      if (width > canvas.width || height > canvas.height) {
-        canvas.width = Math.min(4096, Math.max(canvas.width, width));
-        canvas.height = Math.min(4096, Math.max(canvas.height, height));
-      }
-      const y = canvas.height - height;
-      gl.viewport(0, y, width, height);
-      gl.scissor(0, y, width, height);
+      const y = canvas.height - cell.y - height;
+      gl.viewport(cell.x, y, width, height);
+      gl.scissor(cell.x, y, width, height);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.activeTexture(gl.TEXTURE1);
@@ -178,7 +188,7 @@ function createSurface() {
       gl.uniform3f(at.uInk, ...INK);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       target.clearRect(0, 0, width, height);
-      target.drawImage(canvas, 0, y, width, height, 0, 0, width, height);
+      target.drawImage(canvas, cell.x, cell.y, width, height, 0, 0, width, height);
     },
     release() {
       textures.forEach((texture) => gl.deleteTexture(texture));
@@ -239,13 +249,15 @@ export function inkImage(img, { ghost = 0 } = {}) {
   img.after(canvas);
   img.classList.add("inked");
   const context = canvas.getContext("2d");
+  const cell = surface.cell();
+  let settle = 0;
   const state = { progress: 0, texture: null, rest: null, aspect: 1, restAspect: 1, origin: "bottom", width: 0, height: 0 };
   const paper = paperUnder(img.parentElement);
 
   const paint = () => {
     if (!state.texture || !state.width || !surface) return;
     const box = state.width / state.height;
-    surface.draw(context, state.width, state.height, {
+    surface.draw(context, cell, state.width, state.height, {
       texture: state.texture,
       rest: state.rest,
       progress: state.progress,
@@ -258,7 +270,7 @@ export function inkImage(img, { ghost = 0 } = {}) {
   };
   const resize = () => {
     Object.assign(canvas.style, { left: `${img.offsetLeft + img.clientLeft}px`, top: `${img.offsetTop + img.clientTop}px`, width: `${img.clientWidth}px`, height: `${img.clientHeight}px` });
-    const ratio = Math.min(2, devicePixelRatio || 1);
+    const ratio = Math.min(2, devicePixelRatio || 1, CELL / Math.max(1, img.clientWidth, img.clientHeight));
     state.width = Math.max(1, Math.round(img.clientWidth * ratio));
     state.height = Math.max(1, Math.round(img.clientHeight * ratio));
     canvas.width = state.width;
@@ -279,6 +291,9 @@ export function inkImage(img, { ghost = 0 } = {}) {
       state.progress = progress;
       state.origin = origin;
       paint();
+      // One more copy a frame later, so a browser that hands back the previous frame still ends on the final one.
+      cancelAnimationFrame(settle);
+      settle = requestAnimationFrame(() => requestAnimationFrame(paint));
     },
     async swap(src) {
       const image = await loaded(src);
@@ -292,6 +307,7 @@ export function inkImage(img, { ghost = 0 } = {}) {
       paint();
     },
     dispose() {
+      cancelAnimationFrame(settle);
       observer.disconnect();
       [state.texture, state.rest].forEach((texture) => texture && surface?.drop(texture));
       canvas.remove();
