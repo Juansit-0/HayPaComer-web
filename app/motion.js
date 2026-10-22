@@ -1,6 +1,6 @@
-import { animate, cancelFrame, frame, hover, inView, MotionGlobalConfig, press, stagger } from "./vendor/motion.js";
+import { animate, cancelFrame, frame, hover, inView, MotionGlobalConfig, press, scroll, stagger } from "./vendor/motion.js";
 
-export { animate, hover, inView, press, stagger };
+export { animate, hover, inView, press, scroll, stagger };
 
 export const SPRINGS = {
   snappy: { type: "spring", visualDuration: 0.24, bounce: 0 },

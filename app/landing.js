@@ -1,7 +1,8 @@
 import { formatMoney, formatNumber, t } from "./i18n.js";
 import { esc, ticker } from "./ui.js";
-import { easing, inView, page, reduced, token } from "./motion.js";
+import { animate, easing, inView, page, reduced, scroll, SPRINGS, token } from "./motion.js";
 import { mountStory, storyMarkup } from "./story.js";
+import { createInkCursor } from "./story/ink-cursor.js";
 
 const PRICE_PER_KG = 9750;
 const RESCUED_SHARE = 0.5;
@@ -28,6 +29,15 @@ function stageFragment(stage) {
   return fragments[stage];
 }
 
+// Each letter in its own span so the title can rise letter by letter; words stay unbroken.
+function letters(text) {
+  let index = 0;
+  return text
+    .split(" ")
+    .map((word) => `<span class="title-word">${[...word].map((letter) => `<span style="--i:${index++}">${esc(letter)}</span>`).join("")}</span>`)
+    .join(" ");
+}
+
 function monthly(kilos) {
   return kilos * RESCUED_SHARE * WEEKS_PER_MONTH * PRICE_PER_KG;
 }
@@ -39,7 +49,7 @@ export function renderLanding(main) {
 
       <section class="chapter chapter-papa land-hero" id="land-answer" aria-labelledby="land-title" data-reveal>
         <div class="land-hero-text">
-          <h2 id="land-title" tabindex="-1">${t("now.question")}</h2>
+          <h2 id="land-title" tabindex="-1"><span class="visually-hidden">${t("now.question")}</span><span class="title-letters" aria-hidden="true">${letters(t("now.question"))}</span></h2>
           <p class="land-lead">${t("landing.lead")}</p>
           <div class="land-actions">
             <a class="button primary" href="#/register">${t("auth.create-account")}</a>
@@ -163,4 +173,29 @@ export function renderLanding(main) {
   });
 
   mountStory(main);
+  if (reduced()) return;
+  if (matchMedia("(hover: hover) and (pointer: fine)").matches) {
+    page.defer(createInkCursor());
+    main.querySelectorAll(".land-actions .button").forEach((button) => {
+      const pull = (event) => {
+        const box = button.getBoundingClientRect();
+        animate(button, { x: (event.clientX - box.left - box.width / 2) * 0.25, y: (event.clientY - box.top - box.height / 2) * 0.35 }, SPRINGS.snappy);
+      };
+      const release = () => animate(button, { x: 0, y: 0 }, SPRINGS.surface);
+      button.addEventListener("pointermove", pull);
+      button.addEventListener("pointerleave", release);
+    });
+  }
+  const linked = [
+    [".land-vignette img", { y: [-36, 36] }],
+    [".pasto-photo img", { scale: [1.16, 1] }],
+    [".kit-medallion img", { rotate: [-8, 8] }],
+    [".land-wordmark", { x: ["6%", "-6%"] }],
+  ];
+  linked.forEach(([selector, keyframes]) =>
+    main.querySelectorAll(selector).forEach((element) => {
+      const target = element.closest("section, footer") ?? element;
+      page.defer(scroll(animate(element, keyframes, { ease: "linear" }), { target, offset: ["start end", "end start"] }));
+    }),
+  );
 }
