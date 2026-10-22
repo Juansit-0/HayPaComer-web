@@ -808,7 +808,7 @@ main[data-enter] .bento > * {
 .loader-word {
   position: relative;
   font-family: var(--font-display);
-  font-size: 19.5vw;
+  font-size: min(13vw, 30vh);
   line-height: 0.9;
   letter-spacing: var(--tracking-display);
   text-transform: uppercase;

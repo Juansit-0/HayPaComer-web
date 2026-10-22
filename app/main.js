@@ -259,7 +259,16 @@ languageSwitch.addEventListener("click", async (event) => {
 
 progress(0.2);
 const fontsOrLate = Promise.race([document.fonts.load("900 1em Fraunces").catch(() => null), new Promise((resolve) => setTimeout(resolve, 600))]);
+const fitLoader = () => {
+  const word = document.querySelector(".loader-word");
+  const style = getComputedStyle(loader);
+  const room = loader.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const width = word.firstElementChild.getBoundingClientRect().width;
+  if (width > room) word.style.fontSize = `${(parseFloat(getComputedStyle(word).fontSize) * room) / width}px`;
+};
+fitLoader();
 await Promise.all([loadLocale(), fontsOrLate]);
+fitLoader();
 progress(0.6);
 drawLanguages();
 await render();
