@@ -219,7 +219,7 @@ function cluster(make, count, spacing) {
   const result = new THREE.Group();
   const base = 3 >= count ? count : Math.ceil(count * 0.62);
   const spots = [];
-  for (let index = 0; index < count; index++) {
+  for (let index = 0; count > index; index++) {
     const piece = make(index);
     const jitter = (salt) => hash(index, count + salt, spacing) - 0.5;
     if (base > index) {
