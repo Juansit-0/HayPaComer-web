@@ -200,6 +200,7 @@ export function mountStory(main) {
         last = now;
         held = Math.min(1, Math.max(0, held + (pressing ? dt / HOLD_SECONDS : -dt * REWIND / HOLD_SECONDS)));
         holdButton.style.setProperty("--held", held.toFixed(4));
+        film?.setHeld(held);
         if (held >= 1) {
           pressing = false;
           frameId = 0;

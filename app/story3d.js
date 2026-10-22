@@ -198,6 +198,12 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     hold(seconds) {
       governor.hold(seconds);
     },
+    setHeld(value) {
+      const kitchen = chapters.find((chapter) => chapter.id === "kitchen");
+      if (!kitchen) return;
+      kitchen.world.userData.held = value;
+      film.wake();
+    },
     dispose() {
       film.stop();
       observer.disconnect();
