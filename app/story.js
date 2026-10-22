@@ -39,10 +39,15 @@ function scene({ image, still, width, height, captions, label }, index) {
   </figure>`;
 }
 
-function caption({ id, from, to, corner }) {
+// Captions read like the news of their time: clippings from an 1876 paper in the market, printed receipts at home today, and app notifications
+// once the fridge knows. The year is a numeral, so it needs no translation.
+const ERA_YEARS = { press: 1876, note: 2026 };
+
+function caption({ id, from, to, corner, era = "app" }) {
   const text = t(`landing.story.${id}`);
   const words = text.split(" ").map((word, index) => `<span style="--i:${index}">${word}</span>`).join(" ");
-  return `<p class="story-caption c${corner}" data-from="${from}" data-to="${to}"><span class="visually-hidden">${text}</span><span class="caption-words" aria-hidden="true">${words}</span></p>`;
+  const year = ERA_YEARS[era] ? ` data-year="${ERA_YEARS[era]}"` : "";
+  return `<p class="story-caption c${corner} era-${era}" data-from="${from}" data-to="${to}"${year}><span class="visually-hidden">${text}</span><span class="caption-words" aria-hidden="true">${words}</span></p>`;
 }
 
 export function storyMarkup() {
@@ -138,7 +143,11 @@ export function mountStory(main) {
       showProgress = (value) => {
         rail.style.transform = `scaleX(${value.toFixed(4)})`;
         intro.classList.toggle("gone", value > 0.015);
-        captions.forEach((element) => element.classList.toggle("on", value >= Number(element.dataset.from) && Number(element.dataset.to) > value));
+        captions.forEach((element) => {
+          const on = value >= Number(element.dataset.from) && Number(element.dataset.to) > value;
+          element.classList.toggle("on", on);
+          element.classList.toggle("gone", !on && value >= Number(element.dataset.to));
+        });
         const active = starts.findLastIndex((start) => value >= start);
         chapterButtons.forEach((button, index) => (index === active ? button.setAttribute("aria-current", "step") : button.removeAttribute("aria-current")));
         const gate = closedGate();

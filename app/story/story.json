@@ -468,67 +468,78 @@
       "id": "arrive",
       "from": 0.02,
       "to": 0.11,
-      "corner": 0
+      "corner": 0,
+      "era": "press"
     },
     {
       "id": "market-day",
       "from": 0.14,
       "to": 0.19,
-      "corner": 1
+      "corner": 1,
+      "era": "press"
     },
     {
       "id": "heaps",
       "from": 0.19,
       "to": 0.25,
-      "corner": 0
+      "corner": 0,
+      "era": "press"
     },
     {
       "id": "oca",
       "from": 0.22,
       "to": 0.29,
-      "corner": 1
+      "corner": 1,
+      "era": "press"
     },
     {
       "id": "people",
       "from": 0.26,
       "to": 0.32,
-      "corner": 0
+      "corner": 0,
+      "era": "press"
     },
     {
       "id": "today",
       "from": 0.35,
       "to": 0.45,
-      "corner": 0
+      "corner": 0,
+      "era": "note"
     },
     {
       "id": "fridge",
       "from": 0.52,
       "to": 0.66,
-      "corner": 1
+      "corner": 1,
+      "era": "note"
     },
     {
       "id": "weigh",
       "from": 0.69,
       "to": 0.78,
-      "corner": 0
+      "corner": 0,
+      "era": "app"
     },
     {
       "id": "knows",
       "from": 0.72,
       "to": 0.78,
-      "corner": 1
+      "corner": 1,
+      "era": "app"
     },
     {
       "id": "cook",
       "from": 0.8,
       "to": 0.87,
-      "corner": 0
+      "corner": 0,
+      "era": "app"
     },
     {
       "id": "table",
       "from": 0.89,
       "to": 0.99,
-      "corner": 0
+      "corner": 0,
+      "era": "app"
     }
   ],
   "gates": [
