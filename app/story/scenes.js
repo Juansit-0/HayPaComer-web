@@ -32,9 +32,9 @@ function naranjilla() {
   return mesh(lumpy(new THREE.SphereGeometry(0.05, 18, 14), 0.05), paint("#e8a13a"), (m) => (m.position.y = 0.05));
 }
 
-function heap(make, count, radius, seed) {
+function heap(make, count, radius, seed, kinds = 3) {
   const pile = new THREE.Group();
-  const variants = [0, 1, 2].map((variant) => outline(group(make(variant))));
+  const variants = Array.from({ length: kinds }, (_, variant) => outline(group(make(variant))));
   const placements = variants.map(() => []);
   const total = Math.max(3, Math.round(count * density));
   const matrix = new THREE.Matrix4();
@@ -60,6 +60,38 @@ function umbrella(color, seed) {
   return item;
 }
 
+// A striped cloth awning on four poles, sagging between them.
+function awning(seed) {
+  const colors = [["#f4efe3", "#a8361f"], ["#f4efe3", "#3f6f8f"], ["#e8c35a", "#4f7a4a"]][seed % 3];
+  const item = new THREE.Group();
+  const strips = 7;
+  for (let strip = 0; strips > strip; strip++) {
+    const cloth = new THREE.PlaneGeometry(1.8 / strips, 1.2, 1, 8);
+    const position = cloth.attributes.position;
+    for (let index = 0; position.count > index; index++) {
+      const y = position.getY(index);
+      position.setZ(index, -(1 - (y / 0.6) ** 2) * 0.12);
+    }
+    cloth.computeVertexNormals();
+    item.add(mesh(cloth, paint(colors[strip % 2], { side: THREE.DoubleSide }), (m) => {
+      m.rotation.x = -Math.PI / 2 + 0.12;
+      m.position.set(-0.9 + (1.8 / strips) * (strip + 0.5), 1.85, 0);
+    }));
+  }
+  [[-0.86, -0.56], [0.86, -0.56], [-0.86, 0.56], [0.86, 0.56]].forEach(([x, z]) => item.add(mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.9, 8), paint("#6b4a2a"), (m) => m.position.set(x, 0.95 + (z > 0 ? -0.07 : 0.07), z))));
+  return item;
+}
+
+// A wicker basket, woven in two tones.
+function basket(seed) {
+  const item = new THREE.Group();
+  for (let ring = 0; 5 > ring; ring++) {
+    item.add(mesh(new THREE.CylinderGeometry(0.2 + ring * 0.012, 0.19 + ring * 0.012, 0.045, 18, 1, true), paint(ring % 2 ? "#b8925a" : "#8e6a3c", { side: THREE.DoubleSide }), (m) => (m.position.y = 0.025 + ring * 0.045)));
+  }
+  item.rotation.y = random(seed) * 6;
+  return item;
+}
+
 function stall(seed, produce) {
   const table = group(
     mesh(new RoundedBoxGeometry(1.5, 0.06, 0.8, 2, 0.01), paint("#a4743f"), (m) => (m.position.y = 0.62)),
@@ -77,11 +109,36 @@ function stall(seed, produce) {
     pile.position.set(-0.45 + index * 0.45, 0.66, 0);
     goods.add(pile);
   });
-  return { props: group(table, cloth, umbrella(seed % 2 ? "#d2492f" : "#f3c443", seed)), goods };
+  const cover = seed % 2 ? umbrella("#d2492f", seed) : awning(seed);
+  const baskets = [0, 1].map((index) => {
+    const item = basket(seed * 3 + index);
+    item.position.set(-0.45 + index * 0.9, 0, 0.62);
+    return item;
+  });
+  baskets.forEach((item, index) => {
+    const pile = heap(produce[index % produce.length][0], 8, 0.15, seed * 20 + index, 1);
+    pile.position.set(item.position.x, 0.2, item.position.z);
+    goods.add(pile);
+  });
+  return { props: group(table, cloth, cover, ...baskets), goods };
 }
 
 const PLINTHS = ["#3f6f8f", "#4f7a4a", "#b8862f", "#a8361f", "#6b5a8e"];
 const SHUTTERS = ["#2f5d4a", "#3d5f86", "#7a3b26"];
+
+// One slope of clay tiles: a corrugated surface of half-round tiles laid in overlapping courses.
+function tileSlope(width, length) {
+  const geometry = new THREE.PlaneGeometry(width, length, Math.max(8, Math.round(width / 0.11) * 6), Math.round(length / 0.16) * 3);
+  const position = geometry.attributes.position;
+  for (let index = 0; position.count > index; index++) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const course = (((y + length / 2) % 0.16) + 0.16) % 0.16;
+    position.setZ(index, Math.abs(Math.sin((x / 0.11) * Math.PI)) * 0.03 + (course / 0.16) * 0.014);
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+}
 
 // A whitewashed Pasto house: painted plinth, gabled tile roof with eaves, barred windows, a wooden door, and on two floors a balcony.
 export function house(seed, { floors = 1 + Math.round(random(seed * 5)), width = 1.6 + random(seed) * 1.4 } = {}) {
@@ -95,14 +152,40 @@ export function house(seed, { floors = 1 + Math.round(random(seed * 5)), width =
   const parts = [
     mesh(new THREE.BoxGeometry(width, height, depth), wall, (m) => (m.position.y = height / 2)),
     mesh(new THREE.BoxGeometry(width + 0.02, 0.32, depth + 0.02), paint(plinthColor), (m) => (m.position.y = 0.16)),
-    mesh(new THREE.CylinderGeometry(depth * 0.62, depth * 0.62, width + 0.36, 3), paint("#a4502f"), (m) => {
-      m.rotation.z = Math.PI / 2;
-      m.rotation.x = Math.PI;
-      m.scale.set(0.42, 1, 1);
-      m.position.y = height + 0.14;
-    }),
-    mesh(new THREE.BoxGeometry(0.34, 0.66, 0.04), wood, (m) => m.position.set((random(seed * 13) - 0.5) * (width - 0.6), 0.33, depth / 2 + 0.02)),
   ];
+  const run = depth / 2 + 0.2;
+  const rise = 0.42;
+  const slope = Math.atan2(rise, run);
+  const tiles = paint("#a4502f");
+  [-1, 1].forEach((side) => {
+    parts.push(mesh(tileSlope(width + 0.36, Math.hypot(run, rise)), tiles, (m) => {
+      m.rotation.set(-Math.PI / 2 + slope, side > 0 ? 0 : Math.PI, 0, "YXZ");
+      m.position.set(0, height + rise / 2, (side * run) / 2);
+    }));
+  });
+  parts.push(mesh(new THREE.CylinderGeometry(0.045, 0.045, width + 0.36, 10), paint("#8e4227"), (m) => {
+    m.rotation.z = Math.PI / 2;
+    m.position.y = height + rise + 0.01;
+  }));
+  const gable = new THREE.Shape([new THREE.Vector2(-depth / 2, 0), new THREE.Vector2(depth / 2, 0), new THREE.Vector2(0, rise)]);
+  [-1, 1].forEach((side) => parts.push(mesh(new THREE.ShapeGeometry(gable), wall, (m) => {
+    m.rotation.y = side * Math.PI / 2;
+    m.position.set((side * width) / 2, height, 0);
+  })));
+  const doorX = (random(seed * 13) - 0.5) * (width - 0.7);
+  parts.push(mesh(new THREE.BoxGeometry(0.48, 0.9, 0.03), paint("#e2d6be"), (m) => m.position.set(doorX, 0.45, depth / 2 + 0.012)));
+  parts.push(mesh(new THREE.BoxGeometry(0.36, 0.62, 0.04), wood, (m) => m.position.set(doorX, 0.31, depth / 2 + 0.025)));
+  parts.push(mesh(new THREE.CircleGeometry(0.18, 18, 0, Math.PI), wood, (m) => m.position.set(doorX, 0.62, depth / 2 + 0.046)));
+  if (random(seed * 17) > 0.4) {
+    const lampX = doorX + (doorX > 0 ? -0.42 : 0.42);
+    parts.push(mesh(new THREE.BoxGeometry(0.03, 0.03, 0.16), dark, (m) => m.position.set(lampX, 0.98, depth / 2 + 0.08)));
+    parts.push(mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), dark, (m) => m.position.set(lampX, 0.9, depth / 2 + 0.16)));
+    parts.push(mesh(new THREE.BoxGeometry(0.075, 0.1, 0.075), paint("#f1d27a"), (m) => m.position.set(lampX, 0.9, depth / 2 + 0.16)));
+    parts.push(mesh(new THREE.ConeGeometry(0.08, 0.07, 4), dark, (m) => {
+      m.position.set(lampX, 0.995, depth / 2 + 0.16);
+      m.rotation.y = Math.PI / 4;
+    }));
+  }
   const windows = Math.max(1, Math.floor(width / 0.9));
   for (let floor = 0; floors > floor; floor++) {
     for (let index = 0; windows > index; index++) {
@@ -195,14 +278,39 @@ export function market() {
   return scene;
 }
 
+// A cobbled lane: rounded stones instanced in staggered rows, one draw call however long the street.
+function cobbles(width, length, seed) {
+  const stone = mesh(lumpy(new THREE.SphereGeometry(0.11, 8, 5), 0.35), paint("#bfb39a"), (m) => (m.scale.y = 0.28));
+  stone.userData.noOutline = true;
+  const placements = [];
+  const matrix = new THREE.Matrix4();
+  const turn = new THREE.Quaternion();
+  const size = new THREE.Vector3();
+  const step = 0.23 / Math.sqrt(density);
+  for (let row = 0; length / step > row; row++) {
+    for (let column = 0; width / step > column; column++) {
+      const jitter = (salt) => random(seed + row * 131 + column * 7 + salt) - 0.5;
+      turn.setFromAxisAngle(UP_AXIS, jitter(1) * 3);
+      size.set(1 + jitter(2) * 0.3, 1 + jitter(3) * 0.4, 1 + jitter(4) * 0.3).multiplyScalar(step / 0.23);
+      placements.push(matrix.compose(new THREE.Vector3(-width / 2 + (column + (row % 2) * 0.5) * step + jitter(5) * 0.04, 0.012, -row * step + jitter(6) * 0.04), turn, size).clone());
+    }
+  }
+  return instance(group(stone), placements);
+}
+
+const UP_AXIS = new THREE.Vector3(0, 1, 0);
+
 // Arrival: a cobbled street of whitewashed houses leading to San Juan, Galeras behind, people walking to the market.
 export function streetScene() {
   const scene = new THREE.Group();
   scene.add(mesh(new THREE.PlaneGeometry(60, 80), paint("#e7dfcd"), (m) => (m.rotation.x = -Math.PI / 2)));
-  scene.add(mesh(new THREE.PlaneGeometry(3.2, 40), paint("#cdbf9f"), (m) => {
+  scene.add(mesh(new THREE.PlaneGeometry(3.2, 40), paint("#9c8f78"), (m) => {
     m.rotation.x = -Math.PI / 2;
     m.position.set(0, 0.005, -8);
   }));
+  const lane = cobbles(3.1, 30, 3);
+  lane.position.z = 8;
+  scene.add(lane);
   scene.add(volcano());
   const props = new THREE.Group();
   [-1, 1].forEach((side) => {
@@ -538,6 +646,14 @@ export function homeScene() {
     x += width + 0.04;
   }
   props.add(mesh(new THREE.BoxGeometry(20, 0.12, 0.9), paint("#d6ccb4"), (m) => m.position.set(0, 0.06, -1.1)));
+  scene.add(mesh(new THREE.PlaneGeometry(20, 3), paint("#9c8f78"), (m) => {
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(0, 0.004, 0.9);
+  }));
+  const road = cobbles(3, 20, 7);
+  road.rotation.y = -Math.PI / 2;
+  road.position.set(-10, 0, 0.9);
+  scene.add(road);
   scene.add(outline(merged(props)));
   const walker = crowd([{ at: [-5, -0.4], facing: Math.PI / 2, walk: [6.2, 0] }], { looks: 1, seed: 9 });
   const tote = bag();
