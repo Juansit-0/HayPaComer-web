@@ -2,7 +2,7 @@ import { formatMoney, formatNumber, t } from "./i18n.js";
 import { esc, ticker } from "./ui.js";
 import { animate, easing, inView, page, reduced, scroll, SPRINGS, token } from "./motion.js";
 import { mountStory, storyMarkup } from "./story.js";
-import { createInkCursor } from "./story/ink-cursor.js";
+import { createPaperLens } from "./story/paper-lens.js";
 import { inkImage, releaseInk } from "./story/ink-reveal.js";
 
 const PRICE_PER_KG = 9750;
@@ -214,7 +214,7 @@ export function renderLanding(main) {
   mountStory(main);
   if (reduced()) return;
   if (matchMedia("(hover: hover) and (pointer: fine)").matches) {
-    page.defer(createInkCursor());
+    page.defer(createPaperLens());
     main.querySelectorAll(".land-actions .button").forEach((button) => {
       const pull = (event) => {
         const box = button.getBoundingClientRect();
