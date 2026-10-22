@@ -279,7 +279,8 @@ export function inkImage(img, { ghost = 0 } = {}) {
   };
   const observer = new ResizeObserver(resize);
   observer.observe(img);
-  const ready = loaded(img.currentSrc || img.src).then((image) => {
+  let source = img.currentSrc || img.src;
+  const ready = loaded(source).then((image) => {
     state.texture = surface?.texture(image) ?? null;
     state.aspect = image.naturalWidth / image.naturalHeight;
     resize();
@@ -295,7 +296,11 @@ export function inkImage(img, { ghost = 0 } = {}) {
       cancelAnimationFrame(settle);
       settle = requestAnimationFrame(() => requestAnimationFrame(paint));
     },
+    get source() {
+      return source;
+    },
     async swap(src) {
+      source = new URL(src, location.href).href;
       const image = await loaded(src);
       if (!surface) return;
       if (state.rest) surface.drop(state.rest);

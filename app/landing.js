@@ -69,7 +69,8 @@ export function renderLanding(main) {
         <ul class="kit" data-reveal>${kitPart("door", "door")}${kitPart("probe", "probe")}${kitPart("brain", "board")}${kitPart("scale", "scale")}</ul>
       </section>
 
-      <section class="chapter chapter-arroz land-how" aria-labelledby="how-title">
+      <section class="chapter chapter-arroz land-how" aria-labelledby="how-title" data-scrolly>
+        <div class="how-stage scrolly-stage">
         <div class="how-left">
           <h2 id="how-title">${t("landing.how.title")}</h2>
           <p class="how-clause" data-clause aria-live="polite">${t(`landing.how.${STAGES[0]}`)}</p>
@@ -79,19 +80,31 @@ export function renderLanding(main) {
           <div class="how-fragment" data-ui data-fragment>${stageFragment(STAGES[0])}</div>
         </div>
         <div class="how-slider">
-          <label class="visually-hidden" for="how-range">${t("landing.how.title")}</label>
-          <input id="how-range" type="range" min="0" max="3" step="1" value="0" data-stage-range>
-          <ol class="how-names">${STAGES.map((stage, index) => `<li data-name="${index}" ${index === 0 ? 'aria-current="step"' : ""}>${t(`landing.how.${stage}-name`)}</li>`).join("")}</ol>
+          <div class="how-track" style="--fill:0">
+            <span class="how-line" aria-hidden="true"><span></span></span>
+            ${STAGES.map((stage, index) => `<span class="how-node" data-node="${index}" style="--at:${index / (STAGES.length - 1)}" aria-hidden="true"></span>`).join("")}
+            <label class="visually-hidden" for="how-range">${t("landing.how.title")}</label>
+            <input id="how-range" type="range" min="0" max="3" step="1" value="0" data-stage-range>
+          </div>
+          <ol class="how-names">${STAGES.map((stage, index) => `<li data-name="${index}" style="--at:${index / (STAGES.length - 1)}" ${index === 0 ? 'aria-current="step"' : ""}>${t(`landing.how.${stage}-name`)}</li>`).join("")}</ol>
+        </div>
         </div>
       </section>
 
-      <section class="chapter chapter-mora land-calc" aria-labelledby="calc-title">
+      <section class="chapter chapter-mora land-calc" aria-labelledby="calc-title" data-scrolly>
+        <div class="calc-stage scrolly-stage">
         <h2 id="calc-title">${t("landing.calc.question")}</h2>
-        <label class="calc-control" for="calc-kilos">${t("landing.calc.label")}
-          <span class="calc-row"><input id="calc-kilos" type="range" min="0.5" max="10" step="0.5" value="2" data-kilos><output class="data" data-kilos-out>${formatNumber(2, 1)} kg</output></span>
-        </label>
+        <div class="calc-control">
+          <label for="calc-kilos">${t("landing.calc.label")}</label>
+          <div class="calc-ruler" style="--fill:${(2 - 0.5) / 9.5}">
+            <span class="calc-fill" aria-hidden="true"></span>
+            <output class="calc-tab data" for="calc-kilos" data-kilos-out>${formatNumber(2, 1)} kg</output>
+            <input id="calc-kilos" type="range" min="0.5" max="10" step="0.5" value="2" data-kilos>
+          </div>
+        </div>
         <p class="calc-figure"><span class="data" data-money></span><span>${t("landing.calc.unit")}</span></p>
         <p class="calc-how">${t("landing.calc.how", { price: formatMoney(PRICE_PER_KG, "COP") })}</p>
+        </div>
       </section>
 
       <section class="chapter chapter-tomate land-pasto" aria-labelledby="pasto-title">
@@ -150,18 +163,25 @@ export function renderLanding(main) {
           if (!ink) return;
           inks.set(img, ink);
           ink.set(0, origin);
-          ink.ready.then(() => develop(ink, origin, index * stagger));
+          ink.ready.then(() => {
+            // The scroll may have moved How it works on while the ink was being set up: catch up with the picture now wanted.
+            if (img === picture && wanted && ink.source !== wanted) showScene(wanted);
+            else develop(ink, origin, index * stagger);
+          });
         }, { amount: 0.35 });
         page.defer(stop);
       }),
     );
   }
 
+  let scrolling = false;
+  let wanted = null;
   const range = main.querySelector("[data-stage-range]");
   const picture = main.querySelector("[data-how-scene]");
   let blot = null;
   const showScene = (source) => {
     const ink = inks.get(picture);
+    wanted = new URL(source, location.href).href;
     if (ink) {
       ink.swap(source).then(() => {
         inking?.stop();
@@ -189,7 +209,13 @@ export function renderLanding(main) {
       if (blot === current) blot = null;
     });
   };
+  const track = main.querySelector(".how-track");
+  const nodes = [...main.querySelectorAll("[data-node]")];
+  const markStep = (index) => nodes.forEach((node) => node.classList.toggle("reached", index >= Number(node.dataset.node)));
+  markStep(0);
   range.addEventListener("input", () => {
+    if (!scrolling) track.style.setProperty("--fill", Number(range.value) / 3);
+    markStep(Number(range.value));
     const stage = STAGES[Number(range.value)];
     const fragment = main.querySelector("[data-fragment]");
     fragment.innerHTML = stageFragment(stage);
@@ -203,16 +229,42 @@ export function renderLanding(main) {
   });
 
   const kilos = main.querySelector("[data-kilos]");
+  const ruler = main.querySelector(".calc-ruler");
   const money = main.querySelector("[data-money]");
   ticker(money, formatMoney(monthly(Number(kilos.value)), "COP"));
   kilos.addEventListener("input", () => {
     const value = Number(kilos.value);
     main.querySelector("[data-kilos-out]").textContent = `${formatNumber(value, 1)} kg`;
+    if (!scrolling) ruler.style.setProperty("--fill", (value - 0.5) / 9.5);
     ticker(money, formatMoney(monthly(value), "COP"));
   });
 
   mountStory(main);
   if (reduced()) return;
+  // Scroll-driven scenes: the section holds still while it is scrolled through and the scroll moves the steps and the kilos; the slider stays
+  // on top for the keyboard and the pointer.
+  const drive = (section, onProgress) =>
+    page.defer(scroll((progress) => {
+      scrolling = true;
+      onProgress(progress);
+      scrolling = false;
+    }, { target: section, offset: ["start start", "end end"] }));
+  drive(main.querySelector(".land-how"), (progress) => {
+    track.style.setProperty("--fill", progress.toFixed(4));
+    const index = Math.min(3, Math.floor(progress * 4));
+    if (index !== Number(range.value)) {
+      range.value = index;
+      range.dispatchEvent(new Event("input"));
+    }
+  });
+  drive(main.querySelector(".land-calc"), (progress) => {
+    ruler.style.setProperty("--fill", progress.toFixed(4));
+    const value = 0.5 + Math.round(progress * 19) / 2;
+    if (value !== Number(kilos.value)) {
+      kilos.value = value;
+      kilos.dispatchEvent(new Event("input"));
+    }
+  });
   if (matchMedia("(hover: hover) and (pointer: fine)").matches) {
     page.defer(createPaperLens());
     main.querySelectorAll(".land-actions .button").forEach((button) => {
