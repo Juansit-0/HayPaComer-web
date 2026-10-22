@@ -7,10 +7,10 @@ import { createScroller } from "./story/scroller.js";
 
 const SCENES = [
   { image: "entrada-pasto", width: 1800, height: 1117, captions: ["landing.story.arrive", "landing.story.market-day"] },
-  { image: "mercado-bogota", width: 1800, height: 1231, captions: ["landing.story.heaps", "landing.story.oca"], label: "landing.story.bogota" },
+  { image: "mercado-bogota", width: 1800, height: 1231, captions: ["landing.story.heaps", "landing.story.oca", "landing.story.people"], label: "landing.story.bogota" },
   { image: "calle-pasto", width: 880, height: 1409, captions: ["landing.story.today", "landing.story.fridge"] },
   { still: "scale", width: 960, height: 960, captions: ["landing.story.weigh", "landing.story.knows"] },
-  { still: "plate", width: 960, height: 960, captions: ["landing.story.cook"] },
+  { still: "plate", width: 960, height: 960, captions: ["landing.story.cook", "landing.story.table"] },
 ];
 
 const STORY_SCREENS = 3.2;
@@ -20,10 +20,13 @@ const TAP = 250;
 
 function chapterName(id) {
   return {
+    streets: t("landing.story.chapter.streets"),
     market: t("landing.story.chapter.market"),
     kitchen: t("landing.story.chapter.kitchen"),
     scale: t("landing.story.chapter.scale"),
     plate: t("landing.story.chapter.plate"),
+    home: t("landing.story.chapter.home"),
+    table: t("landing.story.chapter.table"),
   }[id];
 }
 

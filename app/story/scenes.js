@@ -1,6 +1,7 @@
 import * as THREE from "../vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "../vendor/RoundedBoxGeometry.js";
 import { foodModel, group, hash, instance, lumpy, merged, mesh, outline, paint } from "../engrave.js";
+import { crowd } from "./people.js";
 
 export const PAPER = "#f3ecdf";
 const random = (seed) => hash(seed, seed * 1.7, seed * 2.3);
@@ -179,6 +180,71 @@ export function market() {
     scene.add(goods);
   });
   scene.add(outline(merged(street)));
+  const people = [];
+  layout.forEach(([x, , z], index) => {
+    const turn = (random(index * 13) - 0.5) * 0.5;
+    people.push({ at: [x + Math.sin(turn) * -0.7, z - Math.cos(turn) * 0.7], facing: turn });
+    if (index === 0) return;
+    people.push({ at: [x - 0.3 + random(index) * 0.6, z + 0.85], facing: Math.PI + (random(index * 5) - 0.5) * 0.6 });
+    if (index % 2 === 0) people.push({ at: [x + 0.55, z + 1.1], facing: Math.PI - 0.5 });
+  });
+  for (let index = 0; 5 > index; index++) people.push({ at: [-6 + index * 2.4, -5.5 - random(index * 3) * 1.5], facing: Math.PI / 2, walk: [1.6, 0] });
+  const folk = crowd(people, { seed: 2 });
+  scene.add(folk);
+  scene.userData.play = (k) => folk.userData.play(k);
+  return scene;
+}
+
+// Arrival: a cobbled street of whitewashed houses leading to San Juan, Galeras behind, people walking to the market.
+export function streetScene() {
+  const scene = new THREE.Group();
+  scene.add(mesh(new THREE.PlaneGeometry(60, 80), paint("#e7dfcd"), (m) => (m.rotation.x = -Math.PI / 2)));
+  scene.add(mesh(new THREE.PlaneGeometry(3.2, 40), paint("#cdbf9f"), (m) => {
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(0, 0.005, -8);
+  }));
+  scene.add(volcano());
+  const props = new THREE.Group();
+  [-1, 1].forEach((side) => {
+    let z = 6;
+    for (let index = 0; 9 > index; index++) {
+      const width = 1.8 + random(index * 7 + side) * 1.2;
+      const item = house(index * 3 + (side > 0 ? 50 : 0), { floors: (index + (side > 0 ? 1 : 0)) % 3 === 0 ? 2 : 1, width });
+      item.position.set(side * 2.6, 0, z - width / 2);
+      item.rotation.y = -side * Math.PI / 2;
+      props.add(item);
+      props.add(mesh(new THREE.BoxGeometry(0.9, 0.12, width), paint("#d6ccb4"), (m) => m.position.set(side * 1.75, 0.06, z - width / 2)));
+      z -= width + 0.05;
+    }
+  });
+  const church = new THREE.Group();
+  const white = paint("#f6f1e6");
+  church.add(mesh(new THREE.BoxGeometry(4.2, 4.2, 1.6), white, (m) => (m.position.y = 2.1)));
+  const gable = new THREE.Shape([new THREE.Vector2(-2.1, 0), new THREE.Vector2(2.1, 0), new THREE.Vector2(0, 1.3)]);
+  church.add(mesh(new THREE.ExtrudeGeometry(gable, { depth: 1.6, bevelEnabled: false }), white, (m) => m.position.set(0, 4.2, -0.8)));
+  [-1.6, 1.6].forEach((x) => {
+    church.add(mesh(new THREE.BoxGeometry(1, 6.4, 1.2), white, (m) => m.position.set(x, 3.2, 0.25)));
+    church.add(mesh(new THREE.BoxGeometry(0.5, 0.8, 0.05), paint("#2b1d14"), (m) => m.position.set(x, 5.2, 0.86)));
+    church.add(mesh(new THREE.ConeGeometry(0.75, 1, 4), paint("#a4502f"), (m) => {
+      m.position.set(x, 6.9, 0.25);
+      m.rotation.y = Math.PI / 4;
+    }));
+  });
+  church.add(mesh(new THREE.BoxGeometry(1.1, 1.9, 0.05), paint("#4b2c1c"), (m) => m.position.set(0, 0.95, 0.81)));
+  church.add(mesh(new THREE.CircleGeometry(0.55, 16, 0, Math.PI), paint("#4b2c1c"), (m) => m.position.set(0, 1.9, 0.82)));
+  church.add(mesh(new THREE.CircleGeometry(0.35, 16), paint("#3f6f8f"), (m) => m.position.set(0, 3.4, 0.81)));
+  church.position.set(0, 0, -19);
+  props.add(church);
+  scene.add(outline(merged(props)));
+  const people = [];
+  for (let index = 0; 14 > index; index++) {
+    const lane = (random(index * 3) - 0.5) * 2.4;
+    people.push({ at: [lane, 2 - index * 1.4], facing: Math.PI + (random(index) - 0.5) * 0.3, walk: index % 3 === 2 ? undefined : [0, -3 - random(index * 9) * 2] });
+  }
+  [[-1.9, 1.2, Math.PI / 2], [1.9, -3.5, -Math.PI / 2], [-1.9, -7.5, Math.PI / 2]].forEach(([x, z, facing]) => people.push({ at: [x, z], facing }));
+  const folk = crowd(people, { seed: 5 });
+  scene.add(folk);
+  scene.userData.play = (k) => folk.userData.play(k);
   return scene;
 }
 
@@ -415,6 +481,71 @@ export function plateScene() {
     food.position.y = (1 - THREE.MathUtils.smoothstep(k, 0.05, 0.3)) * 0.25;
     food.rotation.y = k * 0.6;
   };
+  return scene;
+}
+
+// The way home: dusk on a side street, someone carries the market bag home.
+export function homeScene() {
+  const scene = new THREE.Group();
+  scene.add(mesh(new THREE.PlaneGeometry(40, 40), paint("#ddd3bd"), (m) => (m.rotation.x = -Math.PI / 2)));
+  const props = new THREE.Group();
+  let x = -9;
+  for (let index = 0; 8 > index; index++) {
+    const width = 1.7 + random(index * 19) * 1.1;
+    const item = house(index * 7 + 90, { floors: index % 3 === 1 ? 2 : 1, width });
+    item.position.set(x + width / 2, 0, -2.2);
+    props.add(item);
+    x += width + 0.04;
+  }
+  props.add(mesh(new THREE.BoxGeometry(20, 0.12, 0.9), paint("#d6ccb4"), (m) => m.position.set(0, 0.06, -1.1)));
+  scene.add(outline(merged(props)));
+  const walker = crowd([{ at: [-5, -0.4], facing: Math.PI / 2, walk: [6.2, 0] }], { looks: 1, seed: 9 });
+  const tote = bag();
+  tote.scale.setScalar(0.85);
+  scene.add(walker, tote);
+  const neighbours = crowd([{ at: [3.4, -1.3], facing: -Math.PI / 2 }, { at: [3.9, -1.4], facing: Math.PI }], { looks: 2, seed: 13 });
+  scene.add(neighbours);
+  scene.userData.play = (k) => {
+    walker.userData.play(k);
+    neighbours.userData.play(k);
+    tote.position.set(-5 + 6.2 * k + 0.12, 0.3 + Math.abs(Math.sin(k * 90)) * 0.03, -0.2);
+  };
+  return scene;
+}
+
+// The table: the family round the plates and the pot, the food that went into the fridge eaten instead of thrown away.
+export function tableScene() {
+  const scene = group(kitchenFloor(6, 4));
+  const props = new THREE.Group();
+  props.add(mesh(new RoundedBoxGeometry(1.9, 0.06, 1.1, 2, 0.01), paint("#a4743f"), (m) => (m.position.y = 0.75)));
+  props.add(mesh(new THREE.BoxGeometry(1.92, 0.006, 1.12), paint("#d2492f"), (m) => (m.position.y = 0.782)));
+  [[-0.85, -0.45], [0.85, -0.45], [-0.85, 0.45], [0.85, 0.45]].forEach(([px, pz]) => props.add(mesh(new THREE.BoxGeometry(0.06, 0.72, 0.06), paint("#7c5530"), (m) => m.position.set(px, 0.36, pz))));
+  const plates = [[-0.55, -0.3], [0.55, -0.3], [-0.55, 0.3], [0.55, 0.3]];
+  plates.forEach(([px, pz]) => {
+    props.add(mesh(new THREE.LatheGeometry([[0, 0], [0.13, 0], [0.17, 0.02], [0.18, 0.03], [0, 0.03]].map(([a, b]) => new THREE.Vector2(a, b)), 32), paint("#ffffff"), (m) => m.position.set(px, 0.786, pz)));
+    props.add(mesh(lumpy(new THREE.SphereGeometry(0.07, 14, 10), 0.3), paint("#f2c94c"), (m) => {
+      m.position.set(px - 0.02, 0.81, pz);
+      m.scale.y = 0.45;
+    }));
+    props.add(mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.022, 24), paint("#e9d3a0"), (m) => m.position.set(px + 0.07, 0.81, pz + 0.03)));
+  });
+  props.add(mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.18, 24), paint("#3b3026"), (m) => m.position.set(0, 0.87, 0)));
+  props.add(mesh(new THREE.TorusGeometry(0.16, 0.012, 8, 24), paint("#3b3026"), (m) => {
+    m.position.set(0, 0.96, 0);
+    m.rotation.x = Math.PI / 2;
+  }));
+  scene.add(outline(merged(props)));
+  const family = crowd(
+    [
+      { at: [-0.55, -0.85], facing: 0 },
+      { at: [0.55, -0.85], facing: 0 },
+      { at: [-1.25, 0], facing: Math.PI / 2 },
+      { at: [1.25, 0.05], facing: -Math.PI / 2 },
+    ],
+    { looks: 4, seed: 21 },
+  );
+  scene.add(family);
+  scene.userData.play = (k) => family.userData.play(k);
   return scene;
 }
 

@@ -10,6 +10,7 @@
 .story-caption { position: absolute; z-index: 1; max-width: min(34ch, 80vw); margin: 0; padding: 12px 16px; background: var(--color-white); box-shadow: 0 0 0 2px var(--color-tinta); font: 600 clamp(15px, 1.3vw, 19px)/1.4 var(--font-body); }
 .story-caption.c0 { top: 14%; left: max(20px, 6vw); }
 .story-caption.c1 { bottom: 14%; right: max(20px, 6vw); }
+.story-caption.c2 { top: 46%; left: max(20px, 6vw); }
 .story-label { position: absolute; left: max(20px, 6vw); bottom: 5%; padding: 4px 10px; background: var(--paper); box-shadow: 0 0 0 1px var(--color-tinta); font-size: 13px; color: var(--color-tinta); }
 .story-credit { margin: 0; padding: var(--space-s) max(20px, 5vw) var(--space-m); font-size: 13px; color: var(--color-text-weak); background: var(--paper); }
 
@@ -23,6 +24,7 @@ html:has(.land-story[data-captured]) { overscroll-behavior: none; }
 .land-story.filming .story-stage { position: absolute; inset: 0; display: block; padding: 0; }
 .land-story.filming .story-frame, .land-story.filming .story-credit { display: none; }
 .land-story.filming .story-canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
+.land-story.filming .story-intro { background: linear-gradient(90deg, color-mix(in srgb, var(--paper) 88%, transparent) 0, color-mix(in srgb, var(--paper) 70%, transparent) 38%, transparent 68%); }
 .land-story.filming .story-intro { position: absolute; z-index: 2; inset: 0; align-content: center; pointer-events: none; transition: opacity var(--duration-slow) var(--ease-standard), translate var(--duration-slow) var(--ease-emphasized); }
 .land-story.filming .story-intro a { pointer-events: auto; }
 .land-story.filming .story-intro.gone { opacity: 0; translate: 0 calc(var(--rise) * -1.5); }

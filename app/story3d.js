@@ -3,13 +3,14 @@ import { boil, inkBias, setHatchScale } from "./engrave.js";
 import { createTrack } from "./camerapath.js";
 import { damp, loop, reduced } from "./motion.js";
 import { TIERS, createGovernor, pixelRatioFor } from "./quality.js";
-import { kitchen, market, PAPER, plateScene, scaleScene, setDensity } from "./story/scenes.js";
+import { homeScene, kitchen, market, PAPER, plateScene, scaleScene, setDensity, streetScene, tableScene } from "./story/scenes.js";
 import { createInkPass } from "./story/ink.js";
 import { createWind } from "./story/wind.js";
 
-const BUILDERS = { market, kitchen, scale: scaleScene, plate: plateScene };
+const BUILDERS = { streets: streetScene, market, home: homeScene, kitchen, scale: scaleScene, plate: plateScene, table: tableScene };
 const WINDS = {
   market: { origin: [-2, 2.4, -2], spread: [5, 1.6, 4], length: 3.2, rise: 0.4, width: 0.012, jitter: 0.02, share: 1 },
+  table: { origin: [0, 0.98, 0], spread: [0.12, 0.01, 0.08], length: 0.02, rise: 0.22, width: 0.002, jitter: 0.0015, share: 0.15 },
   plate: { origin: [-0.06, 0.84, 0], spread: [0.1, 0.01, 0.06], length: 0.015, rise: 0.12, width: 0.0018, jitter: 0.0012, share: 0.125 },
 };
 
