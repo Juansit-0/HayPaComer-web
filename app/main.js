@@ -82,6 +82,42 @@ function placeBlot(route) {
 }
 new ResizeObserver(() => placeBlot(current())).observe(tabs);
 
+// Light or night paper: the reader's choice when they made one, the system's until then. The new paper spreads from the button in a circle.
+const THEME_KEY = "hpc.theme";
+const systemDark = matchMedia("(prefers-color-scheme: dark)");
+const themeButton = document.querySelector("[data-theme-toggle]");
+function savedTheme() {
+  try {
+    return localStorage.getItem(THEME_KEY);
+  } catch {
+    return null;
+  }
+}
+function applyTheme(theme = savedTheme() ?? (systemDark.matches ? "dark" : "light")) {
+  document.documentElement.dataset.theme = theme;
+  themeButton.setAttribute("aria-pressed", String(theme === "dark"));
+  dispatchEvent(new CustomEvent("hpc:theme", { detail: theme }));
+}
+applyTheme();
+systemDark.addEventListener("change", () => applyTheme());
+themeButton.addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {}
+  if (reduced() || !document.startViewTransition) return applyTheme(next);
+  const box = themeButton.getBoundingClientRect();
+  const x = box.left + box.width / 2;
+  const y = box.top + box.height / 2;
+  const reach = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  document.startViewTransition(() => applyTheme(next)).ready.then(() =>
+    document.documentElement.animate(
+      { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${reach}px at ${x}px ${y}px)`] },
+      { duration: token("duration-spring"), easing: easing("ease-emphasized"), pseudoElement: "::view-transition-new(root)" },
+    ),
+  );
+});
+
 // Signed in, language and sound live in the account menu; signed out they sit in the bar for the landing.
 function placePreferences(signedIn) {
   const sound = document.querySelector("[data-sound]");
