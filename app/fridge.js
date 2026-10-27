@@ -1,3 +1,4 @@
+import { art } from "./art/drawings.js";
 import { api, freshAccess } from "./api.js";
 import { reduced } from "./motion.js";
 import { foodName, formatDay, formatMoney, formatNumber, placeName, plural, t } from "./i18n.js";
@@ -107,7 +108,7 @@ function shelfTile(tray, items) {
     ${
       items.length
         ? `<ul class="food-rows">${items.map(foodRow).join("")}</ul>`
-        : `<div class="empty"><p>${t("fridge.empty-shelf")}</p></div>`
+        : `<div class="empty">${art("shelf")}<p>${t("fridge.empty-shelf")}</p></div>`
     }
   </section>`;
 }

@@ -1,3 +1,4 @@
+import { art } from "./art/drawings.js";
 import { easing, newPage, reduced, token } from "./motion.js";
 import { play, setSound, soundOn } from "./sound.js";
 import { api, session } from "./api.js";
@@ -222,7 +223,7 @@ async function render({ navigate = false, refresh = false } = {}) {
     refreshInbox();
     refreshStatus();
   } catch (error) {
-    main.innerHTML = `<section class="empty"><h1>${t("screen.failed")}</h1><p>${esc(errorText(error))}</p><button type="button" data-retry>${t("action.retry")}</button></section>`;
+    main.innerHTML = `<section class="empty">${art("plug")}<h1>${t("screen.failed")}</h1><p>${esc(errorText(error))}</p><button type="button" data-retry>${t("action.retry")}</button></section>`;
     main.querySelector("[data-retry]").addEventListener("click", render);
     enter();
   }

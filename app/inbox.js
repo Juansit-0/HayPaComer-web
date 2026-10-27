@@ -1,3 +1,4 @@
+import { art } from "./art/drawings.js";
 import { api } from "./api.js";
 import { formatDay, formatTime, t } from "./i18n.js";
 import { closeSheet, esc, openSheet } from "./ui.js";
@@ -64,11 +65,11 @@ export async function openInbox(onChange) {
     const unread = notifications?.filter((note) => !note.readAt).length ?? 0;
     await grow(body, () => {
       body.innerHTML = !notifications
-        ? `<div class="inbox-empty" role="alert"><p>${t("inbox.failed")}</p><button type="button" data-retry>${t("action.retry")}</button></div>`
+        ? `<div class="inbox-empty" role="alert">${art("plug")}<p>${t("inbox.failed")}</p><button type="button" data-retry>${t("action.retry")}</button></div>`
         : notifications.length
           ? `${unread ? `<button type="button" class="ghost" data-read-all>${t("inbox.mark-all")}</button>` : ""}
             <ul class="inbox-list">${notifications.map(item).join("")}</ul>`
-          : `<p class="inbox-empty">${t("inbox.empty")}</p>`;
+          : `<div class="inbox-empty">${art("bell")}<p>${t("inbox.empty")}</p></div>`;
     });
   }
 

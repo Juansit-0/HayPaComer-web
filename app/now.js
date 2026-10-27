@@ -1,3 +1,4 @@
+import { art } from "./art/drawings.js";
 import { api } from "./api.js";
 import { dishPicture } from "./dishes.js";
 import { liveFeed } from "./live.js";
@@ -124,7 +125,7 @@ export async function renderNow(main, household) {
 
     <section class="today" aria-labelledby="today-title">
       <h2 id="today-title">${t("now.today")}</h2>
-      ${urgent.length ? `<ul class="today-list">${urgent.map(todayCard).join("")}</ul>` : `<p class="lead">${t("now.today-empty")}</p>`}
+      ${urgent.length ? `<ul class="today-list">${urgent.map(todayCard).join("")}</ul>` : `<div class="empty quiet">${art("plate")}<p class="lead">${t("now.today-empty")}</p></div>`}
     </section>
 
     <section class="summary-row" aria-labelledby="summary-title">

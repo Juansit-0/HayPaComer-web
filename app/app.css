@@ -397,7 +397,8 @@ input.money { width: var(--number-width-money); }
   border-radius: var(--radius-14);
   display: grid;
   gap: var(--space-s);
-  justify-items: start;
+  justify-items: center;
+  text-align: center;
 }
 
 .error { color: var(--color-attention); font-size: var(--size-small); }
@@ -761,7 +762,7 @@ dialog.sheet .sheet-head { display: flex; justify-content: space-between; align-
 .skel {
   background: var(--skeleton);
   border-radius: var(--tile-radius);
-  animation: skel-pulse 1.4s var(--ease-standard) infinite;
+  animation: none;
   animation-delay: calc(var(--i, 0) * var(--stagger));
 }
 .skel-line { display: block; height: 14px; border-radius: var(--radius-full); background: var(--color-meson-strong); }
@@ -1046,7 +1047,7 @@ html:has(.loader:not(.done)) { overflow: hidden; }
 .dish-foods { margin: 0; color: var(--color-text-weak); }
 .dish-foods .missing { color: var(--color-attention); font-weight: 600; }
 .dish-body .primary { margin-top: var(--space-xs); }
-.dish-card.skel { padding: 0; background: none; animation: skel-pulse 1.4s var(--ease-standard) infinite; animation-delay: calc(var(--i, 0) * var(--stagger)); }
+.dish-card.skel { padding: 0; background: none; }
 .skel-photo { display: block; aspect-ratio: 4 / 5; border-radius: var(--radius-20); background: var(--skeleton); }
 
 .adjust summary { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; }
@@ -1829,3 +1830,15 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 @keyframes chip-ink { from { scale: 0.86; border-radius: 46% 54% 52% 48% / 58% 44% 56% 42%; } }
 @keyframes tab-hop { 40% { translate: 0 -4px; rotate: -8deg; } }
 [data-inbox] .icon { transform-origin: 50% 2px; }
+
+/* Empty and failed states carry an engraved drawing; loading placeholders are hatched like an engraving and the hatching drifts */
+.art { display: block; width: 112px; height: 112px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.art .hatch { stroke-width: 1; opacity: 0.5; }
+.empty .art, .inbox-empty .art, .chef-sees .art { margin: 0 auto var(--space-s); color: var(--color-text-weak); }
+.empty.quiet { display: grid; justify-items: center; text-align: center; padding: var(--space-m) 0; }
+.inbox-empty { display: grid; justify-items: center; text-align: center; gap: var(--space-xs); padding: var(--space-m) 0; }
+:is(.skel-line, .skel-photo) { background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--line) 16%, transparent) 0 1.5px, transparent 1.5px 7px) 0 0 / 28px 28px, var(--skeleton); }
+@media (prefers-reduced-motion: no-preference) {
+  :is(.skel-line, .skel-photo) { animation: hatch-drift calc(var(--duration-spring) * 2) linear infinite; }
+}
+@keyframes hatch-drift { to { background-position: 28px 0, 0 0; } }

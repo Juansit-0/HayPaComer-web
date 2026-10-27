@@ -1,3 +1,4 @@
+import { art } from "./art/drawings.js";
 import { api } from "./api.js";
 import { currentLocale, foodName, locales, plural, recipeName, t } from "./i18n.js";
 import { candidate, dishCard, kitchenRecipes } from "./now.js";
@@ -59,6 +60,7 @@ function sees(inventory) {
   const soon = usable.filter((item) => item.days !== null && SOON_DAYS >= item.days);
   return `<section class="chef-sees" aria-labelledby="sees-title">
     <h2 id="sees-title">${t("chef.sees.title")}</h2>
+    ${usable.length ? "" : art("pot")}
     <p class="lead">${usable.length ? `${plural("chef.sees.foods", usable.length)} ${soon.length ? plural("chef.sees.soon", soon.length) : t("chef.sees.calm")}` : t("chef.sees.empty")}</p>
     <ul class="sees-list">${usable
       .slice(0, 6)
