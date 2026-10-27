@@ -15,6 +15,7 @@ import {
   openSheet,
   showError,
   statusPill,
+  ticker,
   toast,
 } from "./ui.js";
 
@@ -433,7 +434,7 @@ export async function renderFridge(main, household) {
   main.innerHTML = `
     <header class="fridge-hero">
       <h1>${t("fridge.title")}</h1>
-      <p class="hero-figure"><span class="data">${grams(total)}</span></p>
+      <p class="hero-figure"><span class="data" data-total></span></p>
       <p class="lead">${t("fridge.lead", { grams: grams(total) })}</p>
       ${twins.map(twinLine).join("")}
     </header>
@@ -442,6 +443,8 @@ export async function renderFridge(main, household) {
       ${tray ? shelfTile(tray, inventory.filter((item) => item.trayId === tray.id)) : ""}
     </div>`;
 
+  // The total rolls its digits from the last figure shown, like the money on Mercado and Números.
+  ticker(main.querySelector("[data-total]"), grams(total));
   const shown = main.querySelector(".fridge-bento");
   main.querySelectorAll("[data-food-id]").forEach((card) => {
     const on = () => focusFood(card.dataset.foodId);

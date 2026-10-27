@@ -1820,3 +1820,12 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 .inbox-actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: 4px; }
 .inbox-item.inbox-unread { border-left: 2px solid var(--line); box-shadow: 3px 3px 0 var(--color-tomate); }
 .inbox-unread .inbox-glyph { color: var(--color-tomate); }
+
+/* Microinteractions: a chosen chip is inked in with a small stamp, the current section's icon hops, the bell swings from its top */
+@media (prefers-reduced-motion: no-preference) {
+  .chip input:checked + span { animation: chip-ink var(--duration-base) var(--ease-spring); }
+  .tabs a[aria-current="page"] .icon { animation: tab-hop var(--duration-slow) var(--ease-spring); }
+}
+@keyframes chip-ink { from { scale: 0.86; border-radius: 46% 54% 52% 48% / 58% 44% 56% 42%; } }
+@keyframes tab-hop { 40% { translate: 0 -4px; rotate: -8deg; } }
+[data-inbox] .icon { transform-origin: 50% 2px; }

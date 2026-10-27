@@ -283,9 +283,19 @@ window.addEventListener("hpc:live-state", (event) => {
   document.querySelector("[data-live]").textContent = event.detail === "on" ? t("live.on") : t("live.reconnecting");
 });
 
-window.addEventListener("hpc:live", (event) => {
-  if (event.detail.kind === "alert") refreshInbox();
-  else refreshStageSoon();
+// A new alert rings the bell once (when the page is in view), so it is noticed without a banner taking over the screen.
+window.addEventListener("hpc:live", async (event) => {
+  if (event.detail.kind !== "alert") {
+    refreshStageSoon();
+    return;
+  }
+  await refreshInbox();
+  if (document.hidden || reduced()) return;
+  play("pop");
+  document.querySelector("[data-inbox] .icon").animate(
+    [{ rotate: "0deg" }, { rotate: "-16deg" }, { rotate: "12deg" }, { rotate: "-7deg" }, { rotate: "3deg" }, { rotate: "0deg" }],
+    { duration: token("duration-spring") + 200, easing: easing("ease-standard") },
+  );
 });
 
 window.addEventListener("hpc:inventory-changed", () => {
