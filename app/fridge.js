@@ -1,10 +1,11 @@
 import { api, freshAccess } from "./api.js";
 import { reduced } from "./motion.js";
-import { foodName, formatDay, formatNumber, placeName, plural, t } from "./i18n.js";
-import { focusFood, shapeClass, takeFocusRequest } from "./stage.js";
+import { foodName, formatDay, formatMoney, formatNumber, placeName, plural, t } from "./i18n.js";
+import { focusFood, shapeClass, takeFocusRequest, undoable } from "./stage.js";
 import {
   busy,
   daysLeft,
+  portions,
   esc,
   expiryText,
   formData,
@@ -64,28 +65,30 @@ function shelfChips(fridges) {
     .join("")}</nav>`;
 }
 
-function foodCard(item) {
+// A shelf lists its food as rows: what it is, how much, and one line about when it goes off. Choosing a row unfolds its actions.
+function foodRow(item) {
   const hidden = item.name === "Private food";
   const days = daysLeft(item.expiresOn);
-  return `<li class="food-card" data-food-id="${esc(item.id)}" data-key="${esc(item.id)}" tabindex="-1">
-    <div class="food-card-top">
+  const notable = (item.statuses ?? []).filter((status) => status !== "AT_RISK");
+  const actions = `actions-${esc(item.id)}`;
+  return `<li class="food-row" data-food-id="${esc(item.id)}" data-key="${esc(item.id)}" tabindex="-1">
+    <button class="food-row-head" type="button" ${item.usable ? `aria-expanded="false" aria-controls="${actions}"` : "disabled"}>
       <i class="${shapeClass(item.name)}" aria-hidden="true"></i>
-      ${days === null || hidden ? "" : `<span class="days ${days <= 1 ? "attention" : ""}">${esc(whenText(item.expiresOn))}</span>`}
-    </div>
-    <span class="value">${grams(item.grams)}</span>
-    <span class="item-name">${esc(foodName(item.name))}</span>
-    <div class="item-meta">${statusPill(item.statuses)}<span class="hint">${
-      hidden ? t("fridge.private") : expiryText(item)
-    }</span></div>
+      <span class="item-name">${esc(foodName(item.name))}</span>
+      <span class="value">${grams(item.grams)}</span>
+      <span class="row-expiry ${days !== null && 1 >= days ? "attention" : ""}">${hidden ? t("fridge.private") : expiryText(item)}</span>
+      ${notable.length ? statusPill(notable) : ""}
+    </button>
     ${
       item.usable
-        ? `<form class="card-actions" data-item="${esc(item.id)}">
+        ? `<div class="row-actions" id="${actions}" inert><div><form class="card-actions" data-item="${esc(item.id)}">
+            ${portions(item.grams)}
             <label class="visually-hidden" for="use-${esc(item.id)}">${esc(t("fridge.grams-of", { food: foodName(item.name) }))}</label>
-            <input id="use-${esc(item.id)}" class="grams" name="grams" type="number" inputmode="numeric" min="1" step="1" required value="${Math.min(100, Math.round(item.grams))}">
+            <input id="use-${esc(item.id)}" class="grams" name="grams" type="number" inputmode="numeric" min="1" step="1" required value="${Math.max(1, Math.round(item.grams / 2))}">
             <button type="submit" name="action" value="consume">${t("fridge.use")}</button>
             ${item.openedOn ? "" : `<button class="ghost" type="submit" name="action" value="open" formnovalidate>${t("fridge.opened")}</button>`}
-            <button class="ghost" type="submit" name="action" value="discard" formnovalidate data-hold aria-describedby="hold-hint">${t("fridge.discard")}</button>
-          </form>`
+            <button class="ghost danger" type="submit" name="action" value="discard" formnovalidate data-hold aria-describedby="hold-hint">${t("fridge.discard")}</button>
+          </form></div></div>`
         : ""
     }
   </li>`;
@@ -102,7 +105,7 @@ function shelfTile(tray, items) {
     </header>
     ${
       items.length
-        ? `<ul class="food-cards">${items.map(foodCard).join("")}</ul>`
+        ? `<ul class="food-rows">${items.map(foodRow).join("")}</ul>`
         : `<div class="empty"><p>${t("fridge.empty-shelf")}</p></div>`
     }
   </section>`;
@@ -129,6 +132,7 @@ function addFoodBody(catalog, trays, trayId, chosen = null) {
     groups.set(food.category, list);
   });
   return `<form class="add-food" data-add-form novalidate>
+    <div class="stepper-head"><span data-step-label aria-live="polite"></span><span class="stepper-bar" aria-hidden="true"><span data-step-bar></span></span></div>
     <fieldset class="step">
       <legend>${t("add.step.food")}</legend>
       <label for="add-search" class="visually-hidden">${t("add.search")}</label>
@@ -177,7 +181,11 @@ function addFoodBody(catalog, trays, trayId, chosen = null) {
       </div>
       <p class="expiry-preview" data-preview aria-live="polite"></p>
     </fieldset>
-    <button class="primary" type="submit">${t("fridge.add")}</button>
+    <div class="stepper-nav">
+      <button type="button" data-step-back>${t("action.back")}</button>
+      <button class="primary" type="button" data-step-next>${t("chef.next")}</button>
+      <button class="primary" type="submit">${t("fridge.add")}</button>
+    </div>
   </form>`;
 }
 
@@ -249,6 +257,45 @@ function wireAddFood(dialog, base, trays, onDone) {
       if (!learn.hidden) teach();
     }
   });
+
+  // One step at a time: what, how much, where, until when. Each step enters from the side it comes from and is checked before moving on.
+  const steps = [...form.querySelectorAll(".step")];
+  const back = form.querySelector("[data-step-back]");
+  const next = form.querySelector("[data-step-next]");
+  const submit = form.querySelector("[type=submit]");
+  let current = 0;
+  const ready = [() => Boolean(formData(form).food), () => Number(formData(form).grams) > 0, () => Boolean(chosenTray()), () => true];
+  const show = (index, focus = true) => {
+    const direction = index > current ? "next" : "previous";
+    current = index;
+    steps.forEach((step, position) => {
+      step.hidden = position !== index;
+      step.dataset.enter = position === index ? direction : "";
+    });
+    back.hidden = index === 0;
+    next.hidden = index === steps.length - 1;
+    submit.hidden = index !== steps.length - 1;
+    form.querySelector("[data-step-label]").textContent = t("chef.step-of", { step: index + 1, total: steps.length });
+    form.querySelector("[data-step-bar]").style.setProperty("--progress", (index + 1) / steps.length);
+    if (focus) steps[index].querySelector("input:checked, input:not([type=radio]):not([type=checkbox]), input")?.focus();
+  };
+  const forward = () => {
+    if (!ready[current]()) {
+      showError(form, { message: t("add.missing") });
+      return;
+    }
+    form.querySelector(".error")?.remove();
+    show(current + 1);
+  };
+  next.addEventListener("click", forward);
+  back.addEventListener("click", () => show(current - 1));
+  form.addEventListener("submit", (event) => {
+    if (current === steps.length - 1) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    forward();
+  }, true);
+  show(formData(form).food ? 1 : 0, false);
 
   const mode = () => form.querySelector("[name=expiryMode]:checked").value;
   const chosenTray = () => trays.find((tray) => tray.id === form.querySelector("[name=tray]:checked")?.value);
@@ -347,7 +394,7 @@ export async function openAddFood(household, { food = null, trayId = null, onDon
 
 export async function renderFridge(main, household) {
   const base = `/households/${household.id}`;
-  const [fridges, inventory] = await Promise.all([api(`${base}/fridges`), api(`${base}/inventory`)]);
+  const [fridges, inventory, prices] = await Promise.all([api(`${base}/fridges`), api(`${base}/inventory`), api(`${base}/prices`).catch(() => ({}))]);
   const twins = await Promise.all(fridges.map((fridge) => api(`${base}/fridges/${fridge.id}/twin`)));
 
   if (fridges.length === 0) {
@@ -404,6 +451,18 @@ export async function renderFridge(main, household) {
     card.addEventListener("focusin", on);
     card.addEventListener("focusout", off);
   });
+  // One row open at a time; its actions unfold and become reachable, the others fold and leave the tab order.
+  shown.addEventListener("click", (event) => {
+    const head = event.target.closest(".food-row-head");
+    if (!head || head.disabled) return;
+    const open = head.getAttribute("aria-expanded") !== "true";
+    shown.querySelectorAll(".food-row-head[aria-expanded]").forEach((other) => {
+      const opening = other === head && open;
+      other.setAttribute("aria-expanded", String(opening));
+      other.closest(".food-row").toggleAttribute("data-open", opening);
+      other.nextElementSibling.inert = !opening;
+    });
+  });
   const reveal = () => {
     const itemId = takeFocusRequest();
     const card = itemId && main.querySelector(`[data-food-id="${CSS.escape(itemId)}"]`);
@@ -446,10 +505,14 @@ export async function renderFridge(main, household) {
       event.preventDefault();
       const action = event.submitter?.value ?? "consume";
       const item = inventory.find((entry) => entry.id === form.dataset.item);
+      const food = foodName(item.name);
       const done = busy(event.submitter ?? form.querySelector("button"), async () => {
         if (action === "discard") {
-          await api(`${base}/items/${item.id}/discard`, { method: "POST" });
-          toast(t("fridge.toast-discarded", { food: foodName(item.name) }));
+          // Say what the waste cost when the household has a price for that food.
+          const perKg = Number(prices[item.name] ?? prices[item.name.toLowerCase()] ?? 0);
+          const lost = perKg ? t("fridge.toast-discarded-value", { food, money: formatMoney((perKg * item.grams) / 1000, household.currency) }) : t("fridge.toast-discarded", { food });
+          await undoable(() => api(`${base}/items/${item.id}/discard`, { method: "POST" }), lost);
+          return;
         } else if (action === "open") {
           const opened = await api(`${base}/items/${item.id}/open`, { method: "POST" });
           toast(
@@ -460,13 +523,13 @@ export async function renderFridge(main, household) {
           );
         } else {
           const amount = Number(new FormData(form).get("grams"));
-          await api(`${base}/items/${item.id}/consume`, { method: "POST", body: { grams: amount } });
-          toast(t("fridge.toast-used", { grams: grams(amount), food: foodName(item.name) }));
+          await undoable(() => api(`${base}/items/${item.id}/consume`, { method: "POST", body: { grams: amount } }), t("fridge.toast-used", { grams: grams(amount), food }));
+          return;
         }
+        renderFridge(main, household);
       });
       try {
         await done;
-        renderFridge(main, household);
       } catch (error) {
         showError(form, error);
       }
