@@ -35,7 +35,9 @@ try {
   await send("Page.enable");
   await send("Emulation.setDeviceMetricsOverride", { width: Number(width), height, deviceScaleFactor: 1, mobile: Number(width) < 700 });
   if (process.env.PRELOAD) await send("Page.addScriptToEvaluateOnNewDocument", { source: process.env.PRELOAD });
-  if (process.env.REDUCED) await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] });
+  // The scheme is always pinned: headless Chrome otherwise follows the machine's appearance.
+  const media = [{ name: "prefers-color-scheme", value: process.env.DARK ? "dark" : "light" }, process.env.REDUCED && { name: "prefers-reduced-motion", value: "reduce" }].filter(Boolean);
+  await send("Emulation.setEmulatedMedia", { features: media });
   await send("Page.navigate", { url: "http://localhost:8091/" });
   await sleep(800);
   const jwt = "x." + Buffer.from(JSON.stringify({ exp: 4102444800, sub: "u1" })).toString("base64").replace(/=+$/, "") + ".y";

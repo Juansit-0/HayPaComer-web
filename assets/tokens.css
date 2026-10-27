@@ -108,6 +108,8 @@
   --color-primary-hover: var(--color-cobre-hover);
   --color-primary-active: var(--color-cobre-active);
   --color-attention: var(--color-tomate);
+  --color-attention-text: var(--color-tomate);
+  --color-positive-text: var(--color-cilantro);
   --color-attention-fg: var(--color-arroz);
   --color-warning: var(--color-papa);
   --color-warning-fg: var(--color-tinta);
@@ -194,6 +196,37 @@
   --line: var(--color-line);
   --paper: var(--color-bg);
   --ink-color: var(--color-line);
+}
+
+/* Night paper: the same print on dark stock, ink turned to chalk. Only the signed-in app opts in (data-app); the landing stays on daylight paper. */
+@media (prefers-color-scheme: dark) {
+  :root[data-app] {
+    color-scheme: dark;
+
+    --color-noche: #1a1612;
+    --color-noche-carta: #242019;
+    --color-noche-paso: #302a22;
+    --color-tiza: #ece3d0;
+    --color-tiza-tenue: #b3a893;
+
+    --color-bg: var(--color-noche);
+    --color-surface: var(--color-noche-carta);
+    --color-step: var(--color-noche-paso);
+    --color-text: var(--color-tiza);
+    --color-text-weak: var(--color-tiza-tenue);
+    --color-line: var(--color-tiza);
+    --color-border: color-mix(in oklab, var(--color-tiza) 22%, transparent);
+    --color-border-strong: var(--color-tiza);
+    --color-primary-text: #e98d5f;
+    --color-attention-text: #f0806a;
+    --color-positive-text: #6dbb88;
+    --color-focus: var(--color-tiza);
+
+    --chapter-settings: var(--color-noche-paso);
+    --chapter-settings-ink: var(--color-tiza);
+    --scrim: rgb(0 0 0 / 0.6);
+    --skeleton: var(--color-noche-paso);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

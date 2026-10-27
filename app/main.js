@@ -168,6 +168,7 @@ async function render({ navigate = false, refresh = false } = {}) {
     sessionBar.hidden = true;
     const route = location.hash.replace("#/", "").split("/")[0];
     document.documentElement.dataset.chapter = "now";
+    delete document.documentElement.dataset.app;
     if (route === "signin" || route === "register") renderSignIn(main, render, route);
     else renderLanding(main);
     main.setAttribute("aria-busy", "false");
@@ -181,6 +182,8 @@ async function render({ navigate = false, refresh = false } = {}) {
     return;
   }
   placePreferences(true);
+  // Night paper follows the system only inside the app; the landing's engraving is printed for daylight paper.
+  document.documentElement.dataset.app = "";
   tabs.hidden = false;
   sessionBar.hidden = false;
   if (stageBox.hidden) {
