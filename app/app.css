@@ -1383,7 +1383,13 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 .kit-medallion img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .landing .kit { gap: var(--space-xl) var(--space-l); }
 .landing .kit-text span { font-size: 17px; }
-.landing .how-right { position: relative; min-height: 0; background: transparent; border-radius: 0; display: block; }
+/* The scene, the words and the timeline share one screen under the bar: the square scene is as wide as the height left for it. */
+.landing .how-right { position: relative; min-height: 0; background: transparent; border-radius: 0; display: block; width: min(100%, calc(100svh - var(--bar-height) - 230px)); justify-self: end; container-type: inline-size; }
+/* On a short screen the scene is small, so the data card shrinks with it instead of covering it. */
+.landing .how-right .how-fragment { font-size: clamp(13px, 5.5cqi, 17px); padding: clamp(12px, 6cqi, 24px); }
+.landing .how-right .ui-figure { font-size: clamp(28px, 15cqi, 56px); }
+.land-how h2 { font-size: clamp(40px, min(6.5vw, 11svh), 120px); }
+.how-clause { font-size: clamp(22px, min(3.6vw, 6svh), 60px); }
 .landing .how-right .how-scene { border: 3px solid var(--ink-color); }
 .landing .how-fragment { position: absolute; left: -24px; bottom: -24px; min-width: 0; padding: var(--space-m); border-radius: 0; background: var(--paper); color: var(--ink-color); border: 3px solid var(--ink-color); box-shadow: 6px 6px 0 var(--ink-color); }
 .landing .how-names { color: var(--color-text-weak); }
@@ -1519,7 +1525,7 @@ img.inked { opacity: 0; }
 @media (prefers-reduced-motion: no-preference) {
   .land-how[data-scrolly] { min-height: 330vh; display: block; align-content: start; }
   .land-calc[data-scrolly] { min-height: 260vh; display: block; align-content: start; }
-  [data-scrolly] > .scrolly-stage { position: sticky; top: var(--bar-height); min-height: calc(100svh - var(--bar-height)); align-content: center; padding-block: var(--space-xl); box-sizing: border-box; }
+  [data-scrolly] > .scrolly-stage { position: sticky; top: var(--bar-height); min-height: calc(100svh - var(--bar-height)); align-content: center; padding-block: clamp(16px, 4svh, 48px); box-sizing: border-box; }
 }
 
 /* Shell v3: one top bar over the stage and the panel. Brand, the five sections with an ink blot under the current one, and the bell, settings
