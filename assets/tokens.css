@@ -1,14 +1,18 @@
 :root {
   color-scheme: light;
 
+  --color-papel: #f3ecdf;
+  --color-carta: #fbf6ec;
+  --color-papel-paso: #e9dfcb;
   --color-arroz: #fbfbf8;
   --color-blanco: #ffffff;
-  --color-tinta: #121212;
-  --color-piedra: #55534e;
+  --color-tinta: #1c1712;
+  --color-piedra: #5c554c;
   --color-meson: #efeee9;
   --color-meson-strong: #dedcd4;
   --color-papa: #f3c443;
   --color-tomate: #c8432a;
+  --color-tomate-hondo: #a8361f;
   --color-cilantro: #2f7a4a;
   --color-mora: #4b1f2e;
   --color-cobre: #a8481f;
@@ -55,7 +59,8 @@
   --radius-full: 999px;
 
   --shadow-subtle: none;
-  --shadow-raised: 0 12px 32px rgb(18 18 18 / 0.16);
+  --shadow-raised: 6px 6px 0 var(--color-line);
+  --shadow-press: 4px 4px 0 var(--color-line);
 
   --duration-press: 100ms;
   --duration-fast: 160ms;
@@ -84,18 +89,19 @@
   --chapter-numbers-ink: var(--color-arroz);
   --chapter-chef: var(--color-cobre);
   --chapter-chef-ink: var(--color-white);
-  --chapter-settings: var(--color-meson);
+  --chapter-settings: var(--color-papel-paso);
   --chapter-settings-ink: var(--color-tinta);
   --chapter: var(--chapter-now);
   --chapter-ink: var(--chapter-now-ink);
 
-  --color-bg: var(--color-arroz);
-  --color-surface: var(--color-blanco);
-  --color-step: var(--color-meson);
+  --color-bg: var(--color-papel);
+  --color-surface: var(--color-carta);
+  --color-step: var(--color-papel-paso);
   --color-text: var(--color-tinta);
   --color-text-weak: var(--color-piedra);
-  --color-border: var(--color-meson);
-  --color-border-strong: var(--color-meson-strong);
+  --color-line: var(--color-tinta);
+  --color-border: color-mix(in oklab, var(--color-tinta) 20%, transparent);
+  --color-border-strong: var(--color-tinta);
   --color-primary: var(--color-cobre);
   --color-primary-fg: var(--color-white);
   --color-primary-text: var(--color-cobre);
@@ -115,23 +121,23 @@
   --button-primary-fg: var(--color-primary-fg);
   --button-primary-bg-hover: var(--color-primary-hover);
   --button-primary-bg-active: var(--color-primary-active);
-  --button-secondary-bg: var(--color-step);
+  --button-secondary-bg: transparent;
   --button-secondary-fg: var(--color-text);
-  --button-secondary-border: transparent;
-  --button-secondary-bg-hover: var(--color-meson-strong);
+  --button-secondary-border: var(--color-line);
+  --button-secondary-bg-hover: var(--color-surface);
   --button-ghost-fg: var(--color-text);
   --button-radius: var(--radius-full);
 
   --input-bg: var(--color-surface);
   --input-fg: var(--color-text);
   --input-placeholder: var(--color-text-weak);
-  --input-border: var(--color-meson-strong);
+  --input-border: var(--color-line);
   --input-focus-ring: var(--color-focus);
-  --input-radius: var(--radius-10);
+  --input-radius: var(--radius-6);
 
   --card-bg: var(--color-surface);
-  --card-border: transparent;
-  --card-radius: var(--radius-14);
+  --card-border: var(--color-line);
+  --card-radius: 6px;
   --card-padding: var(--space-m);
 
   --badge-bg: var(--color-step);
@@ -155,8 +161,8 @@
   --control-gap: 12px;
 
   --tile-bg: var(--color-surface);
-  --tile-border: transparent;
-  --tile-radius: var(--radius-20);
+  --tile-border: var(--color-line);
+  --tile-radius: 6px;
   --tile-padding: var(--space-m);
   --tile-gap: var(--space-s);
 
@@ -170,17 +176,24 @@
   --number-width-money: 12ch;
 
   --chip-height: 44px;
-  --chip-bg: var(--color-step);
-  --chip-border: transparent;
+  --chip-bg: var(--color-surface);
+  --chip-border: var(--color-line);
   --chip-selected-bg: var(--color-text);
   --chip-selected-fg: var(--color-bg);
 
   --sheet-bg: var(--color-bg);
-  --sheet-radius: var(--radius-20);
-  --sheet-shadow: 0 -16px 48px rgb(18 18 18 / 0.2);
-  --scrim: rgb(18 18 18 / 0.5);
+  --sheet-radius: 6px;
+  --sheet-shadow: var(--shadow-raised);
+  --scrim: rgb(28 23 18 / 0.5);
 
-  --skeleton: var(--color-meson);
+  --skeleton: var(--color-papel-paso);
+
+  /* Short names the engraving rules use: the sheet of paper, a card laid on it, and the ink line */
+  --sheet: var(--color-bg);
+  --card: var(--color-surface);
+  --line: var(--color-line);
+  --paper: var(--color-bg);
+  --ink-color: var(--color-line);
 }
 
 @media (prefers-reduced-motion: reduce) {
