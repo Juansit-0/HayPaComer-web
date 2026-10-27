@@ -29,18 +29,19 @@ function row(item, bought, line, currency) {
   return `<li class="market-row ${bought ? "bought" : ""}" data-key="${esc(item.id)}">
     <label class="check">
       <input type="checkbox" id="check-${esc(item.id)}" data-check="${esc(item.id)}" ${bought ? "checked" : ""}>
+      <svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
       <span class="item-name">${esc(foodName(item.food))}</span>
     </label>
     <span class="market-amount"><span class="data">${grams(item.grams)}</span>${
       line?.estimatedCost !== null && line?.estimatedCost !== undefined
         ? `<span class="hint">${formatMoney(line.estimatedCost, currency)}</span><span class="hint">${perKilo(line, currency)}</span>`
         : ""
-    }</span>
-    <span class="item-actions">${
+    }${
       item.source === "PLAN" || item.source === "RECIPE"
         ? `<span class="status quiet">${item.source === "PLAN" ? t("market.from-plan") : t("market.from-recipe")}</span>`
         : ""
-    }<button class="ghost" type="button" data-remove="${esc(item.id)}" aria-label="${esc(t("market.remove-food", { food: foodName(item.food) }))}">${t("market.remove")}</button></span>
+    }</span>
+    <span class="item-actions"><button class="icon-button" type="button" data-remove="${esc(item.id)}" aria-label="${esc(t("market.remove-food", { food: foodName(item.food) }))}"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>
   </li>`;
 }
 
@@ -146,16 +147,8 @@ export async function renderMarket(main, household) {
       <p class="lead">${pending ? plural("market.pending", pending) : t("market.empty")}</p>
       ${budget ? `<p class="hero-figure"><span class="data" data-remaining></span><span>${t("market.left")}</span></p>` : ""}
     </header>    <div class="bento market-bento">
-      <section class="tile w-7 notepad" aria-labelledby="add-title">
-        <h2 id="add-title">${t("market.add-title")}</h2>
-        <form class="row-form" data-add>
-          <label class="grow">${t("field.food")}<input name="food" list="market-foods" required autocomplete="off" placeholder="${esc(t("market.food-example"))}"></label>
-          ${numberField({ name: "grams", label: t("field.grams"), unit: "g", min: 1, bigStep: 250, value: 500 })}
-          ${foodOptions("market-foods")}
-          <button class="primary" type="submit">${t("market.add")}</button>
-        </form>
-        <button type="button" data-plan>${t("market.add-plan")}</button>
-        <h2 id="aisles-title" class="notepad-title">${t("market.aisles")}</h2>
+      <section class="tile w-7 notepad" aria-labelledby="aisles-title">
+        <h2 id="aisles-title">${t("market.aisles")}</h2>
         ${
           list.pending.length
             ? list.pending
@@ -171,6 +164,14 @@ export async function renderMarket(main, household) {
                 <figcaption><span>${t("market.empty")}</span><small>${esc(t("photo.credit", { credit: "michael clarke stuff, CC BY-SA 2.0" }))}</small></figcaption>
               </figure>`
         }
+        <h3 id="add-title" class="notepad-add">${t("market.add-title")}</h3>
+        <form class="row-form market-add" data-add aria-labelledby="add-title">
+          <label class="grow">${t("field.food")}<input name="food" list="market-foods" required autocomplete="off" placeholder="${esc(t("market.food-example"))}"></label>
+          ${numberField({ name: "grams", label: t("field.grams"), unit: "g", min: 1, bigStep: 250, value: 500 })}
+          ${foodOptions("market-foods")}
+          <button class="primary" type="submit">${t("market.add")}</button>
+        </form>
+        <button type="button" data-plan>${t("market.add-plan")}</button>
       </section>
       <div class="w-5 stack">
       ${budgetTile(budget, currency)}
@@ -254,6 +255,7 @@ export async function renderMarket(main, household) {
   // Optimistic: the row moves at once; if the server says no, it moves back and the error is shown.
   async function optimistic(id, bought, request) {
     const before = structuredClone(list);
+    if (bought && !reduced()) await new Promise((resolve) => setTimeout(resolve, token("duration-slow") + 120));
     moveLocally(list, id, bought, categories);
     await swap(main, draw);
     try {
