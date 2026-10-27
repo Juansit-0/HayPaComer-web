@@ -86,7 +86,10 @@ new ResizeObserver(() => placeBlot(current())).observe(tabs);
 function placePreferences(signedIn) {
   const sound = document.querySelector("[data-sound]");
   const signout = accountMenu.querySelector("[data-signout]");
-  if (signedIn) accountMenu.insertBefore(languageSwitch, signout).after(sound);
+  if (signedIn) {
+    accountMenu.querySelector("[data-language-row]").append(languageSwitch);
+    signout.before(sound);
+  }
   else bar.append(sound, languageSwitch);
 }
 
