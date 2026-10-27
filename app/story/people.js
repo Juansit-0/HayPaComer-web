@@ -177,8 +177,11 @@ function walker(era, seed) {
 // A crowd: people placed as [x, z, facing, walk] with walk a [dx, dz] distance travelled over the chapter; play(k) sways and walks them.
 export function crowd(people, { looks = 6, seed = 1, era = 1876 } = {}) {
   const root = new THREE.Group();
-  const walking = WALKERS[era].some(figureReady) ? people.filter((person) => person.walk) : [];
-  const standing = people.filter((person) => !walking.includes(person));
+  // The modelled figures play everyone, walking or standing; the drawn bodies only stand in when the models could not load.
+  const modelled = WALKERS[era].some(figureReady);
+  const walking = modelled ? people.filter((person) => person.walk) : [];
+  const idling = modelled ? people.filter((person) => !person.walk) : [];
+  const standing = modelled ? [] : people;
   const bodies = standing.length ? Array.from({ length: looks }, (_, index) => look(seed * 31 + index)) : [];
   const groups = bodies.map(() => []);
   standing.forEach((person, index) => groups[index % looks].push({ ...person, phase: random(seed + index) * 6.28, scale: 0.9 + random(seed * 3 + index) * 0.16 }));
@@ -187,6 +190,14 @@ export function crowd(people, { looks = 6, seed = 1, era = 1876 } = {}) {
     body.scale.multiplyScalar(0.92 + random(seed * 5 + index) * 0.14);
     root.add(body);
     return { person, figure: body, offset: random(seed * 7 + index) };
+  });
+  const idlers = idling.map((person, index) => {
+    const body = walker(era, seed * 19 + index + 101);
+    body.scale.multiplyScalar(0.92 + random(seed * 11 + index) * 0.14);
+    body.position.set(person.at[0], 0, person.at[1]);
+    body.rotation.y = person.facing ?? 0;
+    root.add(body);
+    return { figure: body, offset: random(seed * 13 + index) };
   });
   const matrix = new THREE.Matrix4();
   const place = new THREE.Vector3();
@@ -217,6 +228,7 @@ export function crowd(people, { looks = 6, seed = 1, era = 1876 } = {}) {
       figure.rotation.y = person.facing ?? 0;
       figure.userData.walk(Math.hypot(dx, dz) * k, offset);
     });
+    idlers.forEach(({ figure, offset }) => figure.userData.stand(k * 30, offset));
     sets.forEach((set) => {
       if (!set) return;
       set.members.forEach((person, index) => {

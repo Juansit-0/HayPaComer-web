@@ -248,10 +248,41 @@ export function figure(kind, look) {
   const mixer = new THREE.AnimationMixer(root);
   mixer.clipAction(clip).play();
   const cycle = FIGURES[kind].cycle;
+  const bones = skeleton.bones;
+  const head = root.getObjectByName("head");
+  const spine = root.getObjectByName("spine");
   // Blender keyed frames 1 to 27 of a 26-frame loop at 24 fps: the cycle starts at 1/24 s and frame 27 repeats frame 1.
+  const at = (cycles) => (1 + (cycles - Math.floor(cycles)) * 26) / 24;
+  const capture = (cycles) => {
+    mixer.setTime(at(cycles));
+    return bones.map((bone) => [bone.quaternion.clone(), bone.position.clone()]);
+  };
+  // Half a cycle apart the two steps mirror each other, so between them every swing cancels: legs under the hips, arms at the sides.
+  const left = capture(0);
+  const right = capture(0.5);
+  const turn = new THREE.Quaternion();
+  const axis = new THREE.Vector3();
+  const nudge = (bone, x, y) => {
+    if (!bone) return;
+    bone.quaternion.multiply(turn.setFromAxisAngle(axis.set(1, 0, 0), x));
+    bone.quaternion.multiply(turn.setFromAxisAngle(axis.set(0, 1, 0), y));
+  };
+  // A person, not a loop: each walker keeps its own pace and lean, and now and then turns its head to look around.
   root.userData.walk = (distance, offset = 0) => {
-    const cycles = distance / (cycle * root.scale.y) + offset;
-    mixer.setTime((1 + (cycles - Math.floor(cycles)) * 26) / 24);
+    const pace = 0.92 + offset * 0.16;
+    mixer.setTime(at(distance / (cycle * root.scale.y * pace) + offset));
+    nudge(spine, 0.02 + offset * 0.06, 0);
+    nudge(head, 0, Math.sin(distance * 0.9 + offset * 6.3) ** 3 * 0.35);
+  };
+  // Standing: the still pose, a slow shift of weight from one leg to the other, breath in the chest and a glance around.
+  root.userData.stand = (time, offset = 0) => {
+    const weight = 0.5 + Math.sin(time * 0.8 + offset * 6.3) * 0.07;
+    bones.forEach((bone, index) => {
+      bone.quaternion.copy(left[index][0]).slerp(right[index][0], weight);
+      bone.position.copy(left[index][1]).lerp(right[index][1], weight);
+    });
+    nudge(spine, Math.sin(time * 2.6 + offset * 9) * 0.012, 0);
+    nudge(head, Math.sin(time * 0.7 + offset * 4) * 0.05, Math.sin(time * 0.45 + offset * 8) ** 3 * 0.45);
   };
   root.userData.walk(0);
   return root;
