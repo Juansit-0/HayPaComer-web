@@ -1,6 +1,7 @@
 import * as THREE from "./vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
 import { boil, css, engrave, foodModel, group, hash, lathe, mesh, outline, paint, sized } from "./engrave.js";
+import { buildKitchen } from "./stage/kitchen.js";
 import { damp, loop, onReduced, reduced as prefersReduced, SPRINGS, springConstants, springStep } from "./motion.js";
 
 const W = 0.72;
@@ -12,13 +13,14 @@ const SHELVES = [0.89, 0.62, 0.35];
 const DRAWER = 0.06;
 const DOOR_OPEN = -1.92;
 
+// One camera stop per section along the kitchen wall, in tab order from the fridge on the left; Ajustes steps back to see the whole room.
 const VIEWS = {
-  now: { position: [1.2, 1.35, 2.7], target: [0.2, 0.85, 0], door: DOOR_OPEN, freezer: 0 },
+  now: { position: [0.95, 1.38, 1.75], target: [0.72, 1.05, 0], door: 0, freezer: 0 },
   fridge: { position: [0.2, 0.78, 1.32], target: [0, 0.58, 0], door: DOOR_OPEN, freezer: 0 },
-  market: { position: [0.62, 1.52, 1.48], target: [0.08, 1.4, 0.3], door: -0.5, freezer: 0 },
-  numbers: { position: [0.72, 1.66, 1.85], target: [0, 1.4, 0.25], door: -0.4, freezer: -1.7 },
-  chef: { position: [0.62, 0.92, 1.45], target: [0, 0.62, 0], door: DOOR_OPEN, freezer: 0 },
-  settings: { position: [0.32, 1.02, 1.12], target: [0, 0.98, -0.2], door: DOOR_OPEN, freezer: 0 },
+  market: { position: [2.2, 1.35, 1.3], target: [2.3, 1.0, -0.1], door: 0, freezer: 0 },
+  numbers: { position: [0.88, 1.62, 1.05], target: [0.87, 1.64, -0.3], door: 0, freezer: 0 },
+  chef: { position: [1.68, 1.45, 1.25], target: [1.55, 0.98, -0.05], door: 0, freezer: 0 },
+  settings: { position: [1.05, 1.6, 3.7], target: [1.05, 1.0, -0.1], door: 0, freezer: 0 },
 };
 
 const CAMERA = springConstants(SPRINGS.camera);
@@ -185,17 +187,8 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   const freezerDoor = tag(group(
     mesh(new RoundedBoxGeometry(W, freezerHeight, 0.05, 4, 0.02), shell, (m) => m.position.set(W / 2, freezerHeight / 2, 0.025)),
     mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 16), steel, (m) => m.position.set(W - 0.06, 0.12, 0.08)),
-  ), "numbers");
+  ), "fridge");
   freezerPivot.add(freezerDoor);
-  const note = tag(mesh(new THREE.PlaneGeometry(0.15, 0.19), new THREE.MeshStandardMaterial({ map: labelTexture(labels.market, "#ffffff", css("--color-tomate")), roughness: 0.9 }), (m) => {
-    m.position.set(W - 0.2, freezerHeight / 2 + 0.03, 0.052);
-    m.rotation.z = 0.06;
-  }), "market");
-  const magnet = tag(mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.012, 20), paint(css("--color-tomate"), { clearcoat: 1 }), (m) => {
-    m.rotation.x = Math.PI / 2;
-    m.position.set(W - 0.2, freezerHeight / 2 + 0.12, 0.058);
-  }), "market");
-  freezerPivot.add(note, magnet);
   fridge.add(freezerPivot);
 
   const doorPivot = new THREE.Group();
@@ -204,7 +197,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   const door = tag(group(
     mesh(new RoundedBoxGeometry(W, doorHeight, 0.06, 4, 0.02), shell, (m) => m.position.set(W / 2, doorHeight / 2, 0.03)),
     mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.24, 16), steel, (m) => m.position.set(W - 0.06, doorHeight - 0.2, 0.09)),
-  ), "now");
+  ), "fridge");
   const racks = [0.22, 0.52, 0.82].map((y) => {
     const rack = mesh(new RoundedBoxGeometry(W - 0.12, 0.03, 0.09, 2, 0.006), glass, (m) => m.position.set(W / 2, y - 0.02, -0.05));
     door.add(rack);
@@ -234,27 +227,25 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   canvas.after(tagLayer);
   const tags = new Map();
 
-  const book = tag(group(
-    mesh(new RoundedBoxGeometry(0.26, 0.045, 0.32, 2, 0.006), paint(css("--color-cobre"), { roughness: 0.55 }), (m) => (m.position.y = 0.022)),
-    mesh(new THREE.BoxGeometry(0.245, 0.035, 0.305), paint("#f6f1e4", { roughness: 0.9 }), (m) => m.position.set(0.006, 0.022, 0)),
-  ), "chef");
-  book.position.set(-0.1, H, 0.02);
-  book.rotation.y = 0.18;
-  fridge.add(book);
+  const kitchen = buildKitchen(labelTexture(labels.market, "#ffffff", css("--color-tomate")));
+  addEventListener("hpc:theme", () => {
+    kitchen.retheme();
+    film?.wake();
+  });
+  scene.add(kitchen.room, tag(kitchen.counter, "now"), tag(kitchen.stove, "chef"), tag(kitchen.pantry, "market"), tag(kitchen.board, "numbers"));
 
   const pot = tag(group(
     mesh(lathe([[0, 0], [0.12, 0], [0.13, 0.13], [0.135, 0.14], [0, 0.14]]), paint("#55534e", { metalness: 0.7, roughness: 0.3 })),
     mesh(new THREE.TorusGeometry(0.04, 0.008, 8, 24, Math.PI), steel, (m) => m.position.set(0.15, 0.11, 0)),
   ), "use");
-  pot.position.set(W / 2 + 0.42, 0, 0.35);
+  pot.position.copy(kitchen.useSpot);
   const bin = tag(group(
     mesh(lathe([[0, 0], [0.11, 0], [0.13, 0.32], [0, 0.32]]), paint("#2b2b2b", { roughness: 0.5 })),
     mesh(new THREE.CylinderGeometry(0.135, 0.135, 0.02, 32), paint("#3a3a3a", { roughness: 0.4 }), (m) => (m.position.y = 0.33)),
   ), "discard");
-  bin.position.set(W / 2 + 0.78, 0, 0.1);
+  bin.position.copy(kitchen.binSpot);
   scene.add(pot, bin);
-  note.userData.noOutline = true;
-  [fridge, pot, bin].forEach(outline);
+  [fridge, pot, bin, kitchen.counter, kitchen.stove, kitchen.pantry, kitchen.board].forEach(outline);
   fridge.traverse((child) => {
     if (child.isMesh && child.material.transparent && !child.userData.outline) {
       const edges = new THREE.LineSegments(new THREE.EdgesGeometry(child.geometry, 30), new THREE.LineBasicMaterial({ color: "#121212" }));
@@ -274,23 +265,8 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
           return food;
         }),
       );
-      plate.position.set(W / 2 + 0.45, 0.95, 0.5);
-      return plate;
-    })(),
-    market: (() => {
-      const bag = group(
-        mesh(new RoundedBoxGeometry(0.28, 0.3, 0.14, 3, 0.02), paint(css("--color-tomate"), { roughness: 0.85 }), (m) => (m.position.y = 0.15)),
-        mesh(new THREE.TorusGeometry(0.07, 0.008, 8, 24, Math.PI), paint("#121212"), (m) => m.position.set(0, 0.3, 0)),
-        ...["Carrot", "Banana"].map((name, index) => {
-          const food = foodModel(name);
-          food.position.set(-0.04 + index * 0.08, 0.3, 0);
-          food.rotation.z = 0.9 - index * 1.6;
-          food.scale.setScalar(1.3);
-          return food;
-        }),
-      );
-      bag.position.set(W / 2 + 0.38, 1.18, 0.45);
-      return bag;
+      plate.position.copy(kitchen.plateSpot);
+      return tag(plate, "now");
     })(),
     numbers: (() => {
       const rings = new THREE.Group();
@@ -306,14 +282,14 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
         rings.add(arc);
         return arc;
       });
-      rings.position.set(0.05, 1.42, 0.42);
-      return rings;
+      // Drawn in chalk on the board: flattened against it, right of centre so the tags fit on the left.
+      rings.position.copy(kitchen.board.position).add(new THREE.Vector3(0.14, 0, 0.022));
+      rings.scale.set(0.7, 0.7, 0.12);
+      return tag(rings, "numbers");
     })(),
   };
   Object.values(extras).forEach((extra) => {
     outline(extra);
-    extra.scale.setScalar(0.001);
-    extra.visible = false;
     scene.add(extra);
   });
 
@@ -366,10 +342,6 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       Object.assign(state.freezerSpring, { value: view.freezer, velocity: 0 });
     }
     film?.wake();
-    Object.entries(extras).forEach(([key, extra]) => {
-      extra.userData.goal = key === route ? 1 : 0;
-      if (key === route) extra.visible = true;
-    });
   }
 
   let deferred = null;
@@ -713,11 +685,16 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   new ResizeObserver(resize).observe(canvas);
   resize();
 
-  const anchors = () => ({ now: extras.now, fridge: shelfSlots[1].slab, market: note, numbers: extras.numbers, chef: shelfSlots[0].slab, settings: knob });
+  const anchors = () => ({ now: extras.now, fridge: shelfSlots[1].slab, market: kitchen.basket, numbers: extras.numbers, chef: kitchen.pot });
   const lastAnchor = { x: -1, y: -1, inside: null };
   function anchor() {
+    if (!onAnchor) return;
     const part = anchors()[state.route];
-    if (!part || !onAnchor) return;
+    if (!part) {
+      if (lastAnchor.inside !== false) onAnchor(0, 0, false);
+      lastAnchor.inside = false;
+      return;
+    }
     const spot = part.getWorldPosition(scratch).project(camera);
     const x = Math.round(canvas.offsetLeft + ((spot.x + 1) / 2) * canvas.clientWidth);
     const y = Math.round(canvas.offsetTop + ((1 - spot.y) / 2) * canvas.clientHeight);
@@ -794,24 +771,20 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     camera.lookAt(state.target);
     doorPivot.rotation.y = state.door;
     freezerPivot.rotation.y = state.freezer;
-    Object.entries(extras).forEach(([key, extra]) => {
-      const goal = extra.userData.goal ?? 0;
-      const scale = damp(extra.scale.x, goal || 0.001, 6, delta);
-      moving ||= !settled(scale, goal || 0.001);
-      extra.scale.setScalar(scale);
-      if (goal === 0 && scale < 0.01) extra.visible = false;
-      if (key === "now" || key === "market") extra.rotation.y += delta * 0.35;
-      if (key === "numbers") {
-        extra.userData.arcs.forEach((arc, index) => {
-          const wanted = Math.max(0.02, state.ringShares[index] ?? 0);
-          if (settled(arc.userData.share, wanted)) return;
-          arc.userData.share = damp(arc.userData.share, wanted, 4, delta);
-          arc.geometry.setDrawRange(0, arcRange(arc.userData.share));
-          moving = true;
-        });
-      }
+    extras.numbers.userData.arcs.forEach((arc, index) => {
+      const wanted = Math.max(0.02, state.ringShares[index] ?? 0);
+      if (settled(arc.userData.share, wanted)) return;
+      arc.userData.share = damp(arc.userData.share, wanted, 4, delta);
+      arc.geometry.setDrawRange(0, arcRange(arc.userData.share));
+      moving = true;
     });
-    book.position.y = H + (state.route === "chef" ? 0.08 + Math.sin(now / 600) * 0.01 : 0);
+    // On Chef the lid sits ajar on the pot; a still pose, so the loop can rest.
+    const lidGoal = state.route === "chef" ? 1 : 0;
+    const ajar = damp(kitchen.lid.userData.ajar ?? 0, lidGoal, 6, delta);
+    moving ||= !settled(ajar, lidGoal);
+    kitchen.lid.userData.ajar = ajar;
+    kitchen.lid.position.y = 0.155 + ajar * 0.03;
+    kitchen.lid.rotation.z = ajar * 0.14;
     const knobGoal = state.route === "settings" ? -2.1 : 0;
     knob.rotation.z = damp(knob.rotation.z, knobGoal, 5, delta);
     moving ||= !settled(knob.rotation.z, knobGoal);
@@ -894,12 +867,15 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
 
     const fridgeTags = state.route === "fridge" && open > 0.8 && !travelling;
     tagLayer.style.opacity = fridgeTags || state.route === "numbers" ? 1 : 0;
+    // Each label sits at the height of its ring's top, all lined up left of the outer ring so none covers the chalk.
+    const outer = extras.numbers.userData.arcs[0];
+    const left = state.route === "numbers" ? outer.localToWorld(scratch.set(0, outer.geometry.parameters.radius, 0)).project(camera).x : 0;
     ringTags.forEach((element, index) => {
       element.style.visibility = state.route === "numbers" && element.textContent ? "" : "hidden";
       if (state.route !== "numbers") return;
       const arc = extras.numbers.userData.arcs[index];
       const spot = arc.localToWorld(scratch.set(arc.geometry.parameters.radius, 0, 0)).project(camera);
-      element.style.transform = `translate(${((spot.x + 1) / 2) * canvas.clientWidth - 14}px, ${((1 - spot.y) / 2) * canvas.clientHeight}px) translate(-100%, -50%)`;
+      element.style.transform = `translate(${((left + 1) / 2) * canvas.clientWidth - 10}px, ${((1 - spot.y) / 2) * canvas.clientHeight}px) translate(-100%, -50%)`;
     });
     placeTags(fridgeTags);
     anchor();
