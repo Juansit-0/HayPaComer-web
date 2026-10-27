@@ -1,4 +1,5 @@
 import { api, freshAccess } from "./api.js";
+import { reduced } from "./motion.js";
 import { foodName, formatDay, formatNumber, placeName, plural, t } from "./i18n.js";
 import { focusFood, shapeClass, takeFocusRequest } from "./stage.js";
 import {
@@ -407,7 +408,7 @@ export async function renderFridge(main, household) {
     const itemId = takeFocusRequest();
     const card = itemId && main.querySelector(`[data-food-id="${CSS.escape(itemId)}"]`);
     if (!card) return;
-    card.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    card.scrollIntoView({ block: "center", behavior: reduced() ? "auto" : "smooth" });
     card.classList.remove("picked");
     void card.offsetWidth;
     card.classList.add("picked");

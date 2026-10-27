@@ -1,4 +1,5 @@
 import { webgl2 } from "./quality.js";
+import { reduced } from "./motion.js";
 import { api } from "./api.js";
 import { foodName, formatNumber, t } from "./i18n.js";
 import { daysLeft, esc, grams, openSheet, toast, whenText } from "./ui.js";
@@ -124,7 +125,7 @@ function fill(fridge, inventory, twin, week) {
 }
 
 function wantsThree() {
-  if (!matchMedia("(min-width: 1024px)").matches || matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+  if (!matchMedia("(min-width: 1024px)").matches || reduced()) return false;
   try {
     return webgl2();
   } catch {
@@ -349,8 +350,9 @@ export function mountStage(element) {
     },
     { passive: true },
   );
-  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  {
     root.addEventListener("pointermove", (event) => {
+      if (reduced()) return;
       const box = root.getBoundingClientRect();
       root.style.setProperty("--tilt-x", ((event.clientX - box.left) / box.width - 0.5).toFixed(3));
       root.style.setProperty("--tilt-y", ((event.clientY - box.top) / box.height - 0.5).toFixed(3));

@@ -1,7 +1,7 @@
 import * as THREE from "./vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
 import { boil, css, engrave, foodModel, group, hash, lathe, mesh, outline, paint, sized } from "./engrave.js";
-import { damp, loop, SPRINGS, springConstants, springStep } from "./motion.js";
+import { damp, loop, onReduced, reduced as prefersReduced, SPRINGS, springConstants, springStep } from "./motion.js";
 
 const W = 0.72;
 const H = 1.7;
@@ -73,7 +73,9 @@ const GAP = 0.025;
 const WHITE = new THREE.Color("#fdfdfb");
 const ALARM = new THREE.Color("#d2492f");
 const GLOW = new THREE.Color("#f3c443");
-const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+// Read live: turning reduced motion on or off takes effect on the next frame, without a reload.
+let reduced = prefersReduced();
+onReduced((value) => (reduced = value));
 
 function frostTexture() {
   const canvas = document.createElement("canvas");

@@ -13,7 +13,7 @@ const onScreen = (rect) => rect.width > 0 && rect.bottom > 0 && innerHeight > re
 
 // Re-render in place: keyed items that moved slide from where they were, new ones grow in, removed ones fade out as inert copies, focus stays.
 export async function swap(root, update) {
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const still = reduced();
   const active = root.contains(document.activeElement) ? document.activeElement : null;
   const focusId = active?.id;
   const focusKey = active?.closest(KEYED)?.dataset.key;
@@ -291,7 +291,7 @@ export function wireDateFields(root) {
   });
 }
 
-const sheetMotion = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sheetMotion = () => !reduced();
 const cssValue = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const compactSheet = () => matchMedia("(max-width: 760px)").matches;
 
