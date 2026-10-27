@@ -88,8 +88,4 @@ html:has(.land-story[data-captured]) { overscroll-behavior: none; }
 .story-frame.still img { object-fit: contain; max-height: 80svh; mix-blend-mode: normal; }
 
 /* Paper lens: a raking light that lifts the paper and shows its fibres under the pointer; nothing is drawn onto the page */
-.paper-lens { position: fixed; inset: 0; z-index: 40; overflow: hidden; pointer-events: none; opacity: 0; }
-.paper-lens > span { position: absolute; top: 0; left: 0; width: 620px; height: 620px; margin: -310px 0 0 -310px; border-radius: 50%; will-change: transform; }
-.paper-lens-light { mix-blend-mode: soft-light; background: radial-gradient(closest-side, rgba(255, 249, 232, 0.5), rgba(255, 249, 232, 0.18) 45%, rgba(255, 249, 232, 0) 72%), radial-gradient(closest-side at 60% 62%, rgba(28, 23, 18, 0.16), rgba(28, 23, 18, 0) 70%); }
-.paper-lens-grain { mix-blend-mode: multiply; opacity: 0.16; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.75' numOctaves='3' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.11 0 0 0 0 0.09 0 0 0 0 0.07 0 0 0 1.4 -0.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23f%29'/%3E%3C/svg%3E") 0 0 / 240px 240px; -webkit-mask: radial-gradient(closest-side, #000, rgba(0, 0, 0, 0.5) 45%, transparent 75%); mask: radial-gradient(closest-side, #000, rgba(0, 0, 0, 0.5) 45%, transparent 75%); }
-.paper-lens .paper-lens-ripple { width: 220px; height: 220px; margin: -110px 0 0 -110px; border-radius: 50%; mix-blend-mode: soft-light; box-shadow: 0 0 0 1.5px rgba(255, 249, 232, 0.9), inset 0 0 40px rgba(255, 249, 232, 0.7); }
+.paper-press { position: fixed; inset: 0; z-index: 40; width: 100%; height: 100%; pointer-events: none; }
