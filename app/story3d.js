@@ -6,6 +6,7 @@ import { TIERS, createGovernor, pixelRatioFor } from "./quality.js";
 import { homeScene, kitchen, market, PAPER, plateScene, scaleScene, setDensity, streetScene, tableScene } from "./story/scenes.js";
 import { createInkPass } from "./story/ink.js";
 import { createWind } from "./story/wind.js";
+import { loadFigures } from "./story/figures.js";
 
 const BUILDERS = { streets: streetScene, market, home: homeScene, kitchen, scale: scaleScene, plate: plateScene, table: tableScene };
 const WINDS = {
@@ -15,7 +16,7 @@ const WINDS = {
 };
 
 export async function createStory(canvas, story, { tier = "high", onStills, onProgress } = {}) {
-  await document.fonts.load("700 64px 'Hanken Grotesk'").catch(() => null);
+  await Promise.all([document.fonts.load("700 64px 'Hanken Grotesk'").catch(() => null), loadFigures().catch(() => null)]);
   const settings = TIERS[tier];
   setDensity(settings.instances);
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: settings.antialias, powerPreference: "high-performance" });

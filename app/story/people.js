@@ -1,6 +1,7 @@
 // People of the story: each look is one vertex-coloured mesh, and a crowd is instances of a few looks, so a street full of people stays a few draw calls.
 import * as THREE from "../vendor/three.module.min.js";
 import { hash, instance, outline, paint } from "../engrave.js";
+import { figure, figureLook, figureReady } from "./figures.js";
 
 const SKIN = ["#e0aa82", "#c99168", "#ecc09c", "#b07a54"];
 const RUANA = ["#a8361f", "#3f6f8f", "#6b4a2a", "#4f7a4a", "#b8862f", "#5b2a3a"];
@@ -151,12 +152,42 @@ export function look(seed) {
   return outline(new THREE.Group().add(new THREE.Mesh(bake(parts), material)));
 }
 
+const JACKETS = ["#2f3b4a", "#7a3b26", "#4f5d3a", "#8a8f96", "#3d3a6b"];
+const DENIM = ["#3d4f6b", "#2a2f3a", "#5b6170"];
+const HAIR = ["#1c1712", "#4a2f1f", "#2b211a"];
+const SNEAKERS = ["#f1ece2", "#1c1712", "#6b4a2a"];
+// Who walks in each era: the Blender figures of tools/blender/character.py.
+const WALKERS = { 1876: ["campesino", "campesina", "cargador"], 2026: ["vecina", "vecino"] };
+const walkerLooks = new Map();
+// Walkers share a few recoloured figures, so a street of them costs one geometry per look, not per person.
+function walker(era, seed) {
+  const pick = (list, salt) => list[Math.floor(random(seed * salt) * list.length) % list.length];
+  const kinds = WALKERS[era].filter(figureReady);
+  if (!kinds.length) return null;
+  const kind = pick(kinds, 11);
+  const colors = era === 2026
+    ? { skin: pick(SKIN, 7), hair: pick(HAIR, 13), top: pick(JACKETS, 3), inner: "#e9e2d2", bottom: pick(DENIM, 5), shoes: pick(SNEAKERS, 17) }
+    : { skin: pick(SKIN, 7), hat: pick(HATS, 5), top: pick(RUANA, 3), inner: "#efe7d6", belt: pick(RUANA, 23), beard: "#d9d2c3", held: "#b8956a",
+        bottom: kind === "campesina" ? pick(SKIRTS, 19) : "#e8dcc2", shoes: kind === "cargador" ? "#3a2a1c" : "#5a3b22" };
+  const key = `${kind}:${Object.values(colors).join(":")}`;
+  if (!walkerLooks.has(key)) walkerLooks.set(key, figureLook(kind, colors));
+  return figure(kind, walkerLooks.get(key));
+}
+
 // A crowd: people placed as [x, z, facing, walk] with walk a [dx, dz] distance travelled over the chapter; play(k) sways and walks them.
-export function crowd(people, { looks = 6, seed = 1 } = {}) {
+export function crowd(people, { looks = 6, seed = 1, era = 1876 } = {}) {
   const root = new THREE.Group();
-  const bodies = Array.from({ length: looks }, (_, index) => look(seed * 31 + index));
+  const walking = WALKERS[era].some(figureReady) ? people.filter((person) => person.walk) : [];
+  const standing = people.filter((person) => !walking.includes(person));
+  const bodies = standing.length ? Array.from({ length: looks }, (_, index) => look(seed * 31 + index)) : [];
   const groups = bodies.map(() => []);
-  people.forEach((person, index) => groups[index % looks].push({ ...person, phase: random(seed + index) * 6.28, scale: 0.9 + random(seed * 3 + index) * 0.16 }));
+  standing.forEach((person, index) => groups[index % looks].push({ ...person, phase: random(seed + index) * 6.28, scale: 0.9 + random(seed * 3 + index) * 0.16 }));
+  const walkers = walking.map((person, index) => {
+    const body = walker(era, seed * 17 + index);
+    body.scale.multiplyScalar(0.92 + random(seed * 5 + index) * 0.14);
+    root.add(body);
+    return { person, figure: body, offset: random(seed * 7 + index) };
+  });
   const matrix = new THREE.Matrix4();
   const place = new THREE.Vector3();
   const turn = new THREE.Quaternion();
@@ -179,6 +210,13 @@ export function crowd(people, { looks = 6, seed = 1 } = {}) {
     return { members, meshes: instanced.children.filter((child) => child.isInstancedMesh) };
   });
   root.userData.play = (k) => {
+    walkers.forEach(({ person, figure, offset }) => {
+      const [x, z] = person.at;
+      const [dx, dz] = person.walk;
+      figure.position.set(x + dx * k, 0, z + dz * k);
+      figure.rotation.y = person.facing ?? 0;
+      figure.userData.walk(Math.hypot(dx, dz) * k, offset);
+    });
     sets.forEach((set) => {
       if (!set) return;
       set.members.forEach((person, index) => {

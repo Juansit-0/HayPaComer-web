@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figures</title>
+<script type="importmap">{ "imports": { "three": "/app/vendor/three.module.min.js" } }</script>
+<style>html, body { margin: 0; background: #f3ecdf; } canvas { display: block; width: 100vw; height: 100vh; }</style>
+</head>
+<body>
+<canvas></canvas>
+<script type="module">
+// Dev only: every Blender figure in one look, front row and back row, at one walk phase (?t=0..1), to tune garment painting in figures.js.
+import * as THREE from "../vendor/three.module.min.js";
+import { FIGURE_KINDS, figure, figureLook, loadFigures } from "../story/figures.js";
+
+const colors = { skin: "#c99168", hat: "#5a3b22", hair: "#2b211a", beard: "#d9d2c3", top: "#a8361f", inner: "#efe7d6", belt: "#3f6f8f",
+  bottom: "#e8dcc2", shoes: "#3a2a1c", held: "#b8956a" };
+await loadFigures();
+const canvas = document.querySelector("canvas");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight, false);
+renderer.setClearColor("#f3ecdf");
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight("#ffffff", "#b9b19c", 1.0));
+const sun = new THREE.DirectionalLight("#ffffff", 1.4);
+sun.position.set(3, 6, 4);
+scene.add(sun);
+const query = new URLSearchParams(location.search);
+const phase = Number(query.get("t") ?? 0.3);
+const only = query.get("only");
+const kinds = only ? [only] : FIGURE_KINDS;
+const spread = only ? 0.55 : 0.9;
+kinds.forEach((kind, index) => {
+  [0, Math.PI].forEach((turn, row) => {
+    const body = figure(kind, figureLook(kind, colors));
+    body.position.set(only ? (row ? spread : -spread) : (index - 2) * spread, only ? 0 : row ? 1.75 : 0, 0);
+    body.rotation.y = turn;
+    body.userData.walk(0, phase);
+    scene.add(body);
+  });
+});
+const aspect = innerWidth / innerHeight;
+const half = only ? 0.85 : 1.85;
+const camera = new THREE.OrthographicCamera(-half * aspect, half * aspect, half, -half, 0.1, 50);
+camera.position.set(0, only ? 0.8 : 1.7, 10);
+camera.lookAt(0, only ? 0.8 : 1.7, 0);
+renderer.render(scene, camera);
+</script>
+</body>
+</html>

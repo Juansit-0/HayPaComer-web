@@ -83,7 +83,7 @@ const routes = [
   [/^\/foods\?/, () => inventory.map((entry) => ({ name: entry.name, category: "VEGETABLE" }))],
 ];
 
-const TYPES = { ".js": "text/javascript", ".css": "text/css", ".html": "text/html", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".png": "image/png", ".woff2": "font/woff2", ".json": "application/json" };
+const TYPES = { ".js": "text/javascript", ".css": "text/css", ".html": "text/html", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".png": "image/png", ".woff2": "font/woff2", ".json": "application/json", ".glb": "model/gltf-binary" };
 createServer((request, response) => {
   const url = request.url;
   if (url.startsWith("/__dev/save") && request.method === "PUT") {

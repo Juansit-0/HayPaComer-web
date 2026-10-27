@@ -655,7 +655,7 @@ export function homeScene() {
   road.position.set(-10, 0, 0.9);
   scene.add(road);
   scene.add(outline(merged(props)));
-  const walker = crowd([{ at: [-5, -0.4], facing: Math.PI / 2, walk: [6.2, 0] }], { looks: 1, seed: 9 });
+  const walker = crowd([{ at: [-5, -0.4], facing: Math.PI / 2, walk: [6.2, 0] }], { looks: 1, seed: 9, era: 2026 });
   const tote = bag();
   tote.scale.setScalar(0.85);
   scene.add(walker, tote);
