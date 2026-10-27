@@ -20,6 +20,10 @@ const loader = document.querySelector("[data-loader]");
 const tabs = document.querySelector(".tabs");
 const stageBox = document.querySelector("[data-stage-box]");
 const sessionBar = document.querySelector(".session");
+const bar = document.querySelector(".bar");
+const accountButton = document.querySelector("[data-account]");
+const accountMenu = document.querySelector("[data-account-menu]");
+const tabsBlot = tabs.querySelector(".tabs-blot");
 const syncSound = () => document.querySelectorAll("[data-sound]").forEach((button) => button.setAttribute("aria-pressed", String(soundOn())));
 syncSound();
 document.addEventListener("click", (event) => {
@@ -52,13 +56,47 @@ function current() {
   return views[route] ? route : "now";
 }
 
+// The bell always stays; a tomato badge counts what is unread and the label says it in words.
 async function refreshInbox() {
   const notifications = await api("/notifications").catch(() => []);
   const unread = notifications.filter((notification) => !notification.readAt).length;
-  const link = document.querySelector("[data-inbox]");
-  link.textContent = unread ? plural("inbox.unread", unread) : "";
-  link.title = notifications[0]?.title ?? "";
+  const bell = document.querySelector("[data-inbox]");
+  const badge = bell.querySelector("[data-inbox-count]");
+  badge.textContent = unread > 9 ? "9+" : String(unread);
+  badge.hidden = !unread;
+  bell.setAttribute("aria-label", unread ? `${t("nav.notifications")}, ${plural("inbox.unread", unread)}` : t("nav.notifications"));
+  bell.title = notifications[0]?.title ?? "";
 }
+
+// The ink blot slides under the current section; it is placed without travel the first time and fades out where no tab is current.
+function placeBlot(route) {
+  const link = tabs.querySelector(`a[data-tab="${route}"]`);
+  tabsBlot.style.setProperty("--blot-on", link ? "1" : "0");
+  if (!link) return;
+  tabsBlot.style.setProperty("--blot-x", `${link.offsetLeft}px`);
+  tabsBlot.style.setProperty("--blot-y", `${link.offsetTop}px`);
+  tabsBlot.style.setProperty("--blot-w", `${link.offsetWidth}px`);
+  tabsBlot.style.setProperty("--blot-h", `${link.offsetHeight}px`);
+  if (!tabsBlot.classList.contains("moving")) requestAnimationFrame(() => tabsBlot.classList.add("moving"));
+}
+new ResizeObserver(() => placeBlot(current())).observe(tabs);
+
+// Signed in, language and sound live in the account menu; signed out they sit in the bar for the landing.
+function placePreferences(signedIn) {
+  const sound = document.querySelector("[data-sound]");
+  const signout = accountMenu.querySelector("[data-signout]");
+  if (signedIn) accountMenu.insertBefore(languageSwitch, signout).after(sound);
+  else bar.append(sound, languageSwitch);
+}
+
+accountMenu.addEventListener("beforetoggle", (event) => {
+  accountButton.setAttribute("aria-expanded", String(event.newState === "open"));
+  if (event.newState !== "open") return;
+  const box = accountButton.getBoundingClientRect();
+  accountMenu.style.top = `${box.bottom + 8}px`;
+  accountMenu.style.right = `${Math.max(8, innerWidth - box.right)}px`;
+});
+accountMenu.addEventListener("toggle", (event) => event.newState === "open" && accountMenu.querySelector("button")?.focus());
 
 async function refreshStatus() {
   const status = await api("/status").catch(() => null);
@@ -113,6 +151,7 @@ async function render({ navigate = false, refresh = false } = {}) {
   const ticket = ++renders;
   newPage();
   if (!session.signedIn) {
+    placePreferences(false);
     tabs.hidden = true;
     stageBox.hidden = true;
     sessionBar.hidden = true;
@@ -130,6 +169,7 @@ async function render({ navigate = false, refresh = false } = {}) {
     });
     return;
   }
+  placePreferences(true);
   tabs.hidden = false;
   sessionBar.hidden = false;
   if (stageBox.hidden) {
@@ -164,6 +204,7 @@ async function render({ navigate = false, refresh = false } = {}) {
     if (link.dataset.tab === route) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
+  placeBlot(route);
   try {
     await views[route](main, household);
     if (ticket !== renders) return;
@@ -212,6 +253,7 @@ window.addEventListener("hpc:signed-out", () => {
 });
 
 document.querySelector("[data-signout]").addEventListener("click", async () => {
+  accountMenu.hidePopover();
   const refreshToken = session.refresh;
   session.clear();
   disconnectLive();

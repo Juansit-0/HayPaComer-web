@@ -22,37 +22,41 @@
   </div>
   <a class="skip" href="#main" data-i18n="nav.skip">Skip to content</a>
   <div class="shell">
-    <aside class="stage" data-stage-box hidden>
-      <div class="stage-fridge" data-stage></div>
+    <header class="bar">
+      <a class="brand" href="#/now" data-i18n-label="nav.home">
+        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+          <rect x="12" y="10" width="8" height="44" rx="3" fill="currentColor"/>
+          <rect x="44" y="10" width="8" height="44" rx="3" fill="currentColor"/>
+          <path d="M8 32 H56" stroke="var(--color-primary)" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="32" cy="19" r="4" fill="var(--color-primary)"/>
+        </svg>
+        <span class="wordmark">HayPaComer</span>
+      </a>
       <nav class="tabs" data-i18n-label="nav.sections" hidden>
-        <a href="#/now" data-tab="now" data-i18n="nav.now">Now</a>
-        <a href="#/fridge" data-tab="fridge" data-i18n="nav.fridge">Fridge</a>
-        <a href="#/market" data-tab="market" data-i18n="nav.market">Market</a>
-        <a href="#/numbers" data-tab="numbers" data-i18n="nav.numbers">Numbers</a>
-        <a href="#/chef" data-tab="chef" data-i18n="nav.chef">Chef</a>
+        <span class="tabs-blot" aria-hidden="true"></span>
+          <a href="#/now" data-tab="now"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v2a6 6 0 0 1-6 6h-4a6 6 0 0 1-6-6z"/><path d="M8 7c0-1.5 1.5-1.5 1.5-3M12 7c0-1.5 1.5-1.5 1.5-3M16 7c0-1.5 1.5-1.5 1.5-3"/><path class="hatch" d="M7 15l3-3M10 17l5-5M14 17l3-3"/></svg><span data-i18n="nav.now">Now</span></a>
+          <a href="#/fridge" data-tab="fridge"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M6 9h12M9 5.5v1.5M9 11.5v3"/><path class="hatch" d="M14 13l3-3M13 17l4-4M15 19l2-2"/></svg><span data-i18n="nav.fridge">Fridge</span></a>
+          <a href="#/market" data-tab="market"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9h17l-1.8 10a2 2 0 0 1-2 1.6H7.3a2 2 0 0 1-2-1.6z"/><path d="M8 9l3-5M16 9l-3-5"/><path class="hatch" d="M8 17l3-3M11 18l4-4M15 17l2-2"/></svg><span data-i18n="nav.market">Market</span></a>
+          <a href="#/numbers" data-tab="numbers"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 8 8h-8z"/><path class="hatch" d="M14 7l2-2M14 10l4-4M16 11l3-3"/></svg><span data-i18n="nav.numbers">Numbers</span></a>
+          <a href="#/chef" data-tab="chef"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 13a4 4 0 0 1 1-7.8A4.5 4.5 0 0 1 16 5.2 4 4 0 0 1 17 13v6H7z"/><path d="M7 16h10"/><path class="hatch" d="M9 19l2-2M12 19l2-2"/></svg><span data-i18n="nav.chef">Chef</span></a>
       </nav>
-    </aside>
-    <div class="column">
-      <header class="bar">
-        <a class="brand" href="#/now" data-i18n-label="nav.home">
-          <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
-            <rect x="12" y="10" width="8" height="44" rx="3" fill="currentColor"/>
-            <rect x="44" y="10" width="8" height="44" rx="3" fill="currentColor"/>
-            <path d="M8 32 H56" stroke="var(--color-primary)" stroke-width="6" stroke-linecap="round"/>
-            <circle cx="32" cy="19" r="4" fill="var(--color-primary)"/>
-          </svg>
-          <span class="wordmark">HayPaComer</span>
-        </a>
-        <div class="session" hidden>
-          <span class="live" data-live data-state="off" role="status" data-i18n="live.connecting">Connecting</span>
-          <a class="inbox" href="#/now" data-inbox data-i18n-label="nav.notifications"></a>
-          <a class="settings-link" href="#/settings" data-tab="settings" data-settings-link data-i18n="nav.settings">Settings</a>
-          <span class="household" data-household></span>
+      <div class="session" hidden>
+        <span class="live" data-live data-state="off" role="status" data-i18n="live.connecting">Connecting</span>
+        <button class="icon-button" type="button" data-inbox data-i18n-label="nav.notifications"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/><path class="hatch" d="M9 14l3-3M11 16l4-4"/></svg><span class="badge" data-inbox-count hidden></span></button>
+        <a class="icon-button settings-link" href="#/settings" data-tab="settings" data-settings-link data-i18n-label="nav.settings"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M10.4 3h3.2l.5 2.4 1.8.8 2.1-1.4 2.2 2.2-1.4 2.1.8 1.8 2.4.5v3.2l-2.4.5-.8 1.8 1.4 2.1-2.2 2.2-2.1-1.4-1.8.8-.5 2.4h-3.2l-.5-2.4-1.8-.8-2.1 1.4-2.2-2.2 1.4-2.1-.8-1.8L3 13.6v-3.2l2.4-.5.8-1.8-1.4-2.1 2.2-2.2 2.1 1.4 1.8-.8z"/></svg></a>
+        <button class="icon-button" type="button" popovertarget="account-menu" data-account data-i18n-label="nav.account"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0z"/><path class="hatch" d="M9 19l3-3M12 19l3-3"/></svg></button>
+        <div class="account-menu" id="account-menu" popover data-account-menu>
+          <p class="household" data-household></p>
           <button class="ghost" type="button" data-signout data-i18n="nav.signout">Sign out</button>
         </div>
-        <button class="ghost sound-toggle" type="button" aria-pressed="false" data-sound data-i18n="sound.toggle">Sound</button>
-        <div class="language" role="group" data-i18n-label="nav.language" data-language></div>
-      </header>
+      </div>
+      <button class="ghost sound-toggle" type="button" aria-pressed="false" data-sound data-i18n="sound.toggle">Sound</button>
+      <div class="language" role="group" data-i18n-label="nav.language" data-language></div>
+    </header>
+    <aside class="stage" data-stage-box hidden>
+      <div class="stage-fridge" data-stage></div>
+    </aside>
+    <div class="column">
       <p class="notice" role="status" data-degraded hidden></p>
       <main id="main" tabindex="-1" aria-busy="true"></main>
     </div>

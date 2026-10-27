@@ -339,7 +339,7 @@ export function mountStage(element) {
   new ResizeObserver(resize).observe(root);
   const box = root.closest(".stage");
   // Folds up by sliding, not by shrinking, so the page below never moves; the gap between 80 and 200 px keeps it from flickering.
-  const fold = () => box.style.setProperty("--fold", `${Math.max(0, (box.querySelector(".tabs")?.offsetTop ?? 0) - 8)}px`);
+  const fold = () => box.style.setProperty("--fold", `${box.offsetHeight}px`);
   new ResizeObserver(fold).observe(box);
   window.addEventListener(
     "scroll",
