@@ -3,7 +3,7 @@ import { currentLocale, foodName, locales, plural, recipeName, t } from "./i18n.
 import { candidate, dishCard, kitchenRecipes } from "./now.js";
 import { highlightFoods, shapeClass } from "./stage.js";
 import { daysLeft, esc, grams, toast, whenText } from "./ui.js";
-import { easing, reduced, token } from "./motion.js";
+import { easing, page, reduced, token } from "./motion.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
 const state = { conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, shown: null };
@@ -98,7 +98,7 @@ function confirmations(list) {
     <h2 id="confirm-title">${t("chef.waiting")}</h2>
     <ul class="list">${list
       .map(
-        (pending) => `<li><span class="item-name">${esc(pending.summary)}</span>
+        (pending) => `<li data-pending><span class="item-name">${esc(pending.summary)}</span>
           <span class="item-actions"><button class="primary" type="button" data-approve="${esc(pending.id)}" data-hold aria-describedby="hold-hint">${t("chef.approve")}</button><button type="button" data-reject="${esc(pending.id)}">${t("chef.reject")}</button></span></li>`,
       )
       .join("")}</ul>
@@ -210,7 +210,16 @@ export async function renderChef(main, household) {
     } catch (error) {
       state.messages.push({ role: "assistant", text: error.message, runs: [] });
     }
-    await renderChef(main, household);
+    // Only the new answer is added: the typing dots give way to it and it is written in from the top, the rest of the screen stays put.
+    const typing = chat.querySelector(".typing");
+    if (!typing || !document.body.contains(chat)) return;
+    typing.outerHTML = message(state.messages.at(-1));
+    const answer = chat.lastElementChild;
+    state.shown = state.messages.length;
+    if (!reduced()) answer.classList.add("fresh");
+    answer.querySelectorAll(".dish-card [data-cook]").forEach((button) => button.addEventListener("click", () => ask(t("chef.how-to", { recipe: recipeName(button.dataset.cook) }))));
+    highlightFoods(state.messages.at(-1).foods ?? []);
+    answer.scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
   }
 
   main.querySelectorAll("[data-prompt]").forEach((button) => button.addEventListener("click", () => ask(button.dataset.prompt)));
@@ -256,23 +265,28 @@ export async function renderChef(main, household) {
   main.querySelectorAll(".dish-card [data-cook]").forEach((button) => button.addEventListener("click", () => ask(t("chef.how-to", { recipe: recipeName(button.dataset.cook) }))));
   highlightFoods(state.messages.findLast((entry) => entry.role === "assistant")?.foods ?? []);
 
+  // An answered confirmation keeps its place as a quiet line saying what happened, so the list still reads as a history.
+  const settle = (button, text, done) => {
+    const row = button.closest("[data-pending]");
+    row.classList.add("resolved", done ? "done" : "declined");
+    row.innerHTML = `<p class="resolved-line"><span class="item-name">${row.querySelector(".item-name").innerHTML}</span><span>${esc(text)}</span></p>`;
+    if (!reduced()) arrive(row);
+  };
   main.querySelectorAll("[data-approve]").forEach((button) =>
     button.addEventListener("click", async () => {
       try {
         const result = await api(`/agent/confirmations/${button.dataset.approve}/approve`, { method: "POST" });
-        toast(result.result);
+        settle(button, result.result, true);
       } catch (error) {
         toast(error.message);
       }
-      renderChef(main, household);
     }),
   );
 
   main.querySelectorAll("[data-reject]").forEach((button) =>
     button.addEventListener("click", async () => {
       await api(`/agent/confirmations/${button.dataset.reject}/reject`, { method: "POST" }).catch(() => null);
-      toast(t("chef.nothing-changed"));
-      renderChef(main, household);
+      settle(button, t("chef.nothing-changed"), false);
     }),
   );
 
@@ -289,6 +303,11 @@ export async function renderChef(main, household) {
     wanted = null;
   }
   if (wanted) ask(t("chef.how-to", { recipe: recipeName(wanted) }));
+
+  if (session && navigator.wakeLock) {
+    const lock = navigator.wakeLock.request("screen").catch(() => null);
+    page.defer(() => lock.then((held) => held?.release()));
+  }
 
   if (state.handsFree && !state.recognition) startListening(true);
   if (!speechSupported) state.handsFree = false;
