@@ -6,7 +6,7 @@ Single source of truth for the visual language of the web app and the landing. I
 
 | File | Purpose |
 |---|---|
-| `assets/tokens.css` | Design tokens as CSS custom properties: primitives, semantic roles, chapters, motion, components. Light only. |
+| `assets/tokens.css` | Design tokens as CSS custom properties: primitives, semantic roles, chapters, motion, components. Light only until the night paper theme lands. |
 | `assets/theme.md` | One-page theme summary |
 | `assets/logo-mark.svg`, `assets/logo-lockup.svg` | The H-and-tray mark and the lockup (the lockup keeps its original Anton drawing until it is redrawn in Fraunces) |
 
@@ -21,22 +21,30 @@ Single source of truth for the visual language of the web app and the landing. I
 
 ## Colour
 
-| Token | Hex | Role | Text on it | Contrast |
-|---|---|---|---|---|
-| `--color-arroz` | `#fbfbf8` | Ground | Tinta | 18.07:1 |
-| `--color-blanco` | `#ffffff` | Tiles and surfaces | Tinta | 18.7:1 |
-| `--color-meson` | `#efeee9` | Tone step between surfaces, skeletons, secondary buttons | Tinta | 16.13:1 |
-| `--color-tinta` | `#121212` | Ink | Arroz | 18.07:1 |
-| `--color-piedra` | `#55534e` | Secondary text on arroz and blanco | (on arroz) | 7.41:1 |
-| `--color-papa` | `#f3c443` | Chapter Ahora; at-risk state | Tinta | 11.41:1 |
-| `--color-tomate` | `#c8432a` | Chapter Mercado; expired, door open | Arroz | 4.72:1 |
-| `--color-cilantro` | `#2f7a4a` | Chapter Nevera; fresh, enough, done | Arroz | 5.06:1 |
-| `--color-mora` | `#4b1f2e` | Chapter Números; under review | Arroz | 13.2:1 |
-| `--color-cobre` | `#a8481f` | Primary action, Chef chapter | White | 5.81:1 |
+| Token | Hex | Role | Text on it |
+|---|---|---|---|
+| `--color-papel` | `#f3ecdf` | Ground: the sheet of paper (`--color-bg`, `--sheet`) | Tinta |
+| `--color-carta` | `#fbf6ec` | Cards, fields and chips laid on the paper (`--color-surface`, `--card`) | Tinta |
+| `--color-papel-paso` | `#e9dfcb` | Tone step, skeletons, the Ajustes band | Tinta |
+| `--color-tinta` | `#1c1712` | Ink: text, borders, hard shadows (`--color-line`, `--line`) | Papel |
+| `--color-piedra` | `#5c554c` | Secondary text on paper | (on papel) |
+| `--color-papa` | `#f3c443` | Chapter Ahora; at-risk state | Tinta |
+| `--color-tomate` | `#c8432a` | Chapter Mercado; expired, door open | Arroz |
+| `--color-cilantro` | `#2f7a4a` | Chapter Nevera; fresh, enough, done | Arroz |
+| `--color-mora` | `#4b1f2e` | Chapter Números; under review | Arroz |
+| `--color-cobre` | `#a8481f` | Primary action, Chef chapter | White |
 
-Chapters by route: `now` papa, `fridge` cilantro, `market` tomate, `numbers` mora, `chef` cobre, `settings` mesón. `main.js` sets `data-chapter` on the root element and `app.css` maps it to `--chapter` and `--chapter-ink`.
+Chapters by route: `now` papa, `fridge` cilantro, `market` tomate, `numbers` mora, `chef` cobre, `settings` papel paso. `main.js` sets `data-chapter` on the root element and `app.css` maps it to `--chapter` and `--chapter-ink`.
 
-Rules: one chapter colour per screen; no tints, no gradients; no shadows on resting elements (only sheets, dialogs and toasts float); copper only on the main action of a screen.
+Rules:
+- One chapter colour per screen; it fills the band, the active tab, the leader line and at most one data mark. No tints, no gradients.
+- Status colours are semantic and always come with words: papa at risk, tomate expired or danger, cilantro fresh or done. On the Mercado screen, danger is told apart from the chapter by its stamp and text.
+- Copper only on the main action of a view; every other button is an ink outline; destructive buttons are an ink outline that fills with tomate while held.
+- **Card or row.**
+  - A card (2 px ink border, 6 px radius, `--shadow-press` 4 px offset ink shadow) is an object acted on as a whole: a dish, a "use today" item, a pending AI confirmation, an unread alert. A card never holds another card.
+  - A row (an `--color-border` hairline, no shadow) is a list of the same kind.
+  - Sheets and toasts use `--shadow-raised`.
+- `app.css` and `app/*.js` never hold raw hex for the interface. Illustrations (food shapes, the drawn fridge, 3D materials) are exempt.
 
 ## Typography
 
@@ -52,7 +60,7 @@ Fraunces is set at its heaviest optical size with the soft, slightly wonky cut, 
 
 ## Shape and space
 
-Spacing 8, 16, 24, 32, 48, 96 px. Radius 4, 8, 12, 16 px and full. Buttons and chips are pills; tiles are 16 px. Controls are at least 52 px tall (touch targets 48 px or more).
+Spacing 8, 16, 24, 32, 48, 96 px on an 8 pt rhythm: 8 inside a control, 16 between elements of a card or row, 24 card padding, 32 between sections, 48 from the band to the first section. Cards, tiles, fields and sheets have a 6 px radius (fields 4 px); buttons and chips are pills. Controls are at least 52 px tall, rows at least 56 px, and every touch target at least 44 px.
 
 ## Motion v2
 
