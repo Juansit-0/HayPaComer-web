@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const [route = "now", out = "shots/cap", width = "1440", wait = "6000"] = process.argv.slice(2);
-const height = Number(width) < 700 ? 844 : 900;
+const height = Number(process.env.HEIGHT ?? (Number(width) < 700 ? 844 : 900));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const profile = mkdtempSync(join(tmpdir(), "hpc-chrome-"));
 const port = 9300 + Math.floor(Math.random() * 600);

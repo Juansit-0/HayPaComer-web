@@ -77,6 +77,12 @@ try {
     await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: Number(width) / 2, y: height / 2, deltaX: 0, deltaY: step });
     await sleep(Math.max(16, (Number(seconds) * 1000) / steps));
   }
+  // TOUR=now,chef,market walks the sections during the window, so the camera travel is what gets measured.
+  const tour = (process.env.TOUR ?? "").split(",").filter(Boolean);
+  for (const stop of tour) {
+    await evaluate(`location.hash = "#/${stop}"`);
+    await sleep((Number(seconds) * 1000) / tour.length);
+  }
   const left = Number(seconds) * 1000 - (Date.now() - start);
   if (left > 0) await sleep(left);
   const raw = await evaluate(`({ frames: window.__probe.frames, long: window.__probe.long, shift: window.__probe.shift, live: window.__probe.live(), created: window.__probe.created(), who: window.__probe.who().concat([...document.querySelectorAll("canvas")].map((c) => "dom " + c.className + " " + c.width + "x" + c.height + " css " + c.clientWidth)), hpc: window.__hpc ?? null })`);
