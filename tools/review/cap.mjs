@@ -33,7 +33,7 @@ try {
   const send = (method, params = {}) => new Promise((r) => { const n = ++id; waiting.set(n, r); ws.send(JSON.stringify({ id: n, method, params })); });
   await send("Runtime.enable");
   await send("Page.enable");
-  await send("Emulation.setDeviceMetricsOverride", { width: Number(width), height, deviceScaleFactor: 1, mobile: Number(width) < 700 });
+  await send("Emulation.setDeviceMetricsOverride", { width: Number(width), height, deviceScaleFactor: Number(process.env.DPR ?? 1), mobile: Number(width) < 700 });
   if (process.env.PRELOAD) await send("Page.addScriptToEvaluateOnNewDocument", { source: process.env.PRELOAD });
   // The scheme is always pinned: headless Chrome otherwise follows the machine's appearance.
   const media = [{ name: "prefers-color-scheme", value: process.env.DARK ? "dark" : "light" }, process.env.REDUCED && { name: "prefers-reduced-motion", value: "reduce" }].filter(Boolean);
