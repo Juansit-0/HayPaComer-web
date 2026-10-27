@@ -780,7 +780,12 @@ main[data-enter] .bento > * {
   animation: rise var(--duration-slow) var(--ease-emphasized) both;
   animation-delay: calc(var(--i, 0) * var(--stagger));
 }
-@keyframes rise { from { opacity: 0; transform: translateY(var(--rise)); } }
+@keyframes rise { from { opacity: 0; transform: translate(var(--enter-x, 0px), var(--rise)); } }
+main[data-enter="next"] > header:first-child { --band-l: 100%; animation: band-in var(--duration-spring) var(--ease-emphasized) both; }
+main[data-enter="previous"] > header:first-child { --band-r: 100%; animation: band-in var(--duration-spring) var(--ease-emphasized) both; }
+/* The sweep ends at the band edge the page can show (its side padding), then the band keeps its full sideways bleed */
+@keyframes band-in { from { clip-path: inset(0 var(--band-r, -24px) 0 var(--band-l, -24px)); } to { clip-path: inset(0 -24px); } }
+@media (max-width: 1023px) { .shell:has(.tabs:not([hidden])) main { touch-action: pan-y pinch-zoom; } }
 
 .loader {
   position: fixed;

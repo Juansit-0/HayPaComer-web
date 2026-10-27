@@ -1,4 +1,4 @@
-import { newPage, reduced, token } from "./motion.js";
+import { easing, newPage, reduced, token } from "./motion.js";
 import { play, setSound, soundOn } from "./sound.js";
 import { api, session } from "./api.js";
 import { chooseHousehold, householdLabel, renderSignIn } from "./auth.js";
@@ -126,8 +126,10 @@ function inkTo(column, to, duration, easing) {
   return ink;
 }
 
+let inkedPaint = false;
 async function paint(update) {
   const inked = loader.classList.contains("gone") && stageBox.classList.contains("has-three") && !stageBox.hidden && !reduced();
+  inkedPaint = inked;
   if (!inked) return update();
   const column = document.querySelector(".column");
   const withdraw = inkTo(column, "0.5%", token("duration-withdraw"), INK_EXIT);
@@ -138,10 +140,18 @@ async function paint(update) {
   reveal.finished.then(() => reveal === ink && (reveal.cancel(), (ink = null)), () => null);
 }
 
-function enter() {
+// Sections in the order of the tab bar: a change of section enters from the side it lies on.
+const SECTIONS = ["now", "fridge", "market", "numbers", "chef", "settings"];
+let shownRoute = null;
+
+// Where no ink edge withdraws the panel (phones, no 3D), the new chapter's colour sweeps across its band from that side instead.
+function enter(route) {
   main.setAttribute("aria-busy", "false");
   [...main.querySelectorAll(":scope > header, .bento > *")].forEach((element, index) => element.style.setProperty("--i", Math.min(index, 5)));
-  main.setAttribute("data-enter", "");
+  const step = route && shownRoute ? Math.sign(SECTIONS.indexOf(route) - SECTIONS.indexOf(shownRoute)) : 0;
+  shownRoute = route ?? shownRoute;
+  main.style.setProperty("--enter-x", `${step * 24}px`);
+  main.setAttribute("data-enter", inkedPaint || !step ? "" : step > 0 ? "next" : "previous");
   setTimeout(() => main.removeAttribute("data-enter"), 1400);
 }
 
@@ -208,7 +218,7 @@ async function render({ navigate = false, refresh = false } = {}) {
   try {
     await views[route](main, household);
     if (ticket !== renders) return;
-    enter();
+    enter(route);
     refreshInbox();
     refreshStatus();
   } catch (error) {
@@ -219,6 +229,49 @@ async function render({ navigate = false, refresh = false } = {}) {
 }
 
 window.addEventListener("hashchange", () => render({ navigate: true }));
+
+// Phones: a sideways swipe on the page moves to the neighbouring section. The page follows the finger and springs back if the swipe falls
+// short; swipes inside sideways scrollers, fields and dialogs, near the screen edges (system back) or mostly vertical are left alone.
+const SWIPE_IGNORE = ".dish-row, .shelf-chips, .palette-chips, input, select, textarea, [data-scroll-x]";
+let swipe = null;
+main.addEventListener("pointerdown", (event) => {
+  if (event.pointerType !== "touch" || tabs.hidden || matchMedia("(min-width: 1024px)").matches || event.target.closest(SWIPE_IGNORE)) return;
+  if (24 > event.clientX || event.clientX > innerWidth - 24) return;
+  swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now(), dx: 0, locked: false };
+});
+main.addEventListener("pointermove", (event) => {
+  if (swipe?.id !== event.pointerId) return;
+  const dx = event.clientX - swipe.x;
+  const dy = event.clientY - swipe.y;
+  if (!swipe.locked) {
+    if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) swipe = null;
+    else if (Math.abs(dx) > 10) swipe.locked = true;
+    return;
+  }
+  swipe.dx = dx;
+  const index = SECTIONS.indexOf(current());
+  const edge = (dx > 0 && index === 0) || (0 > dx && index === 4) || index > 4;
+  if (!reduced()) main.style.translate = `${dx * (edge ? 0.15 : 0.6)}px 0`;
+});
+const endSwipe = (event) => {
+  if (swipe?.id !== event.pointerId) return;
+  const { dx, at, locked } = swipe;
+  swipe = null;
+  if (!locked) return;
+  const index = SECTIONS.indexOf(current());
+  const next = SECTIONS[index + (dx > 0 ? -1 : 1)];
+  const far = Math.abs(dx) > innerWidth * 0.25 || Math.abs(dx) / (performance.now() - at) > 0.5;
+  if (event.type === "pointerup" && far && next && next !== "settings" && index !== -1 && 5 > index) {
+    main.style.translate = "";
+    location.hash = `#/${next}`;
+    return;
+  }
+  const from = main.style.translate || "0px 0";
+  main.style.translate = "";
+  if (!reduced()) main.animate([{ translate: from }, { translate: "0px 0" }], { duration: token("duration-slow"), easing: easing("ease-spring") });
+};
+main.addEventListener("pointerup", endSwipe);
+main.addEventListener("pointercancel", endSwipe);
 
 document.querySelector(".skip").addEventListener("click", (event) => {
   event.preventDefault();
