@@ -43,7 +43,7 @@ const recipe = (name, minutes, foods) => ({ id: name, name, servings: 2, minutes
 const recipes = [recipe("Scrambled eggs with tomato", 10, [["Egg", 120], ["Tomato", 100]]), recipe("Pasta con tomate", 25, [["Tomato", 200], ["Cheese", 50]]), recipe("Arroz con pollo", 35, [["Chicken breast", 300], ["Carrot", 100]])];
 const tally = (consumed, rescued, discarded) => ({ consumedGrams: consumed, rescuedGrams: rescued, discardedGrams: discarded, wasteRate: discarded / Math.max(1, consumed + discarded) });
 const notifications = [
-  { id: "n1", type: "ALERT", title: "Puerta abierta", body: "La puerta de la nevera lleva 2 minutos abierta.", at: new Date(Date.now() - 3600000).toISOString(), readAt: null },
+  { id: "n1", type: "DOOR_LEFT_OPEN", title: "Puerta abierta", body: "La puerta de la nevera lleva 2 minutos abierta.", at: new Date(Date.now() - 3600000).toISOString(), readAt: null },
   { id: "n2", type: "BRIEFING", title: "Usa primero el tomate", body: "Vence mañana: 360 g de tomate.", at: new Date(Date.now() - 86400000).toISOString(), readAt: new Date().toISOString() },
 ];
 

@@ -1800,3 +1800,23 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 @keyframes write-in { to { -webkit-mask-position: 0 0; mask-position: 0 0; } }
 .resolved-line { display: grid; gap: 2px; margin: 0; color: var(--color-text-weak); }
 .resolved.done .resolved-line > :last-child::before { content: "\2713  "; color: var(--color-cilantro); font-weight: 700; }
+
+/* Ajustes: an index of the groups, and a stamp that confirms each save beside its button */
+.settings-index { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.settings-index .chip-button { min-height: 44px; padding: 0 var(--space-s); }
+.saved-stamp { justify-self: start; align-self: center; display: inline-block; padding: 4px 10px; border: 2px solid var(--color-cilantro); border-radius: 4px; color: var(--color-cilantro); font-weight: 700; font-size: var(--size-small); rotate: -3deg; }
+@media (prefers-reduced-motion: no-preference) { .saved-stamp { animation: stamp-in var(--duration-base) var(--ease-spring); } }
+@keyframes stamp-in { from { opacity: 0; scale: 1.4; rotate: -10deg; } }
+@media (max-width: 1023px) { .settings-index { display: none; } }
+
+/* Bandeja: under the bell on desktop, a sheet on phones; each alert is a sentence with its glyph and one action */
+@media (min-width: 761px) {
+  dialog.sheet.inbox-sheet { margin: calc(var(--bar-height) + 8px) var(--space-m) auto auto; width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - var(--bar-height) - 32px); }
+}
+.inbox-item { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: var(--space-s); align-items: start; touch-action: pan-y; transition: translate var(--duration-base) var(--ease-spring); }
+.inbox-glyph { display: grid; place-items: center; width: 32px; height: 32px; }
+.inbox-text { display: grid; gap: 4px; }
+.inbox-line { display: block; margin: 0; }
+.inbox-actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: 4px; }
+.inbox-item.inbox-unread { border-left: 2px solid var(--line); box-shadow: 3px 3px 0 var(--color-tomate); }
+.inbox-unread .inbox-glyph { color: var(--color-tomate); }

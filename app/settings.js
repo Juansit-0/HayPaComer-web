@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { soundOn } from "./sound.js";
 import { currentLocale, formatNumber, loadLocale, locales, t } from "./i18n.js";
 import { esc, formData, numberField, showError, toast, wireSteppers } from "./ui.js";
+import { reduced } from "./motion.js";
 
 const DIETS = ["OMNIVORE", "PESCATARIAN", "VEGETARIAN", "VEGAN"];
 const ALLERGENS = [
@@ -123,6 +124,17 @@ function householdTile(settings, owner) {
   </section>`;
 }
 
+// Each group confirms its own save with a stamp beside its button, where the eye already is.
+function saved(form, text = t("settings.saved")) {
+  form.querySelector(".saved-stamp")?.remove();
+  const stamp = document.createElement("span");
+  stamp.className = "saved-stamp";
+  stamp.setAttribute("role", "status");
+  stamp.textContent = text;
+  form.querySelector("button[type=submit]:last-of-type, button[type=submit]")?.after(stamp);
+  setTimeout(() => stamp.remove(), 4000);
+}
+
 export async function renderSettings(main, household, rerender) {
   const base = `/households/${household.id}`;
   const [me, detail, profiles, preferences, settings] = await Promise.all([
@@ -141,6 +153,14 @@ export async function renderSettings(main, household, rerender) {
       <h1>${t("settings.title")}</h1>
       <p class="lead">${t("settings.lead")}</p>
     </header>
+    <nav class="settings-index" aria-label="${esc(t("settings.title"))}">${[
+      ["profile-title", "settings.profile"],
+      ["language-title", "settings.language"],
+      ["alerts-title", "settings.alerts"],
+      ["household-settings-title", "settings.household"],
+    ]
+      .map(([target, key]) => `<button type="button" class="chip-button" data-goto="${target}">${t(key)}</button>`)
+      .join("")}</nav>
     <div class="bento">
       ${profileTile(profile)}
       <div class="w-5 stack">
@@ -150,6 +170,12 @@ export async function renderSettings(main, household, rerender) {
       ${householdTile(settings, owner)}
     </div>`;
   wireSteppers(main);
+
+  // The index scrolls to a group; the route stays on Ajustes, so these are buttons, not hash links.
+  main.querySelector(".settings-index").addEventListener("click", (event) => {
+    const heading = main.querySelector(`#${event.target.closest("[data-goto]")?.dataset.goto}`);
+    heading?.scrollIntoView({ block: "start", behavior: reduced() ? "auto" : "smooth" });
+  });
 
   main.querySelector("[data-language-form]").addEventListener("change", async (event) => {
     await loadLocale(event.target.value);
@@ -174,7 +200,7 @@ export async function renderSettings(main, household, rerender) {
             .filter(Boolean),
         },
       });
-      toast(t("settings.toast-profile"));
+      saved(profileForm);
     } catch (error) {
       showError(profileForm, error);
     }
@@ -189,7 +215,7 @@ export async function renderSettings(main, household, rerender) {
         method: "PUT",
         body: { channels: data.getAll("channels"), telegramChatId: formData(alertsForm).telegramChatId || null },
       });
-      toast(t("settings.toast-alerts"));
+      saved(alertsForm);
     } catch (error) {
       showError(alertsForm, error);
     }
@@ -204,8 +230,8 @@ export async function renderSettings(main, household, rerender) {
           method: "PUT",
           body: { key: form.dataset.setting, value: reset ? null : String(new FormData(form).get("value")) },
         });
-        toast(reset ? t("settings.toast-reset") : t("settings.toast-saved"));
-        renderSettings(main, household, rerender);
+        await renderSettings(main, household, rerender);
+        saved(main.querySelector(`[data-setting="${CSS.escape(form.dataset.setting)}"]`), reset ? t("settings.toast-reset") : t("settings.saved"));
       } catch (error) {
         showError(form, error);
       }
