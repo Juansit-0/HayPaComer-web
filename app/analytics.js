@@ -42,7 +42,7 @@ function chart(days) {
       const eaten = Number(day.tally.consumedGrams) / scale;
       const rescued = Number(day.tally.rescuedGrams) / scale;
       const wasted = Number(day.tally.discardedGrams) / scale;
-      return `<g>
+      return `<g style="--i:${index}">
         ${eaten ? `<rect class="eaten" x="${x}" y="${(middle - eaten).toFixed(1)}" width="${bar.toFixed(1)}" height="${eaten.toFixed(1)}"/>` : ""}
         ${rescued ? `<rect class="rescued" x="${x}" y="${(middle - rescued).toFixed(1)}" width="${bar.toFixed(1)}" height="${rescued.toFixed(1)}"/>` : ""}
         ${wasted ? `<rect class="wasted" x="${x}" y="${middle}" width="${bar.toFixed(1)}" height="${wasted.toFixed(1)}"/>` : ""}
@@ -73,18 +73,11 @@ function chart(days) {
   </figure>`;
 }
 
-function ranking(members) {
-  const best = Math.max(1, ...members.map((member) => Number(member.tally.rescuedGrams)));
-  return `<ol class="ranking">${members
-    .map(
-      (member) => `<li>
-        <span class="item-name">${esc(member.name)}${member.userId === me ? ` <span class="status quiet">${t("numbers.you")}</span>` : ""}</span>
-        <span class="meter" aria-hidden="true"><span data-member="${esc(member.userId)}" style="width:${((Number(member.tally.rescuedGrams) / best) * 100).toFixed(0)}%"></span></span>
-        <span class="data">${t("numbers.rescued-grams", { grams: grams(member.tally.rescuedGrams) })}</span>
-        <span class="item-meta">${t("numbers.member-detail", { eaten: grams(member.tally.consumedGrams), wasted: grams(member.tally.discardedGrams) })}</span>
-      </li>`,
-    )
-    .join("")}</ol>`;
+// The household is celebrated as one: what everyone rescued together, and your own share in positive terms. Nobody is ranked.
+function together(members, total) {
+  const mine = members.find((member) => member.userId === me);
+  return `<p class="together">${t("numbers.together", { n: members.length, grams: `<b>${grams(total.rescuedGrams)}</b>` })}</p>
+    ${mine ? `<p class="yours"><span class="status quiet">${t("numbers.you")}</span> ${t("numbers.rescued-grams", { grams: grams(mine.tally.rescuedGrams) })}, ${t("numbers.eaten-grams", { grams: grams(mine.tally.consumedGrams) })}</p>` : ""}`;
 }
 
 function foods(list) {
@@ -154,7 +147,6 @@ export async function renderAnalytics(main, household) {
     { key: "wasted", grams: total.discardedGrams, rate: share(total.discardedGrams, moved) },
   ];
   const wasted = [...metrics.foods].sort((a, b) => Number(b.tally.discardedGrams) - Number(a.tally.discardedGrams))[0];
-  const rescuer = [...metrics.members].sort((a, b) => Number(b.tally.rescuedGrams) - Number(a.tally.rescuedGrams))[0];
   const foodLabel = (food) => (food.foodKey === "unknown" ? t("numbers.unknown-food") : esc(foodName(food.foodKey)));
 
   main.innerHTML = `
@@ -193,14 +185,6 @@ export async function renderAnalytics(main, household) {
               }
               ${Number(metrics.moneyWasted) ? `<p class="hint">${t("numbers.money-lost", { money: esc(money(metrics.moneyWasted, metrics.currency)) })}</p>` : ""}
             </article>
-            ${
-              rescuer
-                ? `<article class="fact">
-                    <h2>${t("numbers.top-rescuer")}</h2>
-                    <p class="fact-value">${esc(rescuer.name)}${rescuer.userId === me ? ` <span class="status quiet">${t("numbers.you")}</span>` : ""} <span class="data">${grams(rescuer.tally.rescuedGrams)}</span></p>
-                  </article>`
-                : ""
-            }
           </section>
           <section class="tile" aria-labelledby="daily-title">
             <h2 id="daily-title">${t("numbers.daily")}</h2>
@@ -208,7 +192,7 @@ export async function renderAnalytics(main, household) {
           </section>
           ${
             metrics.members.length > 1
-              ? `<section class="tile" aria-labelledby="ranking-title"><h2 id="ranking-title">${t("numbers.ranking")}</h2>${ranking(metrics.members)}</section>`
+              ? `<section class="tile" aria-labelledby="ranking-title"><h2 id="ranking-title">${t("numbers.ranking")}</h2>${together(metrics.members, total)}</section>`
               : ""
           }
           ${
@@ -251,12 +235,6 @@ export async function renderAnalytics(main, household) {
     if (!from || still) return;
     circle.style.animation = "none";
     circle.animate([{ strokeDasharray: from }, { strokeDasharray: to }], { duration: token("duration-spring"), easing: curve });
-  });
-  main.querySelectorAll("[data-member]").forEach((bar, index) => {
-    const to = bar.style.width;
-    now.members[bar.dataset.member] = to;
-    if (still) return;
-    bar.animate([{ width: shown?.members[bar.dataset.member] ?? "0%" }, { width: to }], { duration: token("duration-shutter"), delay: index * token("stagger"), easing: curve, fill: "backwards" });
   });
   shown = now;
 
