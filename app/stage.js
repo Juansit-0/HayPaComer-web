@@ -400,6 +400,8 @@ export function showRoute(route) {
   }
   root.dataset.route = route;
   root.closest(".stage").dataset.route = route;
+  // The fridge is the interface on Ahora and Nevera; elsewhere it steps aside and the panel takes the room.
+  root.closest(".shell").dataset.layout = ["now", "fridge"].includes(route) ? "wide" : "aside";
   root.querySelectorAll("[data-part]").forEach((part) => {
     if (part.dataset.part === route) part.setAttribute("aria-current", "page");
     else part.removeAttribute("aria-current");

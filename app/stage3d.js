@@ -706,6 +706,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     Object.assign(tagLayer.style, { left: `${canvas.offsetLeft}px`, top: `${canvas.offsetTop}px`, width: `${clientWidth}px`, height: `${clientHeight}px` });
     camera.aspect = clientWidth / clientHeight;
     camera.updateProjectionMatrix();
+    film?.wake();
   }
   new ResizeObserver(resize).observe(canvas);
   resize();

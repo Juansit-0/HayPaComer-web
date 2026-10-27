@@ -1406,7 +1406,9 @@ a.button:active { transform: scale(0.97); }
 
 /* Fridge-first: on desktop with the 3D fridge, the fridge is the interface and the column is the panel of the part you opened */
 @media (min-width: 1024px) {
-  .shell:has(.stage.has-three:not([hidden])) { grid-template-columns: minmax(0, 1fr) clamp(400px, 36vw, 540px); }
+  .shell:has(.stage.has-three:not([hidden])) { grid-template-columns: minmax(0, 1fr) clamp(400px, 36vw, 540px); transition: grid-template-columns var(--duration-spring) var(--ease-spring); }
+  .shell[data-layout="aside"]:has(.stage.has-three:not([hidden])) { grid-template-columns: minmax(0, 1fr) clamp(560px, 62vw, 1040px); }
+  .shell[data-layout="aside"]:has(.stage.has-three:not([hidden])) .column main { max-width: 960px; margin-inline: auto; }
   .shell:has(.stage.has-three:not([hidden])) .column { position: relative; z-index: 7; background: var(--color-bg); box-shadow: -1px 0 0 color-mix(in oklab, var(--color-tinta) 12%, transparent), -24px 0 48px -32px color-mix(in oklab, var(--color-tinta) 30%, transparent); }
   .shell:has(.stage.has-three:not([hidden])) .column main { container: panel / inline-size; max-width: none; padding-inline: var(--space-m); }
   .shell:has(.stage.has-three:not([hidden])) .bar { flex-wrap: nowrap; gap: var(--space-s); padding-inline: var(--space-m); }
@@ -1705,4 +1707,13 @@ img.inked { opacity: 0; }
   .bar .session { margin-left: auto; }
   .shell:has(.tabs:not([hidden])) main { padding-bottom: calc(var(--space-xxl) + var(--tabbar-height) + env(safe-area-inset-bottom)); }
   .shell:has(.tabs:not([hidden])) ~ .toast { bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-s)); }
+}
+
+/* Contextual fridge: on routes that don't use it, it steps aside (desktop) or folds away (phones) */
+@media (min-width: 1024px) {
+  .shell:has(.stage:not(.has-three):not([hidden])) { transition: grid-template-columns var(--duration-spring) var(--ease-spring); }
+  .shell[data-layout="aside"]:has(.stage:not(.has-three):not([hidden])) { grid-template-columns: minmax(300px, 28vw) minmax(0, 1fr); }
+}
+@media (max-width: 1023px) {
+  .shell[data-layout="aside"] .stage { display: none; }
 }
