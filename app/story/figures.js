@@ -267,12 +267,11 @@ export function figure(kind, look) {
     bone.quaternion.multiply(turn.setFromAxisAngle(axis.set(1, 0, 0), x));
     bone.quaternion.multiply(turn.setFromAxisAngle(axis.set(0, 1, 0), y));
   };
-  // A person, not a loop: each walker keeps its own pace and lean, and now and then turns its head to look around.
+  // Each walker keeps its own pace. Nothing is added on top of the clip: the mixer only rewrites a bone when its value changes, so a
+  // rotation multiplied in here would pile up every frame while the scroll stands still.
   root.userData.walk = (distance, offset = 0) => {
     const pace = 0.92 + offset * 0.16;
     mixer.setTime(at(distance / (cycle * root.scale.y * pace) + offset));
-    nudge(spine, 0.02 + offset * 0.06, 0);
-    nudge(head, 0, Math.sin(distance * 0.9 + offset * 6.3) ** 3 * 0.35);
   };
   // Standing: the still pose, a slow shift of weight from one leg to the other, breath in the chest and a glance around.
   root.userData.stand = (time, offset = 0) => {

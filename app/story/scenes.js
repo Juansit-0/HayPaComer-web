@@ -659,7 +659,8 @@ export function homeScene() {
   const tote = bag();
   tote.scale.setScalar(0.85);
   scene.add(walker, tote);
-  const neighbours = crowd([{ at: [3.4, -1.3], facing: -Math.PI / 2 }, { at: [3.9, -1.4], facing: Math.PI }], { looks: 2, seed: 13 });
+  // Two neighbours talking at a door, face to face.
+  const neighbours = crowd([{ at: [3.35, -1.2], facing: Math.PI / 2 }, { at: [3.95, -1.2], facing: -Math.PI / 2 }], { looks: 2, seed: 13, era: 2026 });
   scene.add(neighbours);
   scene.userData.play = (k) => {
     walker.userData.play(k);
