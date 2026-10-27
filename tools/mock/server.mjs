@@ -72,6 +72,7 @@ const routes = [
     members: [{ userId: "u1", name: "Juan", tally: tally(320, 270, 0) }, { userId: "u2", name: "Jenifer", tally: tally(200, 0, 80) }],
     foods: [{ foodKey: "chicken breast", tally: tally(0, 0, 80) }, { foodKey: "tomato", tally: tally(150, 150, 0) }] })],
   [/^\/households\/[^/]+\/market-list$/, () => ({ pending: ["VEGETABLE", "DAIRY", "GRAIN"].map((category) => ({ category, items: market.filter((entry) => entry.category === category && !entry.checked) })).filter((group) => group.items.length), checked: market.filter((entry) => entry.checked) })],
+  [/^\/households\/[^/]+\/agent\/chat$/, () => ({ conversationId: "c1", answer: "El **tomate** vence mañana y hay 360 g: úsalo hoy en unos huevos pericos o en una salsa para la pasta.\nLa pechuga de pollo también vence mañana.", runs: [{ specialist: "chef" }], evidence: [{ tool: "view_expiries", content: "Tomate 360 g, vence mañana" }, { tool: "query_inventory", content: "Pechuga de pollo 400 g, vence mañana" }] })],
   [/^\/households\/[^/]+\/prices$/, () => ({ Tomato: 4400, "Chicken breast": 18000, Tuna: 30000, Milk: 4200 })],
   [/^\/households\/[^/]+\/market-budget$/, () => ({ currency: "COP", monthly: 600000, spent: 210000, plannedCost: 48000, remaining: 342000, lines: [] })],
   [/^\/households\/[^/]+\/cooking-sessions\/active$/, () => null],
