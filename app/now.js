@@ -2,7 +2,8 @@ import { api } from "./api.js";
 import { dishPicture } from "./dishes.js";
 import { liveFeed } from "./live.js";
 import { foodName, formatTime, plural, recipeName, t } from "./i18n.js";
-import { busy, esc, expiryText, grams, kpi, numberField, showError, statusPill, toast, wireSteppers } from "./ui.js";
+import { busy, esc, expiryText, grams, kpi, numberField, portions, showError, statusPill, wireSteppers } from "./ui.js";
+import { undoable } from "./stage.js";
 
 const URGENT = ["EXPIRED", "UNDER_REVIEW", "AT_RISK", "LEFTOVER"];
 const LABELS = { inventory: "live.kind.inventory", sensor: "live.kind.sensor", alert: "live.kind.alert", copilot: "live.kind.copilot" };
@@ -60,7 +61,7 @@ export function dishCard(dish, index) {
       ]
         .filter(Boolean)
         .join(". ")}</p>
-      <button class="primary" type="button" data-cook="${esc(dish.recipe)}">${t("now.dish.cook")}</button>
+      <button class="${index ? "" : "primary"}" type="button" data-cook="${esc(dish.recipe)}">${t("now.dish.cook")}</button>
     </div>
   </article>`;
 }
@@ -76,10 +77,11 @@ function todayCard(item) {
   return `<li class="today-card" data-key="${esc(item.id)}">
     <span class="today-grams">${grams(item.grams)}</span>
     <span class="item-name">${esc(foodName(item.name))}</span>
-    <span class="item-meta">${statusPill(item.statuses)}<span>${expiryText(item)}</span></span>
+    <span class="item-meta">${item.statuses.some((status) => status !== "AT_RISK") ? statusPill(item.statuses.filter((status) => status !== "AT_RISK")) : ""}<span class="row-expiry attention">${expiryText(item)}</span></span>
     <form class="today-use" data-consume="${esc(item.id)}">
+      ${portions(item.grams)}
       <label class="visually-hidden" for="use-${esc(item.id)}">${esc(t("now.grams-used"))}</label>
-      <input id="use-${esc(item.id)}" class="grams" name="grams" type="number" inputmode="numeric" min="1" step="1" required value="${Math.round(item.grams)}">
+      <input id="use-${esc(item.id)}" class="grams" name="grams" type="number" inputmode="numeric" min="1" step="1" required value="${Math.max(1, Math.round(item.grams / 2))}">
       <button type="submit">${t("now.mark-used")}</button>
     </form>
   </li>`;
@@ -173,10 +175,8 @@ export async function renderNow(main, household) {
       const amount = Number(new FormData(form).get("grams"));
       try {
         await busy(event.submitter ?? form.querySelector("button"), () =>
-          api(`${base}/items/${item.id}/consume`, { method: "POST", body: { grams: amount } }),
+          undoable(() => api(`${base}/items/${item.id}/consume`, { method: "POST", body: { grams: amount } }), t("now.toast-used", { grams: grams(amount), food: foodName(item.name) })),
         );
-        toast(t("now.toast-used", { grams: grams(amount), food: foodName(item.name) }));
-        renderNow(main, household);
       } catch (error) {
         showError(form, error);
       }

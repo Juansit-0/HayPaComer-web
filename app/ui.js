@@ -437,3 +437,28 @@ document.addEventListener(
   },
   true,
 );
+
+// Quick portions beside a grams field: a quarter, half or all of what there is, so one tap does not use everything by mistake.
+export function portions(total) {
+  return `<span class="portions" role="group">${[
+    [0.25, "stage.share.25", "\u00bc"],
+    [0.5, "stage.share.50", "\u00bd"],
+    [1, "stage.share.100", ""],
+  ]
+    .map(
+      ([share, key, mark]) =>
+        `<button class="chip-button" type="button" data-share="${Math.max(1, Math.round(total * share))}" aria-pressed="${share === 0.5}" ${mark ? `aria-label="${esc(t(key))}"` : ""}>${mark || esc(t(key))}</button>`,
+    )
+    .join("")}</span>`;
+}
+
+document.addEventListener("click", (event) => {
+  const chosen = event.target.closest("[data-share]");
+  const form = chosen?.closest("form");
+  if (!form) return;
+  form.querySelector("input.grams").value = chosen.dataset.share;
+  form.querySelectorAll("[data-share]").forEach((button) => button.setAttribute("aria-pressed", String(button === chosen)));
+});
+document.addEventListener("input", (event) => {
+  if (event.target.matches("input.grams")) event.target.form?.querySelectorAll("[data-share]").forEach((button) => button.setAttribute("aria-pressed", "false"));
+});

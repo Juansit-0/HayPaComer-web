@@ -144,7 +144,8 @@ function changed() {
 const PACK_GRAMS = { Tomato: 500, Egg: 360, Milk: 1000, "Chicken breast": 500, Potato: 1000, Carrot: 500, Avocado: 400, Cheese: 250, Yogurt: 150, Banana: 600 };
 const SHARES = [1, 0.5, 0.25];
 
-async function undoable(task, message) {
+// An inventory change with a toast that can take it back: every use, discard and move goes through here.
+export async function undoable(task, message) {
   const base = `/households/${household.id}`;
   let ok = false;
   try {
