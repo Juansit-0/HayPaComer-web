@@ -824,48 +824,136 @@ export function plateScene() {
     ),
   );
   scene.add(table);
-  const plate = outline(mesh(new THREE.LatheGeometry([[0, 0], [0.17, 0], [0.22, 0.025], [0.23, 0.035], [0, 0.035]].map(([x, y]) => new THREE.Vector2(x, y)), 48), paint("#ffffff"), (m) => (m.position.y = 0.781)));
+  // A deep-rimmed plate with a band round its edge.
+  const plate = outline(group(
+    mesh(new THREE.LatheGeometry([[0, 0], [0.15, 0], [0.165, 0.008], [0.21, 0.026], [0.235, 0.034], [0.232, 0.04], [0.2, 0.034], [0.16, 0.014], [0, 0.014]].map(([x, y]) => new THREE.Vector2(x, y)), 64), paint("#ffffff")),
+    mesh(new THREE.TorusGeometry(0.215, 0.003, 4, 64), paint("#3f6f8f"), (m) => {
+      m.rotation.x = Math.PI / 2;
+      m.position.y = 0.031;
+    }),
+  ));
+  plate.position.y = 0.781;
   scene.add(plate);
+  // Breakfast: huevos pericos (soft scrambled egg folded with tomato and spring onion), an arepa toasted on the griddle with butter melting
+  // on it, and a slice of fresh cheese.
   const food = new THREE.Group();
-  for (let index = 0; 16 > index; index++) {
-    const angle = random(index * 1.3) * Math.PI * 2;
-    const reach = Math.sqrt(random(index * 2.9)) * 0.1;
-    const egg = outline(mesh(lumpy(new THREE.SphereGeometry(0.022 + random(index) * 0.012, 14, 10), 0.35), paint(index % 4 ? "#f2c94c" : "#f7e6a6")));
-    egg.position.set(-0.05 + Math.cos(angle) * reach, 0.81 + random(index * 5) * 0.012, Math.sin(angle) * reach * 0.8);
-    egg.scale.y = 0.6;
-    food.add(egg);
+  const egg = paint("#f2c94c");
+  const eggLight = paint("#f7df8a");
+  for (let index = 0; 9 > index; index++) {
+    const angle = (index / 9) * Math.PI * 2 + random(index) * 0.6;
+    const reach = index ? 0.035 + random(index * 2.9) * 0.035 : 0;
+    const curd = new THREE.SphereGeometry(0.03 + random(index * 3.1) * 0.014, 14, 10);
+    food.add(mesh(lumpy(curd, 0.28), index % 3 ? egg : eggLight, (m) => {
+      m.position.set(-0.07 + Math.cos(angle) * reach, 0.808 + (index ? 0 : 0.012), Math.sin(angle) * reach * 0.85);
+      m.scale.set(1.25, 0.5, 1.05);
+      m.rotation.y = angle;
+    }));
   }
-  for (let index = 0; 10 > index; index++) {
+  for (let index = 0; 9 > index; index++) {
     const angle = random(index * 4.1) * Math.PI * 2;
-    const reach = Math.sqrt(random(index * 6.7)) * 0.09;
-    const bit = outline(mesh(lumpy(new THREE.SphereGeometry(0.011, 10, 8), 0.3), paint(index % 3 ? "#c8432a" : "#3f7a3a")));
-    bit.position.set(-0.05 + Math.cos(angle) * reach, 0.832, Math.sin(angle) * reach * 0.8);
-    food.add(bit);
+    const reach = Math.sqrt(random(index * 6.7)) * 0.07;
+    food.add(mesh(new RoundedBoxGeometry(0.016, 0.01, 0.014, 1, 0.003), paint("#c8432a"), (m) => {
+      m.position.set(-0.07 + Math.cos(angle) * reach, 0.826, Math.sin(angle) * reach * 0.8);
+      m.rotation.set(random(index) * 2, angle, random(index * 3));
+    }));
   }
-  const arepa = outline(mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.03, 32), paint("#e9d3a0"), (m) => m.position.set(0.12, 0.83, 0.07)));
+  for (let index = 0; 8 > index; index++) {
+    const angle = random(index * 7.3) * Math.PI * 2;
+    const reach = Math.sqrt(random(index * 5.1)) * 0.075;
+    food.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.012, 8), paint("#4f8a3a"), (m) => {
+      m.position.set(-0.07 + Math.cos(angle) * reach, 0.828, Math.sin(angle) * reach * 0.8);
+      m.rotation.set(Math.PI / 2, 0, angle);
+    }));
+  }
+  const arepa = new THREE.Group();
+  arepa.add(mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.026, 40), paint("#e9d3a0")));
+  [[0.03, 0.02, 0.018], [-0.035, -0.01, 0.014], [0.01, -0.045, 0.012], [-0.02, 0.045, 0.01], [0.05, -0.02, 0.009]].forEach(([x, z, r]) => arepa.add(mesh(new THREE.CircleGeometry(r, 12), paint("#b98a4c"), (m) => {
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(x, 0.0135, z);
+  })));
+  arepa.add(mesh(new RoundedBoxGeometry(0.035, 0.012, 0.028, 2, 0.004), paint("#f6e7a6"), (m) => m.position.set(-0.005, 0.019, 0.005)));
+  arepa.position.set(0.09, 0.808, 0.05);
   food.add(arepa);
-  scene.add(food);
-  const cup = outline(
-    group(
-      mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.1, 24), paint("#ffffff"), (m) => (m.position.y = 0.83)),
-      mesh(new THREE.TorusGeometry(0.03, 0.008, 8, 16), paint("#ffffff"), (m) => m.position.set(0.06, 0.83, 0)),
-    ),
-  );
-  cup.position.set(0.42, 0, -0.18);
+  food.add(mesh(new RoundedBoxGeometry(0.07, 0.016, 0.05, 2, 0.004), paint("#f3ead2"), (m) => {
+    m.position.set(0.06, 0.806, -0.1);
+    m.rotation.y = 0.4;
+  }));
+  scene.add(outline(food));
+  // A coffee cup on its saucer, open, with coffee in it.
+  const cup = outline(group(
+    mesh(new THREE.LatheGeometry([[0, 0], [0.07, 0.002], [0.075, 0.008], [0.07, 0.01], [0, 0.006]].map(([x, y]) => new THREE.Vector2(x, y)), 32), paint("#ffffff")),
+    mesh(new THREE.LatheGeometry([[0.03, 0.008], [0.04, 0.012], [0.046, 0.06], [0.048, 0.085]].map(([x, y]) => new THREE.Vector2(x, y)), 32), paint("#ffffff", { side: THREE.DoubleSide })),
+    mesh(new THREE.CircleGeometry(0.042, 24), paint("#5a3b22"), (m) => {
+      m.rotation.x = -Math.PI / 2;
+      m.position.y = 0.07;
+    }),
+    mesh(new THREE.TorusGeometry(0.022, 0.006, 8, 16, Math.PI * 1.2), paint("#ffffff"), (m) => {
+      m.position.set(0.055, 0.05, 0);
+      m.rotation.z = -Math.PI * 0.6;
+    }),
+  ));
+  cup.position.set(0.42, 0.781, -0.18);
   scene.add(cup);
-  // The place set round the plate: a folded napkin with fork and knife, a glass of juice, salt and a sprig of flowers in a little vase.
+  // The place set round the plate: a folded napkin with a fork on it, a knife and a spoon on the right, a glass of juice, salt and a
+  // sprig of flowers in a little vase.
   const setting = new THREE.Group();
-  setting.add(mesh(new THREE.BoxGeometry(0.12, 0.008, 0.2), paint("#efe6c8"), (m) => m.position.set(-0.33, 0.785, 0.02)));
-  setting.add(mesh(new THREE.BoxGeometry(0.014, 0.006, 0.18), paint("#9aa0a4"), (m) => m.position.set(-0.32, 0.792, 0.02)));
-  setting.add(mesh(new THREE.BoxGeometry(0.016, 0.006, 0.19), paint("#9aa0a4"), (m) => m.position.set(0.3, 0.784, 0.06)));
-  setting.add(mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.12, 16), paint("#f0a640"), (m) => m.position.set(0.3, 0.84, -0.2)));
-  setting.add(mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.06, 12), paint("#f6f1e6"), (m) => m.position.set(-0.28, 0.81, -0.24)));
-  setting.add(mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.09, 14), paint("#3f6f8f"), (m) => m.position.set(-0.5, 0.825, -0.3)));
+  const steel = paint("#a9afb3");
+  const fork = (x, z) => {
+    setting.add(mesh(new RoundedBoxGeometry(0.014, 0.005, 0.11, 1, 0.002), steel, (m) => m.position.set(x, 0, z + 0.04)));
+    setting.add(mesh(new THREE.BoxGeometry(0.022, 0.004, 0.03), steel, (m) => m.position.set(x, 0, z - 0.028)));
+    [-0.008, -0.0027, 0.0027, 0.008].forEach((dx) => setting.add(mesh(new THREE.BoxGeometry(0.0035, 0.004, 0.04), steel, (m) => m.position.set(x + dx, 0, z - 0.06))));
+  };
+  // A table knife: a wooden handle toward the diner, a broad steel blade beyond it, its tip cut on a slant.
+  const knife = (x, z) => {
+    setting.add(mesh(new RoundedBoxGeometry(0.014, 0.008, 0.08, 1, 0.003), paint("#6b4a2a"), (m) => m.position.set(x, 0.001, z + 0.065)));
+    const blade = new THREE.Shape();
+    blade.moveTo(-0.009, 0);
+    blade.lineTo(0.009, 0);
+    blade.lineTo(0.009, 0.085);
+    blade.quadraticCurveTo(0.008, 0.112, -0.003, 0.118);
+    blade.lineTo(-0.009, 0.1);
+    blade.lineTo(-0.009, 0);
+    setting.add(mesh(new THREE.ExtrudeGeometry(blade, { depth: 0.003, bevelEnabled: false, curveSegments: 8 }), steel, (m) => {
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(x, -0.0015, z + 0.026);
+    }));
+  };
+  const spoon = (x, z) => {
+    setting.add(mesh(new RoundedBoxGeometry(0.012, 0.005, 0.12, 1, 0.002), steel, (m) => m.position.set(x, 0, z + 0.035)));
+    setting.add(mesh(new THREE.SphereGeometry(0.02, 14, 8), steel, (m) => {
+      m.position.set(x, 0, z - 0.045);
+      m.scale.set(0.8, 0.22, 1.2);
+    }));
+  };
+  setting.add(mesh(new RoundedBoxGeometry(0.13, 0.01, 0.21, 2, 0.003), paint("#efe6c8"), (m) => m.position.set(-0.34, -0.004, 0.02)));
+  setting.add(mesh(new THREE.BoxGeometry(0.004, 0.012, 0.21), paint("#d9cfb0"), (m) => m.position.set(-0.31, -0.003, 0.02)));
+  fork(-0.35, 0.02);
+  knife(0.3, 0.04);
+  spoon(0.34, 0.04);
+  setting.add(mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.06, 12), paint("#f6f1e6"), (m) => m.position.set(-0.28, 0.026, -0.24)));
+  setting.add(mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.008, 12), paint("#9aa0a4"), (m) => m.position.set(-0.28, 0.06, -0.24)));
+  setting.add(mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.09, 14), paint("#3f6f8f"), (m) => m.position.set(-0.5, 0.04, -0.3)));
   [[-0.51, -0.3, "#c8432a"], [-0.48, -0.29, "#f2c94c"], [-0.5, -0.32, "#d98a9b"]].forEach(([x, z, color], index) => {
-    setting.add(mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.12, 4), paint("#4f7a4a"), (m) => m.position.set(x, 0.92, z)));
-    setting.add(mesh(lumpy(new THREE.SphereGeometry(0.018, 8, 6), 0.3), paint(color), (m) => m.position.set(x, 0.98 + index * 0.012, z)));
+    setting.add(mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.12, 4), paint("#4f7a4a"), (m) => m.position.set(x, 0.135, z)));
+    setting.add(mesh(lumpy(new THREE.SphereGeometry(0.018, 8, 6), 0.3), paint(color), (m) => m.position.set(x, 0.195 + index * 0.012, z)));
   });
-  scene.add(outline(merged(setting)));
+  // merged() keeps the parts relative to their group, so the height of the table goes on the merged result.
+  const laid = outline(merged(setting));
+  laid.position.y = 0.785;
+  scene.add(laid);
+  // A glass of juice: clear glass with the juice standing in it, a thick base and a rim.
+  const glass = group(
+    mesh(new THREE.CylinderGeometry(0.031, 0.027, 0.085, 24), paint("#f0a640"), (m) => (m.position.y = 0.05)),
+    mesh(new THREE.CircleGeometry(0.031, 24), paint("#f6c26a"), (m) => {
+      m.rotation.x = -Math.PI / 2;
+      m.position.y = 0.093;
+    }),
+    mesh(new THREE.CylinderGeometry(0.036, 0.031, 0.13, 24, 1, true), paint("#eef4f2", { transparent: true, opacity: 0.38, side: THREE.DoubleSide }), (m) => (m.position.y = 0.067)),
+    mesh(new THREE.CylinderGeometry(0.031, 0.031, 0.012, 24), paint("#dfe8e4", { transparent: true, opacity: 0.6 }), (m) => (m.position.y = 0.006)),
+  );
+  outline(glass);
+  glass.position.set(0.3, 0.781, -0.2);
+  scene.add(glass);
   scene.userData.play = (k) => {
     food.position.y = (1 - THREE.MathUtils.smoothstep(k, 0.05, 0.3)) * 0.25;
     food.rotation.y = k * 0.6;
@@ -1029,7 +1117,8 @@ function wallDecor(props, wall, { windowX, shelfX, clockX, sill = 1.33 }) {
   props.add(mesh(new THREE.BoxGeometry(0.95, 0.8, 0.04), paint("#f6f1e6"), (m) => m.position.set(windowX, 1.75 + lift, wall)));
   props.add(mesh(new THREE.BoxGeometry(0.83, 0.68, 0.03), paint("#bcd3d6"), (m) => m.position.set(windowX, 1.75 + lift, wall + 0.012)));
   props.add(mesh(new THREE.BoxGeometry(0.03, 0.68, 0.035), paint("#f6f1e6"), (m) => m.position.set(windowX, 1.75 + lift, wall + 0.016)));
-  [-1, 1].forEach((side) => props.add(mesh(new THREE.BoxGeometry(0.26, 0.92, 0.04), paint("#c8432a"), (m) => m.position.set(windowX + side * 0.5, 1.72 + lift, wall + 0.05))));
+  // Curtains hang from the top of the window down to the sill, never past it, so a counter under a low window stays clear.
+  [-1, 1].forEach((side) => props.add(mesh(new THREE.BoxGeometry(0.26, 0.84, 0.03), paint("#c8432a"), (m) => m.position.set(windowX + side * 0.5, 1.765 + lift, wall + 0.03))));
   props.add(mesh(new THREE.BoxGeometry(1.0, 0.04, 0.16), paint("#f6f1e6"), (m) => m.position.set(windowX, sill, wall + 0.07)));
   props.add(mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.12, 14), paint("#b5633d"), (m) => m.position.set(windowX + 0.25, sill + 0.08, wall + 0.07)));
   props.add(mesh(lumpy(new THREE.SphereGeometry(0.11, 12, 9), 0.35), paint("#5f8a4a"), (m) => m.position.set(windowX + 0.25, sill + 0.22, wall + 0.07)));
