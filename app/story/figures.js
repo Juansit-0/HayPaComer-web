@@ -122,7 +122,9 @@ body.onBeforeCompile = (shader) => {
     .replace("#include <begin_vertex>", "#include <begin_vertex>\nvOcclusion = occlusion;");
   shader.fragmentShader = shader.fragmentShader
     .replace("uniform float hatchScale;", "uniform float hatchScale;\nvarying float vOcclusion;")
-    .replace("float shade = smoothstep(", "lit *= mix(0.45, 1.0, vOcclusion);\n      float shade = smoothstep(");
+    // People carry less ink than the buildings: the light is lifted toward paper, the folds darken it gently and a chapter's extra ink (the
+    // market's low sun) is left to the setting, so the hatching keeps to the shadowed side instead of covering the whole figure.
+    .replace("float shade = smoothstep(", "lit = mix(lit, 1.0, 0.45) * mix(0.85, 1.0, vOcclusion) + inkBias;\n      float shade = smoothstep(");
 };
 
 // The ink edge: an inverted hull pushed out along the skinned normal. Built on MeshBasicMaterial, whose vertex shader already skins normals.
