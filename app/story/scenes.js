@@ -1127,6 +1127,30 @@ export function homeScene() {
     m.position.set(dash, 0.006, 0.9);
   }));
   scene.add(wires(-15, 16, -0.72));
+  // Beyond the cross street the town goes on: a lower row of blocks farther back and, between them and the mountain, a line of eucalyptus,
+  // which closes the view where the slopes come down to the ground.
+  const beyond = new THREE.Group();
+  let far = -26;
+  [2, 1, 2, 2, 1, 3, 2, 1, 2, 2].forEach((floors, index) => {
+    const width = 1.6 + random(index * 23 + 5) * 1.0;
+    const item = scaled(block(index * 11 + 300, { floors, width, brick: index % 2 === 0 }), BLOCK_SCALE * 0.9);
+    item.position.set(far + (width * BLOCK_SCALE * 0.9) / 2, 0, -11.5 - random(index * 7) * 1.5);
+    beyond.add(item);
+    far += width * BLOCK_SCALE * 0.9 + 0.6;
+  });
+  const bark = paint("#8a7a66");
+  const leaves = [paint("#6f8a5a"), paint("#5f7a4f"), paint("#7f9564")];
+  for (let index = 0; 26 > index; index++) {
+    const x = -30 + index * 2.4 + random(index * 3) * 1.2;
+    const z = -15.5 - random(index * 5) * 2;
+    const height = 6 + random(index * 9) * 3.5;
+    beyond.add(mesh(new THREE.CylinderGeometry(0.08, 0.14, height * 0.55, 6), bark, (m) => m.position.set(x, height * 0.275, z)));
+    beyond.add(mesh(lumpy(new THREE.SphereGeometry(1, 12, 9), 0.25), leaves[index % 3], (m) => {
+      m.position.set(x, height * 0.66, z);
+      m.scale.set(1.1 + random(index) * 0.5, height * 0.38, 1.1);
+    }));
+  }
+  scene.add(outline(merged(beyond)));
   scene.add(outline(merged(props)));
   const tote = bag();
   tote.scale.setScalar(0.85);
