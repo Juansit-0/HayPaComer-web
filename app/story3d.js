@@ -148,13 +148,14 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
       }
     }
     for (let other = 0; last >= other; other += 1) chapters[other].world.visible = other === index || other === neighbour;
-    // The table is two worlds, 1876 and today; once the cut has passed, a seam crosses from the left edge to the middle of the screen and
-    // today takes the screen behind it.
+    // The table is two worlds, 1876 and today; once the cut has passed, a torn seam crosses from the right edge to the left, 1876 on its
+    // left and today on its right, until today holds the whole screen.
     const split = chapter.world.userData.split;
-    const seam = split && neighbour === -1 ? 0.5 * THREE.MathUtils.smoothstep(k, 0.1, 0.5) : 0;
+    const seam = split && neighbour === -1 ? 1 - THREE.MathUtils.smoothstep(k, 0.1, 0.75) : 1;
     if (split) {
-      split.then.visible = true;
-      split.today.visible = false;
+      split.then.visible = seam > 0;
+      split.today.visible = 0 >= seam;
+      if (0 >= seam) tone = 0;
     }
 
     if (state.override) {
@@ -166,7 +167,10 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
       camera.lookAt(look);
     } else {
       camera.fov = chapter.track.sample(k, camera.position, look);
-      camera.position.sub(look).multiplyScalar(Math.max(1, 0.95 / camera.aspect)).add(look);
+      const pull = Math.max(1, 0.95 / camera.aspect);
+      camera.position.sub(look).multiplyScalar(pull).add(look);
+      // A tall frame pulls the camera back along its view; one looking up would sink below the street, so it stops at eye height.
+      if (pull > 1) camera.position.y = Math.max(camera.position.y, 1.2);
       camera.position.x += state.gazeX * 0.04;
       camera.position.y += -state.gazeY * 0.025;
       camera.lookAt(look);
@@ -196,7 +200,7 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     if (seam !== shownSeam) {
       shownSeam = seam;
       stage.style.setProperty("--seam", seam.toFixed(4));
-      stage.style.setProperty("--tear", seam > 0 ? "1" : "0");
+      stage.style.setProperty("--tear", seam > 0 && 1 > seam ? "1" : "0");
     }
     const stepped = Math.floor(now * 8) / 8;
     if (tone > 0 && stepped !== shownGrain) {
@@ -211,7 +215,7 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     ink.uniforms.uTime.value = stepped;
 
     renderer.clear();
-    if (seam > 0) {
+    if (seam > 0 && 1 > seam) {
       const width = canvas.clientWidth;
       const edge = Math.round(width * seam);
       const pass = (show, hide, value, x, span) => {
@@ -226,8 +230,8 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
         renderer.render(scene, camera);
       };
       renderer.setScissorTest(true);
-      pass(split.then, split.today, 1, edge, width - edge);
-      pass(split.today, split.then, 0, 0, edge);
+      pass(split.then, split.today, 1, 0, edge);
+      pass(split.today, split.then, 0, edge, width - edge);
       renderer.setScissorTest(false);
       shownTone = -1;
     } else {

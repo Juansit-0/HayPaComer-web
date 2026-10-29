@@ -153,6 +153,14 @@ function tileSlope(width, length) {
 }
 
 // A whitewashed Pasto house: painted plinth, gabled tile roof with eaves, barred windows, a wooden door, and on two floors a balcony.
+// Houses and blocks are drawn at a small unit and set at the scale of the people: a storey stands well over a head (a figure is 1.6 tall).
+const HOUSE_SCALE = 2.1;
+const BLOCK_SCALE = 2.6;
+const scaled = (item, scale) => {
+  item.scale.setScalar(scale);
+  return item;
+};
+
 export function house(seed, { floors = 1 + Math.round(random(seed * 5)), width = 1.6 + random(seed) * 1.4 } = {}) {
   const height = floors * 1.15;
   const depth = 1.3;
@@ -330,11 +338,14 @@ export function market() {
   scene.add(ground);
   scene.add(volcano());
   const street = new THREE.Group();
+  let across = -20;
   for (let index = 0; 9 > index; index++) {
-    const item = house(index, { floors: 1 + (index % 3 === 1 ? 1 : 0) });
-    item.position.set(-9 + index * 2.3 + random(index) * 0.6, 0, -8 - random(index * 4) * 3);
-    item.rotation.y = (random(index * 9) - 0.5) * 0.4;
+    const width = 1.7 + random(index) * 1.1;
+    const item = scaled(house(index, { floors: 1 + (index % 3 === 1 ? 1 : 0), width }), HOUSE_SCALE);
+    item.position.set(across + (width * HOUSE_SCALE) / 2, 0, -11 - random(index * 4) * 2.5);
+    item.rotation.y = (random(index * 9) - 0.5) * 0.3;
     street.add(item);
+    across += width * HOUSE_SCALE + 0.2;
   }
 
   const potato = () => foodModel("Potato");
@@ -351,6 +362,10 @@ export function market() {
     [2.5, 0, -1.6, [[tomatoes, 14, 0.16], [potato, 20, 0.2], [() => naranjilla(), 14, 0.16]]],
     [-1.2, 0, -3.6, [[ocas, 18, 0.18], [potato, 18, 0.2], [tomatoes, 12, 0.15]]],
     [1.6, 0, -4.2, [[potato, 18, 0.2], [ocas, 16, 0.18], [() => naranjilla(), 12, 0.15]]],
+    [-4.8, 0, 0.4, [[tomatoes, 14, 0.16], [ocas, 18, 0.18], [potato, 16, 0.2]]],
+    [4.9, 0, -0.2, [[() => naranjilla(), 16, 0.17], [potato, 22, 0.22], [tomatoes, 12, 0.15]]],
+    [-4.2, 0, -4.9, [[potato, 20, 0.21], [tomatoes, 12, 0.15], [ocas, 16, 0.18]]],
+    [4.4, 0, -5.4, [[ocas, 20, 0.19], [() => naranjilla(), 12, 0.15], [potato, 16, 0.2]]],
   ];
   layout.forEach(([x, y, z, produce], index) => {
     const { props, goods } = stall(index + 1, produce);
@@ -361,6 +376,25 @@ export function market() {
     street.add(props);
     scene.add(goods);
   });
+  // Sacks of potatoes and baskets set down on the ground between the stalls.
+  const ground_goods = new THREE.Group();
+  [[-1.3, 1.4], [1.2, 1.1], [-3.3, -2.1], [3.2, -2.6], [-0.2, -6.2], [-6.1, -2], [6.2, -3]].forEach(([x, z], index) => {
+    if (index % 2) {
+      const item = basket(index * 5 + 3);
+      item.position.set(x, 0, z);
+      ground_goods.add(item);
+      return;
+    }
+    ground_goods.add(mesh(lumpy(new THREE.SphereGeometry(0.24, 12, 9), 0.18), paint("#c8b089"), (m) => {
+      m.position.set(x, 0.24, z);
+      m.scale.set(0.9, 1.25, 0.8);
+    }));
+    ground_goods.add(mesh(lumpy(new THREE.SphereGeometry(0.2, 12, 9), 0.2), paint("#bea47d"), (m) => {
+      m.position.set(x + 0.36, 0.2, z + 0.08);
+      m.scale.set(0.9, 1.2, 0.8);
+    }));
+  });
+  street.add(ground_goods);
   scene.add(outline(merged(street)));
   const people = [];
   layout.forEach(([x, , z], index) => {
@@ -369,12 +403,21 @@ export function market() {
     people.push({ at: [x + Math.sin(turn) * -0.7, z - Math.cos(turn) * 0.7], facing: turn, act: ["Point", "Argue", "Talk"][index % 3] });
     if (index === 0) return;
     people.push({ at: [x - 0.3 + random(index) * 0.6, z + 0.85], facing: Math.PI + (random(index * 5) - 0.5) * 0.6, act: index % 2 ? "Talk" : "Rest" });
-    if (index % 2 === 0) people.push({ at: [x + 0.55, z + 1.1], facing: Math.PI - 0.5 });
+    if (index % 2 === 0) people.push({ at: [x + 0.55, z + 1.1], facing: Math.PI - 0.5, act: "Talk" });
   });
-  // Passers-by; an old man takes short steps over less ground, one carries a basket to sell.
-  for (let index = 0; 5 > index; index++) {
-    const old = index === 3;
-    people.push({ at: [-6 + index * 2.4, -5.5 - random(index * 3) * 1.5], facing: Math.PI / 2, walk: [old ? 0.55 : 1.6, 0], act: old ? "Old" : index === 1 ? "Haul" : undefined, carry: index === 1 ? load(index) : undefined });
+  // Neighbours stopped to talk between the stalls, face to face.
+  [[-2.6, 1.8, 0.4], [2.7, 1.5, -0.3], [-0.4, -2.4, 1.1], [6.6, 1.6, 0.8], [-6.8, 1.9, -0.6], [0.6, -7.2, 0.2]].forEach(([x, z, turn], index) => {
+    people.push({ at: [x, z], facing: Math.PI / 2 + turn, act: index % 2 ? "Talk" : "Argue" });
+    people.push({ at: [x + Math.sin(Math.PI / 2 + turn) * 0.62, z + Math.cos(Math.PI / 2 + turn) * 0.62], facing: -Math.PI / 2 + turn, act: "Talk" });
+  });
+  // Passers-by in both directions along two paths through the market; an old man takes short steps, some carry baskets to sell.
+  for (let index = 0; 10 > index; index++) {
+    const old = index === 3 || index === 8;
+    const haul = index % 4 === 1;
+    const back = index % 2 === 1;
+    const path = index % 3 === 0 ? -6.8 : 3.0;
+    const distance = (old ? 0.6 : 1.8) * (back ? -1 : 1);
+    people.push({ at: [(back ? 7 : -7) + (index % 5) * (back ? -2.6 : 2.6), path - random(index * 3) * 1.2], facing: back ? -Math.PI / 2 : Math.PI / 2, walk: [distance, 0], act: old ? "Old" : haul ? "Haul" : undefined, carry: haul ? load(index) : undefined });
   }
   const folk = crowd(people, { seed: 2 });
   scene.add(folk);
@@ -424,15 +467,15 @@ export function streetScene() {
   scene.add(volcano());
   const props = new THREE.Group();
   [-1, 1].forEach((side) => {
-    let z = 6;
-    for (let index = 0; 9 > index; index++) {
-      const width = 1.8 + random(index * 7 + side) * 1.2;
-      const item = house(index * 3 + (side > 0 ? 50 : 0), { floors: (index + (side > 0 ? 1 : 0)) % 3 === 0 ? 2 : 1, width });
-      item.position.set(side * 2.6, 0, z - width / 2);
+    let z = 7;
+    for (let index = 0; 6 > index; index++) {
+      const width = (1.8 + random(index * 7 + side) * 1.2) * HOUSE_SCALE;
+      const item = scaled(house(index * 3 + (side > 0 ? 50 : 0), { floors: (index + (side > 0 ? 1 : 0)) % 3 === 0 ? 2 : 1, width: width / HOUSE_SCALE }), HOUSE_SCALE);
+      item.position.set(side * (2.5 + (1.3 * HOUSE_SCALE) / 2), 0, z - width / 2);
       item.rotation.y = -side * Math.PI / 2;
       props.add(item);
-      props.add(mesh(new THREE.BoxGeometry(0.9, 0.12, width), paint("#d6ccb4"), (m) => m.position.set(side * 1.75, 0.06, z - width / 2)));
-      z -= width + 0.05;
+      props.add(mesh(new THREE.BoxGeometry(0.9, 0.12, width), paint("#d6ccb4"), (m) => m.position.set(side * 2.05, 0.06, z - width / 2)));
+      z -= width + 0.1;
     }
   });
   const church = new THREE.Group();
@@ -451,7 +494,8 @@ export function streetScene() {
   church.add(mesh(new THREE.BoxGeometry(1.1, 1.9, 0.05), paint("#4b2c1c"), (m) => m.position.set(0, 0.95, 0.81)));
   church.add(mesh(new THREE.CircleGeometry(0.55, 16, 0, Math.PI), paint("#4b2c1c"), (m) => m.position.set(0, 1.9, 0.82)));
   church.add(mesh(new THREE.CircleGeometry(0.35, 16), paint("#3f6f8f"), (m) => m.position.set(0, 3.4, 0.81)));
-  church.position.set(0, 0, -19);
+  church.position.set(0, 0, -27);
+  church.scale.setScalar(1.7);
   props.add(church);
   scene.add(outline(merged(props)));
   const people = [];
@@ -463,7 +507,7 @@ export function streetScene() {
     people.push({ at: [lane, 2 - index * 1.4], facing: Math.PI + (random(index) - 0.5) * 0.3, walk, act: walk && (old ? "Old" : haul ? "Haul" : undefined), carry: walk && haul ? load(index) : undefined });
   }
   // By the houses: two talking at a door, two more standing alone.
-  [[-1.9, 1.2, Math.PI / 2, "Talk"], [-1.3, 1.2, -Math.PI / 2, "Talk"], [1.9, -3.5, -Math.PI / 2], [-1.9, -7.5, Math.PI / 2]].forEach(([x, z, facing, act]) => people.push({ at: [x, z], facing, act }));
+  [[-2.1, 1.2, Math.PI / 2, "Talk"], [-1.5, 1.2, -Math.PI / 2, "Talk"], [2.1, -3.5, -Math.PI / 2], [-2.1, -7.5, Math.PI / 2], [2.1, -11, -Math.PI / 2, "Talk"], [1.5, -11, Math.PI / 2, "Talk"]].forEach(([x, z, facing, act]) => people.push({ at: [x, z], facing, act }));
   const folk = crowd(people, { seed: 5 });
   scene.add(folk);
   scene.userData.play = (k, now) => folk.userData.play(k, now);
@@ -812,21 +856,21 @@ function block(seed, { floors = 2 + Math.round(random(seed * 5) * 2), width = 2.
 function wires(from, to, z) {
   const poles = new THREE.Group();
   const lines = new THREE.Group();
-  const step = 3.4;
+  const step = 7.5;
   const tops = [];
   for (let x = from; to >= x; x += step) {
-    poles.add(mesh(new THREE.CylinderGeometry(0.04, 0.06, 2.9, 8), paint("#b3ada2"), (m) => m.position.set(x, 1.45, z)));
-    poles.add(mesh(new THREE.BoxGeometry(0.05, 0.05, 0.5), paint("#8d8880"), (m) => m.position.set(x, 2.75, z)));
+    poles.add(mesh(new THREE.CylinderGeometry(0.09, 0.14, 7.4, 8), paint("#b3ada2"), (m) => m.position.set(x, 3.7, z)));
+    poles.add(mesh(new THREE.BoxGeometry(0.1, 0.1, 1.1), paint("#8d8880"), (m) => m.position.set(x, 7.0, z)));
     tops.push(x);
   }
   const cable = new THREE.MeshBasicMaterial({ color: "#2b2620" });
-  [[2.77, -0.2, 0.32], [2.77, 0.2, 0.26]].forEach(([height, offset, sag]) => {
+  [[7.05, -0.45, 0.7], [7.05, 0.45, 0.6], [6.2, 0, 0.9]].forEach(([height, offset, sag]) => {
     for (let index = 1; tops.length > index; index++) {
       const points = Array.from({ length: 9 }, (_, step) => {
         const share = step / 8;
         return new THREE.Vector3(tops[index - 1] + (tops[index] - tops[index - 1]) * share, height - Math.sin(share * Math.PI) * sag, z + offset);
       });
-      lines.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 12, 0.005, 4), cable, (m) => (m.userData.noOutline = true)));
+      lines.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 12, 0.012, 4), cable, (m) => (m.userData.noOutline = true)));
     }
   });
   return group(outline(merged(poles)), lines);
@@ -837,32 +881,37 @@ export function homeScene() {
   scene.add(mesh(new THREE.PlaneGeometry(40, 40), paint("#ddd3bd"), (m) => (m.rotation.x = -Math.PI / 2)));
   // The same mountains, today, above the roofs of the blocks: a little taller in the frame, so Galeras still shows over three floors.
   const hills = volcano();
-  hills.position.set(4, 0, -2);
-  hills.scale.y = 1.45;
+  hills.position.set(2, 0, -6);
+  hills.scale.set(1.3, 2.6, 1);
   scene.add(hills);
   const props = new THREE.Group();
-  let x = -9;
-  // Bare brick on some, painted render on most, as a street of Pasto mixes them.
-  [2, 3, 2, 3, 2, 2, 3, 2].forEach((floors, index) => {
-    const width = 2.2 + random(index * 19) * 1.4;
-    const item = block(index * 7 + 90, { floors, width, brick: index % 3 === 1 });
-    item.position.set(x + width / 2, 0, -2.2);
+  // Bare brick on some, painted render on most, as a street of Pasto mixes them; a cross street opens partway along, and through it Galeras
+  // shows whole.
+  let x = -16;
+  [2, 3, 2, 0, 3, 2, 3, 2].forEach((floors, index) => {
+    if (!floors) {
+      x += 6;
+      return;
+    }
+    const width = (2.0 + random(index * 19) * 1.2) * BLOCK_SCALE;
+    const item = scaled(block(index * 7 + 90, { floors, width: width / BLOCK_SCALE, brick: index % 3 === 1 }), BLOCK_SCALE);
+    item.position.set(x + width / 2, 0, -1.55 - (1.3 * BLOCK_SCALE) / 2);
     props.add(item);
-    x += width + 0.03;
+    x += width + 0.08;
   });
   // A concrete pavement with its kerb, and asphalt where 1876 had cobbles.
-  props.add(mesh(new THREE.BoxGeometry(20, 0.14, 0.9), paint("#cfcac0"), (m) => m.position.set(0, 0.07, -1.1)));
-  props.add(mesh(new THREE.BoxGeometry(20, 0.15, 0.1), paint("#b9b3a8"), (m) => m.position.set(0, 0.075, -0.62)));
+  props.add(mesh(new THREE.BoxGeometry(60, 0.14, 0.9), paint("#cfcac0"), (m) => m.position.set(0, 0.07, -1.1)));
+  props.add(mesh(new THREE.BoxGeometry(60, 0.15, 0.1), paint("#b9b3a8"), (m) => m.position.set(0, 0.075, -0.62)));
   // The asphalt runs on toward the viewer, so a tall phone frame, which pulls the camera back, still stands on the street.
-  scene.add(mesh(new THREE.PlaneGeometry(20, 12), paint("#6f6c68"), (m) => {
+  scene.add(mesh(new THREE.PlaneGeometry(90, 70), paint("#6f6c68"), (m) => {
     m.rotation.x = -Math.PI / 2;
-    m.position.set(0, 0.004, 5.4);
+    m.position.set(0, 0.004, 34.4);
   }));
-  for (let dash = -9; 10 > dash; dash += 1.6) scene.add(mesh(new THREE.PlaneGeometry(0.8, 0.07), paint("#e8e2d4"), (m) => {
+  for (let dash = -30; 30 > dash; dash += 1.6) scene.add(mesh(new THREE.PlaneGeometry(0.8, 0.07), paint("#e8e2d4"), (m) => {
     m.rotation.x = -Math.PI / 2;
     m.position.set(dash, 0.006, 0.9);
   }));
-  scene.add(wires(-8.5, 9, -0.72));
+  scene.add(wires(-15, 16, -0.72));
   scene.add(outline(merged(props)));
   const tote = bag();
   tote.scale.setScalar(0.85);
@@ -999,7 +1048,8 @@ function tableThen() {
 }
 
 // The table: the family round the plates and the pot, the food that went into the fridge eaten instead of thrown away. The same table in
-// two times: the story renders 1876 and today side by side, split where a torn edge of paper crosses the screen (userData.split).
+// two times: the story renders 1876 and today side by side, split where a torn edge of paper crosses the screen (userData.split), today
+// coming in from the right until it has the whole table.
 export function tableScene() {
   const then = tableThen();
   const today = tableToday();
