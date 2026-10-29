@@ -11,25 +11,92 @@ export function setDensity(value) {
   density = value;
 }
 
-function oca(color) {
-  return mesh(lumpy(new THREE.CapsuleGeometry(0.035, 0.07, 6, 12), 0.18), paint(color), (m) => {
-    m.rotation.z = Math.PI / 2;
-    m.position.y = 0.035;
+// A tuber or fruit body: a sphere stretched to its size and dented by a few slow waves, so it reads as grown, not chipped like a stone.
+function grown(size, seed, wobble = 0.09) {
+  const geometry = new THREE.SphereGeometry(1, 20, 14);
+  const position = geometry.attributes.position;
+  for (let index = 0; position.count > index; index++) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    const dent = 1 + wobble * (Math.sin(x * 2.3 + seed) * Math.sin(y * 1.9 + seed * 1.7) + 0.6 * Math.sin(z * 2.9 + seed * 2.3));
+    position.setXYZ(index, x * size[0] * dent, y * size[1] * dent, z * size[2] * dent);
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// Eyes on a potato's skin: a few small dark dimples set on its surface.
+function eyes(size, seed, color) {
+  return [0, 1, 2].map((eye) => {
+    const angle = random(seed * 3 + eye) * Math.PI * 2;
+    const rise = (random(seed * 5 + eye) - 0.5) * 1.2;
+    const point = new THREE.Vector3(Math.cos(angle), rise, Math.sin(angle)).normalize();
+    return mesh(new THREE.CircleGeometry(size[0] * 0.09, 8), paint(color), (m) => {
+      m.position.set(point.x * size[0] * 1.01, point.y * size[1] * 1.01, point.z * size[2] * 1.01);
+      m.lookAt(m.position.clone().multiplyScalar(2));
+    });
   });
 }
 
+// Andean potatoes as Pasto's market sells them: the big pale pastusa, the red-skinned parda and the small round yellow criolla.
+const POTATOES = [
+  { size: [0.045, 0.032, 0.036], color: "#cfa868", eye: "#8a6a3c" },
+  { size: [0.04, 0.03, 0.033], color: "#9a5a3c", eye: "#5e3220" },
+  { size: [0.024, 0.022, 0.024], color: "#e4bb45", eye: "#9a7a2a" },
+];
+function potato(variant = 0) {
+  const { size, color, eye } = POTATOES[variant % POTATOES.length];
+  const body = mesh(grown(size, variant * 3.7 + 1), paint(color));
+  // The eyes go in as one mesh with no ink edge, so a heap of potatoes costs one more draw call per variety, not three.
+  const dimples = merged(group(...eyes(size, variant + 4, eye)));
+  dimples.traverse((child) => (child.userData.noOutline = true));
+  const tuber = group(body, dimples);
+  tuber.position.y = size[1];
+  return tuber;
+}
+
+// An oca: a short, knobbly tuber ringed with ridges, rose, yellow or ivory.
+function oca(color) {
+  const geometry = new THREE.CapsuleGeometry(0.022, 0.055, 6, 14);
+  const position = geometry.attributes.position;
+  for (let index = 0; position.count > index; index++) {
+    const y = position.getY(index);
+    const ring = 1 + 0.07 * Math.sin(y * 115);
+    const taper = 1 - Math.max(0, y) * 4;
+    position.setX(index, position.getX(index) * ring * taper);
+    position.setZ(index, position.getZ(index) * ring * taper);
+  }
+  geometry.computeVertexNormals();
+  return mesh(geometry, paint(color), (m) => {
+    m.rotation.z = Math.PI / 2;
+    m.position.y = 0.024;
+  });
+}
+
+// A tree tomato (tamarillo): an egg drawn to a point, glossy red, a green star of sepals and a long stalk at the top.
 function treeTomato() {
+  const profile = [[0, 0], [0.018, 0.004], [0.036, 0.02], [0.044, 0.048], [0.04, 0.078], [0.026, 0.1], [0.008, 0.112], [0, 0.114]];
+  const sepals = new THREE.ConeGeometry(0.02, 0.01, 5);
   return group(
-    mesh(new THREE.SphereGeometry(0.045, 20, 14), paint("#c8432a"), (m) => {
-      m.scale.set(1, 1.35, 1);
-      m.position.y = 0.06;
+    mesh(new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), 24), paint("#c8432a")),
+    mesh(sepals, paint("#4b5a2a"), (m) => (m.position.y = 0.116)),
+    mesh(new THREE.CylinderGeometry(0.0018, 0.0028, 0.018, 6), paint("#4b5a2a"), (m) => {
+      m.position.set(0.002, 0.126, 0);
+      m.rotation.z = -0.25;
     }),
-    mesh(new THREE.CylinderGeometry(0.004, 0.006, 0.03, 6), paint("#4b5a2a"), (m) => (m.position.y = 0.13)),
   );
 }
 
+// A naranjilla (lulo): a round orange fruit under a fine fuzz, with its dry green calyx on top.
 function naranjilla() {
-  return mesh(lumpy(new THREE.SphereGeometry(0.05, 18, 14), 0.05), paint("#e8a13a"), (m) => (m.position.y = 0.05));
+  const fruit = mesh(grown([0.045, 0.042, 0.045], 2.2, 0.03), paint("#e8a13a"));
+  fruit.position.y = 0.042;
+  const calyx = mesh(new THREE.ConeGeometry(0.024, 0.012, 5), paint("#6a7a3a"), (m) => {
+    m.position.y = 0.088;
+    m.rotation.x = Math.PI;
+  });
+  return group(fruit, calyx);
 }
 
 function heap(make, count, radius, seed, kinds = 3) {
@@ -44,8 +111,9 @@ function heap(make, count, radius, seed, kinds = 3) {
   for (let index = 0; total > index; index++) {
     const angle = random(seed + index) * Math.PI * 2;
     const reach = Math.sqrt(random(seed + index * 3.1)) * radius;
-    const place = new THREE.Vector3(Math.cos(angle) * reach, (1 - reach / radius) * radius * 0.55 + random(seed + index * 7.3) * 0.02, Math.sin(angle) * reach);
-    rotation.setFromEuler(euler.set(random(index + seed) * 3, random(index * 2 + seed) * 6, random(index * 5 + seed) * 3));
+    // A settled mound: highest in the middle, each piece resting upright and only turned about its own axis, with a little tilt.
+    const place = new THREE.Vector3(Math.cos(angle) * reach, (1 - (reach / radius) ** 2) * radius * 0.5, Math.sin(angle) * reach);
+    rotation.setFromEuler(euler.set((random(index + seed) - 0.5) * 0.5, random(index * 2 + seed) * 6, (random(index * 5 + seed) - 0.5) * 0.5));
     placements[index % variants.length].push(matrix.compose(place, rotation, one).clone());
   }
   variants.forEach((model, index) => placements[index].length && pile.add(instance(model, placements[index])));
@@ -357,24 +425,24 @@ export function market() {
     across += width * HOUSE_SCALE + 0.2;
   }
 
-  const potato = () => foodModel("Potato");
+  const potatoes = (variant) => potato(variant);
   const tomatoes = () => treeTomato();
-  const ocas = (variant) => oca(["#d98a9b", "#f0d27a", "#f4ece0"][variant]);
+  const ocas = (variant) => oca(["#c9677d", "#e8b93c", "#e6c9b4"][variant]);
   const stalls = [
-    [potato, 26, 0.24],
-    [ocas, 30, 0.2],
+    [potatoes, 26, 0.24],
+    [ocas, 16, 0.23],
     [tomatoes, 16, 0.18],
   ];
   const layout = [
     [0, 0, 0, stalls],
-    [-2.4, 0, -1.2, [[potato, 22, 0.22], [() => naranjilla(), 18, 0.18], [ocas, 22, 0.18]]],
-    [2.5, 0, -1.6, [[tomatoes, 14, 0.16], [potato, 20, 0.2], [() => naranjilla(), 14, 0.16]]],
-    [-1.2, 0, -3.6, [[ocas, 18, 0.18], [potato, 18, 0.2], [tomatoes, 12, 0.15]]],
-    [1.6, 0, -4.2, [[potato, 18, 0.2], [ocas, 16, 0.18], [() => naranjilla(), 12, 0.15]]],
-    [-4.8, 0, 0.4, [[tomatoes, 14, 0.16], [ocas, 18, 0.18], [potato, 16, 0.2]]],
-    [4.9, 0, -0.2, [[() => naranjilla(), 16, 0.17], [potato, 22, 0.22], [tomatoes, 12, 0.15]]],
-    [-4.2, 0, -4.9, [[potato, 20, 0.21], [tomatoes, 12, 0.15], [ocas, 16, 0.18]]],
-    [4.4, 0, -5.4, [[ocas, 20, 0.19], [() => naranjilla(), 12, 0.15], [potato, 16, 0.2]]],
+    [-2.4, 0, -1.2, [[potatoes, 22, 0.22], [() => naranjilla(), 18, 0.18], [ocas, 12, 0.21]]],
+    [2.5, 0, -1.6, [[tomatoes, 14, 0.16], [potatoes, 20, 0.2], [() => naranjilla(), 14, 0.16]]],
+    [-1.2, 0, -3.6, [[ocas, 10, 0.21], [potatoes, 18, 0.2], [tomatoes, 12, 0.15]]],
+    [1.6, 0, -4.2, [[potatoes, 18, 0.2], [ocas, 9, 0.21], [() => naranjilla(), 12, 0.15]]],
+    [-4.8, 0, 0.4, [[tomatoes, 14, 0.16], [ocas, 10, 0.21], [potatoes, 16, 0.2]]],
+    [4.9, 0, -0.2, [[() => naranjilla(), 16, 0.17], [potatoes, 22, 0.22], [tomatoes, 12, 0.15]]],
+    [-4.2, 0, -4.9, [[potatoes, 20, 0.21], [tomatoes, 12, 0.15], [ocas, 9, 0.21]]],
+    [4.4, 0, -5.4, [[ocas, 11, 0.22], [() => naranjilla(), 12, 0.15], [potatoes, 16, 0.2]]],
   ];
   layout.forEach(([x, y, z, produce], index) => {
     const { props, goods } = stall(index + 1, produce);
