@@ -2,7 +2,8 @@
 
 usage: Blender -b --factory-startup -P tools/blender/character.py -- <name> <out dir> [--shots]
 reads ~/Downloads/<name>.glb and the Mixamo clips in ~/Downloads/<clip>.fbx, writes <out dir>/<name>.glb and <name>.blend (and review renders
-with --shots). Steps: centre on the feet, simplify to 8000 triangles, bake ambient occlusion into COLOR_0.r, place a 19-bone skeleton from body
+with --shots). Steps: centre on the feet, simplify to 8000 triangles, bake ambient occlusion into COLOR_0.r and the garment zone of each face into COLOR_0.g
+(tools/blender/zones.py), place a 19-bone skeleton from body
 proportions and the arm line, skin it, hand cloth that hangs off the arms back to the torso, then carry each of the figure's clips onto the skeleton.
 """
 import math
@@ -111,6 +112,23 @@ scene.world.light_settings.distance = 0.2
 scene.render.engine = "CYCLES"
 scene.cycles.samples = 192
 bpy.ops.object.bake(type="AO", target="VERTEX_COLORS")
+
+# Garment zones are read on the full mesh, then each simplified face takes the zone of the full face nearest its centre. Stored per corner, so
+# a vertex shared by two garments splits and every face keeps its own zone; the zone is an exact step of 1/16 in a float colour.
+import zones
+from mathutils.bvhtree import BVHTree
+
+garments = zones.label(source.data, NAME)
+nearest = BVHTree.FromPolygons([v.co for v in source.data.vertices], [p.vertices for p in source.data.polygons])
+shade = mesh.color_attributes.new("Shade", "FLOAT_COLOR", "CORNER")
+for polygon in mesh.polygons:
+    zone = garments[nearest.find_nearest(polygon.center)[2]]
+    for loop in polygon.loop_indices:
+        ao = occlusion.data[mesh.loops[loop].vertex_index].color[0]
+        shade.data[loop].color = (ao, zone / 16, 0, 1)
+mesh.color_attributes.active_color = shade
+mesh.color_attributes.render_color_index = mesh.color_attributes.active_color_index
+mesh.color_attributes.remove(mesh.color_attributes["Occlusion"])
 
 # Skeleton from proportions (Drillis and Contini) plus each arm's measured line from shoulder to fingertip.
 points = [v.co.copy() for v in mesh.vertices]

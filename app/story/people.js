@@ -170,7 +170,7 @@ function walker(era, seed, act, kind) {
   if (!figureReady(kind)) return null;
   const colors = ERA[kind] === 2026
     ? { skin: pick(SKIN, 7), hair: pick(HAIR, 13), top: pick(JACKETS, 3), inner: "#e9e2d2", bottom: pick(DENIM, 5), shoes: pick(SNEAKERS, 17) }
-    : { skin: pick(SKIN, 7), hat: pick(HATS, 5), top: pick(RUANA, 3), inner: "#efe7d6", belt: pick(RUANA, 23), beard: "#d9d2c3", held: "#b8956a",
+    : { skin: pick(SKIN, 7), hair: pick(HAIR, 13), hat: pick(HATS, 5), top: pick(RUANA, 3), inner: "#efe7d6", belt: pick(RUANA, 23), beard: "#d9d2c3", held: "#b8956a",
         bottom: kind === "campesina" ? pick(SKIRTS, 19) : "#e8dcc2", shoes: kind === "cargador" ? "#3a2a1c" : "#5a3b22" };
   const key = `${kind}:${Object.values(colors).join(":")}`;
   if (!walkerLooks.has(key)) walkerLooks.set(key, figureLook(kind, colors));

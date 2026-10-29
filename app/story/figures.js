@@ -1,6 +1,6 @@
 // People modelled in Blender (tools/blender/character.py): each is one skinned mesh, one skeleton and its Mixamo clips, read by a small
-// loader that only knows that shape, so three's 4000-line GLTFLoader isn't needed. Folds baked in Blender arrive as COLOR_0 and darken the light
-// the hatching reads, not the colour; garment colours are painted per vertex here, so one model serves many looks.
+// loader that only knows that shape, so three's 4000-line GLTFLoader isn't needed. Folds baked in Blender arrive in COLOR_0.r and darken the
+// light the hatching reads, not the colour; COLOR_0.g names each face's garment, painted here, so one model serves many looks.
 import * as THREE from "../vendor/three.module.min.js";
 import { engrave } from "../engrave.js";
 
@@ -10,81 +10,10 @@ const PATHS = { translation: "position", rotation: "quaternion", scale: "scale" 
 // Model units are metres; 0.91 matches the procedural people (about 1.6 tall).
 const HEIGHT_SCALE = 0.91;
 
-const part = (joint) => joint.split(".")[0];
-const ARM = ["hand", "forearm", "upper_arm", "shoulder"];
-const HEAD = ["head", "neck"];
-
-// Per figure: which garment slot each vertex wears,
-// from the bone that moves it most and where it sits (y up, facing +z).
-const FIGURES = {
-  campesino: {
-    paint(p, joint) {
-      if (HEAD.includes(part(joint))) {
-        if (p.y > 1.63 || (p.y > 1.57 && Math.hypot(p.x, p.z + 0.02) > 0.105)) return "hat";
-        if (p.y < 1.4) return "top";
-        return p.z > 0.04 && p.y < 1.53 ? "beard" : "skin";
-      }
-      if (ARM.includes(part(joint))) return Math.abs(p.x) >= 0.5 ? "skin" : "top";
-      // The ruana hangs wider than the trouser legs, so a point far from the leg's axis is cloth even below the hem line.
-      const nearLeg = 0.125 > Math.hypot(Math.abs(p.x) - 0.125, p.z + 0.04);
-      if (p.y > 0.735 || (!nearLeg && p.y > 0.33)) return p.y > 0.77 && 0.81 > p.y ? "band" : "top";
-      if (part(joint) === "foot") return p.y < 0.035 ? "shoes" : "skin";
-      return p.y < 0.165 ? "skin" : "bottom";
-    },
-  },
-  campesina: {
-    paint(p, joint) {
-      if (HEAD.includes(part(joint))) {
-        if (p.y > 1.6 || (p.y > 1.54 && Math.hypot(p.x, p.z) > 0.1)) return "hat";
-        return p.y < 1.43 ? "inner" : "skin";
-      }
-      if (ARM.includes(part(joint))) return Math.abs(p.x) >= 0.5 ? "skin" : "top";
-      if (p.y < 0.09) return "shoes";
-      if (p.y < 0.34) return "skin";
-      // The ruana hangs over the skirt: its back panel nearly to the knee, its sides to the hips.
-      if (p.y < 1.0) return (p.z < -0.08 && p.y > 0.66) || (Math.abs(p.x) > 0.27 && p.y > 0.8) ? "top" : "bottom";
-      if (p.y < 1.06) return Math.hypot(p.x, p.z) < 0.24 && p.z > -0.05 ? "belt" : "top";
-      return Math.abs(p.x) < 0.1 && p.z > 0.04 ? "inner" : "top";
-    },
-  },
-  cargador: {
-    paint(p, joint) {
-      if (joint === "hand.R" && p.x < -0.22) return "held";
-      if (HEAD.includes(part(joint))) {
-        if (p.y > 1.62 || (p.y > 1.56 && Math.hypot(p.x, p.z) > 0.1)) return "hat";
-        return p.z > 0.04 && p.y < 1.52 && p.y > 1.38 ? "beard" : "skin";
-      }
-      if (part(joint) === "hand") return "skin";
-      if (ARM.includes(part(joint))) return "top";
-      if (p.y < 0.22) return "shoes";
-      // The coat hangs behind and beside the trousers down to the knee.
-      if (p.y < 0.98) return p.y > 0.57 && (p.z < -0.05 || Math.abs(p.x) > 0.2) ? "top" : "bottom";
-      if (p.y < 1.06) return Math.hypot(p.x, p.z) < 0.24 && p.z > -0.05 && Math.abs(p.x) < 0.2 ? "belt" : "top";
-      return Math.abs(p.x) < 0.07 && p.z > 0.04 ? "inner" : "top";
-    },
-  },
-  vecina: {
-    paint(p, joint) {
-      if (HEAD.includes(part(joint))) return p.z > 0.03 && p.y < 1.62 && p.y > 1.42 ? "skin" : p.y < 1.45 ? "inner" : "hair";
-      if (part(joint) === "hand") return "skin";
-      if (ARM.includes(part(joint))) return "top";
-      if (p.y < 0.12) return "shoes";
-      if (p.y < 0.93) return "bottom";
-      return Math.abs(p.x) < 0.075 && p.z > 0.03 && p.y < 1.45 ? "inner" : "top";
-    },
-  },
-  vecino: {
-    paint(p, joint) {
-      if (HEAD.includes(part(joint))) return p.z > 0.06 && p.y < 1.74 && p.y > 1.56 ? "skin" : p.y < 1.56 ? "inner" : "hair";
-      if (part(joint) === "hand") return "skin";
-      if (ARM.includes(part(joint))) return "top";
-      if (p.y < 0.1) return "shoes";
-      if (p.y < 0.86) return "bottom";
-      return Math.abs(p.x) < 0.07 && p.z > 0.03 ? "inner" : "top";
-    },
-  },
-};
-export const FIGURE_KINDS = Object.keys(FIGURES);
+// The garment zone of each face, stored by tools/blender/zones.py in COLOR_0.g as steps of 1/16, in this order.
+const ZONES = ["skin", "hair", "hat", "beard", "top", "band", "inner", "belt", "bottom", "shoes", "held"];
+const FIGURES = ["campesino", "campesina", "cargador", "vecina", "vecino"];
+export const FIGURE_KINDS = FIGURES;
 
 const models = new Map();
 
@@ -129,11 +58,16 @@ function parse(buffer) {
   const folds = attribute("COLOR_0");
   const shade = unit(folds);
   const occlusion = new Float32Array(geometry.attributes.position.count);
-  for (let index = 0; occlusion.length > index; index++) occlusion[index] = shade[index * folds.width];
+  const zone = new Uint8Array(occlusion.length);
+  for (let index = 0; occlusion.length > index; index++) {
+    occlusion[index] = shade[index * folds.width];
+    zone[index] = Math.round(shade[index * folds.width + 1] * 16);
+  }
   geometry.setAttribute("occlusion", new THREE.BufferAttribute(occlusion, 1));
+  geometry.setAttribute("zone", new THREE.BufferAttribute(zone, 1));
   geometry.setIndex(new THREE.BufferAttribute(read(primitive.indices).array, 1));
-  // Unindexed so each triangle takes one garment colour: shared vertices would blend neighbouring garments into each other.
-  const flat = geometry.toNonIndexed();
+  // Blender split every vertex shared by two garments, so each face's corners all carry its zone and the mesh stays indexed.
+  const flat = geometry;
   flat.computeBoundingSphere();
 
   const skin = json.skins[0];
@@ -160,39 +94,20 @@ function parse(buffer) {
     skin,
     geometry: flat,
     binds: skin.joints.map((_, index) => new THREE.Matrix4().fromArray(inverses, index * 16)),
-    dominant: dominantJoints(flat, skin.joints.map((node) => names[node])),
   };
-}
-
-function dominantJoints(geometry, jointNames) {
-  const index = geometry.attributes.skinIndex;
-  const weight = geometry.attributes.skinWeight;
-  return Array.from({ length: index.count }, (_, vertex) => {
-    let best = 0;
-    for (let slot = 1; 4 > slot; slot++) if (weight.getComponent(vertex, slot) > weight.getComponent(vertex, best)) best = slot;
-    return jointNames[index.getComponent(vertex, best)];
-  });
 }
 
 // A look recolours a figure's shared shape: one geometry per combination of garment colours, so walkers in the same clothes share it.
 // colors maps garment slots (skin, hat, hair, beard, top, band, inner, belt, bottom, shoes, held) to hex; band defaults to a darker top.
 export function figureLook(kind, colors) {
-  const { geometry, dominant } = models.get(kind);
+  const { geometry } = models.get(kind);
   const tones = Object.fromEntries(Object.entries(colors).map(([slot, value]) => [slot, new THREE.Color(value).convertSRGBToLinear()]));
   tones.band ??= tones.top.clone().multiplyScalar(0.55);
-  const paint = FIGURES[kind].paint;
-  const position = geometry.attributes.position;
-  const values = new Float32Array(position.count * 3);
-  const corner = new THREE.Vector3();
-  const centre = new THREE.Vector3();
-  for (let first = 0; position.count > first; first += 3) {
-    centre.set(0, 0, 0);
-    for (let index = first; first + 3 > index; index++) centre.add(corner.fromBufferAttribute(position, index));
-    centre.divideScalar(3);
-    const [a, b, c] = [dominant[first], dominant[first + 1], dominant[first + 2]];
-    const joint = b === c ? b : a;
-    const color = tones[paint(centre, joint)] ?? tones.top;
-    for (let index = first; first + 3 > index; index++) values.set([color.r, color.g, color.b], index * 3);
+  const zone = geometry.attributes.zone;
+  const values = new Float32Array(zone.count * 3);
+  for (let index = 0; zone.count > index; index++) {
+    const color = tones[ZONES[zone.getX(index)]] ?? tones.top;
+    values.set([color.r, color.g, color.b], index * 3);
   }
   const look = geometry.clone();
   look.setAttribute("color", new THREE.BufferAttribute(values, 3));
