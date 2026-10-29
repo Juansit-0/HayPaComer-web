@@ -669,7 +669,9 @@ export function kitchen() {
     mist.userData.play(Math.max(held, burst), held + k * 3);
     // She takes the handle, pulls the door a third of the way, and lets it swing on.
     fridge.userData.door.updateMatrixWorld(true);
-    const share = THREE.MathUtils.smoothstep(k, 0.04, 0.16) * (1 - THREE.MathUtils.smoothstep(k, 0.27, 0.4));
+    // Her hand lets go of the handle once the door swings past the reach of her arm (0.4 of the swing).
+    const swing = Math.max(held, opening);
+    const share = THREE.MathUtils.smoothstep(k, 0.04, 0.16) * (1 - THREE.MathUtils.smoothstep(k, 0.27, 0.4)) * (1 - THREE.MathUtils.smoothstep(swing, 0.38, 0.55));
     neighbour?.userData.reach("L", fridge.userData.door.localToWorld(handle.copy(grip)), share);
     travellers.forEach((model, index) => {
       const t = THREE.MathUtils.smoothstep(k, 0.36 + index * 0.07, 0.62 + index * 0.07);

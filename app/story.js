@@ -14,8 +14,9 @@ const SCENES = [
 ];
 
 const STORY_SCREENS = 3.61;
-// The fridge opens by dragging its handle: past OPEN_AT the door is let go and swings open, short of it the handle springs back.
-const OPEN_AT = 0.85;
+// The fridge opens by pulling its door: the hand keeps the handle up to OPEN_AT of the swing, as far as the arm reaches; there the door
+// is let go by itself and swings the rest of the way. Let go sooner and it springs back shut.
+const OPEN_AT = 0.4;
 const SPRING_BACK = 3;
 const TAP = 6;
 
@@ -144,7 +145,13 @@ export function mountStory(main) {
         heardAt = now;
       };
       page.defer(quiet);
+      // Once open, the door is held open until the story has caught up with it, so it never falls shut while the scroll eases forward.
+      let settle = null;
       showProgress = (value) => {
+        if (settle && value > settle.at) {
+          settle.done();
+          settle = null;
+        }
         rail.style.transform = `scaleX(${value.toFixed(4)})`;
         intro.classList.toggle("gone", value > 0.015);
         captions.forEach((element) => {
@@ -214,16 +221,17 @@ export function mountStory(main) {
         if (!gate) return;
         gate.open = true;
         play("door");
-        show(0);
+        show(1);
+        settle = { at: gate.at + 0.045, done: () => show(0) };
         holdButton.hidden = true;
         scroller.set(gate.at + 0.05, { jump: true });
       };
-      // Let go: past the mark the door swings the rest of the way and opens; short of it the handle springs back shut.
+      // Let go: past the mark the door swings the rest of the way and opens; short of it the door springs back shut.
       const step = (now) => {
         const dt = Math.min(0.05, (now - last) / 1000);
         last = now;
         const opening = held >= OPEN_AT;
-        show(held + (opening ? dt * 4 : -dt * SPRING_BACK));
+        show(held + (opening ? dt * 2.2 : -dt * SPRING_BACK));
         if (opening && held >= 1) {
           releasing = false;
           frameId = 0;
@@ -252,18 +260,6 @@ export function mountStory(main) {
         drag = { x: event.clientX, from: held, moved: 0, width: film.doorWidth() };
         story.classList.add("pulling");
       });
-      canvas.addEventListener("pointermove", (event) => {
-        if (!drag) {
-          canvas.style.cursor = onDoor(event) ? "grab" : "";
-          return;
-        }
-        drag.moved = Math.max(drag.moved, Math.abs(event.clientX - drag.x));
-        show(drag.from + (drag.x - event.clientX) / drag.width);
-      });
-      // A touch that starts on the door belongs to the door, not to the story's scroll.
-      canvas.addEventListener("touchstart", (event) => {
-        if (event.touches.length === 1 && onDoor(event.touches[0])) event.stopPropagation();
-      }, { passive: true });
       const endDrag = () => {
         if (!drag) return;
         if (TAP > drag.moved) toast(t("landing.story.drag-hint"));
@@ -272,6 +268,19 @@ export function mountStory(main) {
         canvas.style.cursor = "";
         letGo();
       };
+      canvas.addEventListener("pointermove", (event) => {
+        if (!drag) {
+          canvas.style.cursor = onDoor(event) ? "grab" : "";
+          return;
+        }
+        drag.moved = Math.max(drag.moved, Math.abs(event.clientX - drag.x));
+        show(drag.from + (OPEN_AT * (drag.x - event.clientX)) / drag.width);
+        if (held >= OPEN_AT) endDrag();
+      });
+      // A touch that starts on the door belongs to the door, not to the story's scroll.
+      canvas.addEventListener("touchstart", (event) => {
+        if (event.touches.length === 1 && onDoor(event.touches[0])) event.stopPropagation();
+      }, { passive: true });
       ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => canvas.addEventListener(type, endDrag));
       holdButton.addEventListener("contextmenu", (event) => event.preventDefault());
       holdButton.addEventListener("keydown", (event) => {

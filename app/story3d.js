@@ -276,8 +276,8 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     hold(seconds) {
       governor.hold(seconds);
     },
-    // The fridge door on screen: whether a point (client pixels) falls on it while the kitchen is showing, and how wide it looks, so a drag
-    // across most of its width swings it fully open.
+    // The fridge door on screen: whether a point (client pixels) falls on it while the kitchen is showing, and the drag that brings the
+    // hand to the end of its reach: half the door's width on screen.
     doorAt(x, y) {
       const door = kitchenDoor();
       if (!door) return false;
@@ -292,7 +292,7 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
       const span = new THREE.Box3().setFromObject(door);
       const left = span.min.clone().project(camera);
       const right = span.max.clone().project(camera);
-      return Math.max(80, (Math.abs(right.x - left.x) / 2) * canvas.clientWidth * 0.7);
+      return Math.max(80, (Math.abs(right.x - left.x) / 2) * canvas.clientWidth * 0.5);
     },
     setHeld(value) {
       const kitchen = chapters.find((chapter) => chapter.id === "kitchen");
