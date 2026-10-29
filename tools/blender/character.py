@@ -188,8 +188,8 @@ for side, sign in (("L", 1), ("R", -1)):
     reach = tip - shoulder
     elbow = shoulder + reach * 0.42
     wrist = shoulder + reach * 0.76
-    # The hand splits at the knuckles, so the fingers can close on what the hand holds; the thumb is the part of the hand that stands out
-    # farthest from its line, between the wrist and the knuckles.
+    # The hand splits at the knuckles, so the fingers can close on what the hand holds. These figures stand with the palms toward the
+    # thighs, so the thumb is the part of the hand reaching farthest forward (-y), between the wrist and the knuckles.
     palm = tip - wrist
     knuckle = wrist + palm * 0.5
     span = palm.length
@@ -199,7 +199,7 @@ for side, sign in (("L", 1), ("R", -1)):
         if 0.05 < t < 0.75:
             near.append(((p - (wrist + palm * t)).length, p))
     near = [entry for entry in near if 0.45 * span > entry[0]]
-    thumb_tip = max(near, key=lambda entry: entry[0])[1] if near else knuckle
+    thumb_tip = min(near, key=lambda entry: entry[1].y)[1] if near else knuckle
     thumb_base = wrist + palm * 0.15 + (thumb_tip - (wrist + palm * 0.15)) * 0.3
     ankle_x = abs(ankles[1 if sign > 0 else 0])
     knee_x = 0.055 * H + (ankle_x - 0.055 * H) * (hip_z - knee_z) / (hip_z - ankle_z)

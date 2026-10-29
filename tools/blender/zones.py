@@ -117,7 +117,7 @@ def vecina(c, H):
         if c.z < 0.84 * H and c.y > 0.04:
             return "top"
         return "hair"
-    if _hand(c, (0.362, 1.146), (0.516, 0.957), -0.03) and c.z < 0.62 * H:
+    if _hand(c, (0.362, 1.146), (0.516, 0.957), 0.028) and c.z < 0.62 * H:
         return "skin"
     if c.z < 0.07 * H:
         return "shoes"
