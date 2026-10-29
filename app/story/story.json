@@ -7,7 +7,7 @@
     {
       "id": "streets",
       "film": 1,
-      "share": 0.13,
+      "share": 0.1152,
       "light": {
         "sun": [
           3,
@@ -52,12 +52,12 @@
           "pos": [
             0,
             2.2,
-            -9
+            -6
           ],
           "look": [
             0,
-            5.2,
-            -27
+            5.0,
+            -22
           ],
           "fov": 38,
           "ease": "linear"
@@ -67,7 +67,7 @@
     {
       "id": "market",
       "film": 1,
-      "share": 0.2,
+      "share": 0.1773,
       "light": {
         "sun": [
           -10,
@@ -156,7 +156,7 @@
     },
     {
       "id": "home",
-      "share": 0.14,
+      "share": 0.1241,
       "light": {
         "sun": [
           -6,
@@ -200,7 +200,7 @@
     },
     {
       "id": "kitchen",
-      "share": 0.21,
+      "share": 0.1861,
       "light": {
         "sun": [
           3,
@@ -304,7 +304,7 @@
     },
     {
       "id": "scale",
-      "share": 0.11,
+      "share": 0.0975,
       "light": {
         "sun": [
           -2,
@@ -363,7 +363,7 @@
     },
     {
       "id": "plate",
-      "share": 0.09,
+      "share": 0.0798,
       "light": {
         "sun": [
           -3,
@@ -423,7 +423,7 @@
     {
       "id": "table",
       "film": 1,
-      "share": 0.12,
+      "share": 0.22,
       "light": {
         "sun": [
           3,
@@ -469,78 +469,78 @@
   "captions": [
     {
       "id": "arrive",
-      "from": 0.02,
-      "to": 0.11,
+      "from": 0.0177,
+      "to": 0.0975,
       "corner": 0,
       "era": "press"
     },
     {
       "id": "market-day",
-      "from": 0.14,
-      "to": 0.19,
+      "from": 0.1241,
+      "to": 0.1684,
       "corner": 1,
       "era": "press"
     },
     {
       "id": "heaps",
-      "from": 0.19,
-      "to": 0.25,
+      "from": 0.1684,
+      "to": 0.2216,
       "corner": 0,
       "era": "press"
     },
     {
       "id": "oca",
-      "from": 0.22,
-      "to": 0.29,
+      "from": 0.195,
+      "to": 0.257,
       "corner": 1,
       "era": "press"
     },
     {
       "id": "people",
-      "from": 0.26,
-      "to": 0.32,
+      "from": 0.2305,
+      "to": 0.2836,
       "corner": 0,
       "era": "press"
     },
     {
       "id": "today",
-      "from": 0.35,
-      "to": 0.45,
+      "from": 0.3102,
+      "to": 0.3989,
       "corner": 0,
       "era": "note"
     },
     {
       "id": "fridge",
-      "from": 0.52,
-      "to": 0.66,
+      "from": 0.4609,
+      "to": 0.585,
       "corner": 1,
       "era": "note"
     },
     {
       "id": "weigh",
-      "from": 0.69,
-      "to": 0.78,
+      "from": 0.6116,
+      "to": 0.6914,
       "corner": 0,
       "era": "app"
     },
     {
       "id": "knows",
-      "from": 0.72,
-      "to": 0.78,
+      "from": 0.6382,
+      "to": 0.6914,
       "corner": 1,
       "era": "app"
     },
     {
       "id": "cook",
-      "from": 0.8,
-      "to": 0.87,
+      "from": 0.7091,
+      "to": 0.7711,
       "corner": 0,
       "era": "app"
     },
     {
       "id": "table",
-      "from": 0.89,
-      "to": 0.99,
+      "from": 0.7983,
+      "to": 0.9817,
       "corner": 0,
       "era": "app"
     }
@@ -548,12 +548,12 @@
   "gates": [
     {
       "id": "door",
-      "at": 0.5084
+      "at": 0.4506
     }
   ],
   "sounds": [
     {
-      "at": 0.73,
+      "at": 0.647,
       "name": "beep"
     }
   ]

@@ -11,7 +11,7 @@ import { loadFigures } from "./story/figures.js";
 const BUILDERS = { streets: streetScene, market, home: homeScene, kitchen, scale: scaleScene, plate: plateScene, table: tableScene };
 const WINDS = {
   market: { origin: [-2, 2.4, -2], spread: [5, 1.6, 4], length: 3.2, rise: 0.4, width: 0.012, jitter: 0.02, share: 1 },
-  table: { origin: [0, 0.98, 0], spread: [0.12, 0.01, 0.08], length: 0.02, rise: 0.22, width: 0.002, jitter: 0.0015, share: 0.15 },
+  table: { origin: [-0.12, 0.98, 0], spread: [0.12, 0.01, 0.08], length: 0.02, rise: 0.22, width: 0.002, jitter: 0.0015, share: 0.15 },
   plate: { origin: [-0.06, 0.84, 0], spread: [0.1, 0.01, 0.06], length: 0.015, rise: 0.12, width: 0.0018, jitter: 0.0012, share: 0.125 },
 };
 
@@ -31,7 +31,7 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
   renderer.autoClear = false;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(PAPER, 18, 46);
+  scene.fog = new THREE.Fog(PAPER, 24, 80);
   scene.add(new THREE.HemisphereLight("#ffffff", "#b9b19c", 1.0));
   const sun = new THREE.DirectionalLight("#ffffff", 1.4);
   scene.add(sun);
@@ -151,7 +151,7 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     // The table is two worlds, 1876 and today; once the cut has passed, a torn seam crosses from the right edge to the left, 1876 on its
     // left and today on its right, until today holds the whole screen.
     const split = chapter.world.userData.split;
-    const seam = split && neighbour === -1 ? 1 - THREE.MathUtils.smoothstep(k, 0.1, 0.75) : 1;
+    const seam = split && neighbour === -1 ? 1 - THREE.MathUtils.smoothstep(k, 0.12, 0.9) : 1;
     if (split) {
       split.then.visible = seam > 0;
       split.today.visible = 0 >= seam;

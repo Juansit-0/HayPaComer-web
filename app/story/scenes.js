@@ -336,7 +336,9 @@ export function market() {
   const scene = new THREE.Group();
   const ground = earth(60, 60, "#e3d9c4", 2);
   scene.add(ground);
-  scene.add(volcano());
+  const mountain = volcano();
+  mountain.position.z = -8;
+  scene.add(mountain);
   const street = new THREE.Group();
   let across = -20;
   for (let index = 0; 9 > index; index++) {
@@ -464,11 +466,14 @@ export function streetScene() {
     m.position.set(0, 0.018, -8);
   }));
   [-0.13, 0.13].forEach((x) => scene.add(mesh(new THREE.BoxGeometry(0.05, 0.03, 40), paint("#8f857a"), (m) => m.position.set(x, 0.02, -8))));
-  scene.add(volcano());
+  // Galeras stands well behind the church, whose front would otherwise sink into its lower slope.
+  const mountain = volcano();
+  mountain.position.z = -8;
+  scene.add(mountain);
   const props = new THREE.Group();
   [-1, 1].forEach((side) => {
     let z = 7;
-    for (let index = 0; 6 > index; index++) {
+    for (let index = 0; 5 > index; index++) {
       const width = (1.8 + random(index * 7 + side) * 1.2) * HOUSE_SCALE;
       const item = scaled(house(index * 3 + (side > 0 ? 50 : 0), { floors: (index + (side > 0 ? 1 : 0)) % 3 === 0 ? 2 : 1, width: width / HOUSE_SCALE }), HOUSE_SCALE);
       item.position.set(side * (2.5 + (1.3 * HOUSE_SCALE) / 2), 0, z - width / 2);
@@ -494,17 +499,18 @@ export function streetScene() {
   church.add(mesh(new THREE.BoxGeometry(1.1, 1.9, 0.05), paint("#4b2c1c"), (m) => m.position.set(0, 0.95, 0.81)));
   church.add(mesh(new THREE.CircleGeometry(0.55, 16, 0, Math.PI), paint("#4b2c1c"), (m) => m.position.set(0, 1.9, 0.82)));
   church.add(mesh(new THREE.CircleGeometry(0.35, 16), paint("#3f6f8f"), (m) => m.position.set(0, 3.4, 0.81)));
-  church.position.set(0, 0, -27);
-  church.scale.setScalar(1.7);
+  church.position.set(0, 0, -22);
+  church.scale.setScalar(1.3);
   props.add(church);
   scene.add(outline(merged(props)));
   const people = [];
-  for (let index = 0; 14 > index; index++) {
-    const lane = (random(index * 3) - 0.5) * 2.4;
-    const old = index === 7;
-    const haul = index % 5 === 4;
-    const walk = index % 3 === 2 ? undefined : [0, (-3 - random(index * 9) * 2) * (old ? 0.35 : 1)];
-    people.push({ at: [lane, 2 - index * 1.4], facing: Math.PI + (random(index) - 0.5) * 0.3, walk, act: walk && (old ? "Old" : haul ? "Haul" : undefined), carry: walk && haul ? load(index) : undefined });
+  // Fewer walkers, each in a lane of its own and well apart, so nobody walks through anybody: the slow ones walk ahead, the quick ones behind.
+  const LANES = [-1.05, -0.35, 0.35, 1.05];
+  for (let index = 0; 8 > index; index++) {
+    const old = index === 5;
+    const haul = index === 2 || index === 6;
+    const lane = LANES[index % 4] + (random(index * 3) - 0.5) * 0.15;
+    people.push({ at: [lane, 2.5 - index * 2.6], facing: Math.PI, walk: [0, old ? -1.2 : -3.4 - (index % 4) * 0.25], act: old ? "Old" : haul ? "Haul" : undefined, carry: haul ? load(index) : undefined });
   }
   // By the houses: two talking at a door, two more standing alone.
   [[-2.1, 1.2, Math.PI / 2, "Talk"], [-1.5, 1.2, -Math.PI / 2, "Talk"], [2.1, -3.5, -Math.PI / 2], [-2.1, -7.5, Math.PI / 2], [2.1, -11, -Math.PI / 2, "Talk"], [1.5, -11, Math.PI / 2, "Talk"]].forEach(([x, z, facing, act]) => people.push({ at: [x, z], facing, act }));
@@ -951,19 +957,45 @@ function tableToday() {
   props.add(mesh(new RoundedBoxGeometry(1.9, 0.06, 1.1, 2, 0.01), paint("#a4743f"), (m) => (m.position.y = 0.75)));
   props.add(mesh(new THREE.BoxGeometry(1.92, 0.006, 1.12), paint("#d2492f"), (m) => (m.position.y = 0.782)));
   [[-0.85, -0.45], [0.85, -0.45], [-0.85, 0.45], [0.85, 0.45]].forEach(([px, pz]) => props.add(mesh(new THREE.BoxGeometry(0.06, 0.72, 0.06), paint("#7c5530"), (m) => m.position.set(px, 0.36, pz))));
-  PLATES.forEach(([px, pz]) => {
+  // Lunch today: rice, a piece of chicken, papa criolla, avocado and tomato on each plate, a glass of juice, fork and knife; the pot of locro
+  // and a basket of bread in the middle.
+  PLATES.forEach(([px, pz], index) => {
+    const side = pz > 0 ? 1 : -1;
     props.add(mesh(new THREE.LatheGeometry([[0, 0], [0.13, 0], [0.17, 0.02], [0.18, 0.03], [0, 0.03]].map(([a, b]) => new THREE.Vector2(a, b)), 32), paint("#ffffff"), (m) => m.position.set(px, 0.786, pz)));
-    props.add(mesh(lumpy(new THREE.SphereGeometry(0.07, 14, 10), 0.3), paint("#f2c94c"), (m) => {
-      m.position.set(px - 0.02, 0.81, pz);
-      m.scale.y = 0.45;
+    props.add(mesh(lumpy(new THREE.SphereGeometry(0.055, 14, 10), 0.18), paint("#f4f0e6"), (m) => {
+      m.position.set(px - 0.05, 0.815, pz - 0.02);
+      m.scale.set(1.1, 0.5, 1);
     }));
-    props.add(mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.022, 24), paint("#e9d3a0"), (m) => m.position.set(px + 0.07, 0.81, pz + 0.03)));
+    props.add(mesh(lumpy(new THREE.SphereGeometry(0.045, 10, 8), 0.35), paint("#a8642e"), (m) => {
+      m.position.set(px + 0.05, 0.82, pz - 0.03);
+      m.scale.set(1.3, 0.55, 0.9);
+      m.rotation.y = index;
+    }));
+    [[-0.02, 0.06], [0.02, 0.075], [0.05, 0.05]].forEach(([dx, dz]) => props.add(mesh(lumpy(new THREE.SphereGeometry(0.019, 8, 6), 0.2), paint("#f0c23a"), (m) => m.position.set(px + dx, 0.812, pz + dz))));
+    props.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.012, 16, 1, false, 0, Math.PI), paint("#8fb04a"), (m) => {
+      m.position.set(px - 0.07, 0.808, pz + 0.05);
+      m.rotation.y = 0.6;
+    }));
+    [0, 1].forEach((slice) => props.add(mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.01, 14), paint("#d2492f"), (m) => m.position.set(px + 0.09 + slice * 0.02, 0.807, pz + 0.03 + slice * 0.025))));
+    props.add(mesh(new THREE.BoxGeometry(0.012, 0.005, 0.16), paint("#9aa0a4"), (m) => m.position.set(px - 0.21, 0.788, pz)));
+    props.add(mesh(new THREE.BoxGeometry(0.014, 0.005, 0.17), paint("#9aa0a4"), (m) => m.position.set(px + 0.21, 0.788, pz)));
+    props.add(mesh(new THREE.CylinderGeometry(0.03, 0.026, 0.1, 14), paint("#f0a640"), (m) => m.position.set(px + 0.2, 0.835, pz - side * 0.17)));
   });
-  props.add(mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.18, 24), paint("#3b3026"), (m) => m.position.set(0, 0.87, 0)));
+  props.add(mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.18, 24), paint("#3b3026"), (m) => m.position.set(-0.12, 0.87, 0)));
   props.add(mesh(new THREE.TorusGeometry(0.16, 0.012, 8, 24), paint("#3b3026"), (m) => {
-    m.position.set(0, 0.96, 0);
+    m.position.set(-0.12, 0.96, 0);
     m.rotation.x = Math.PI / 2;
   }));
+  props.add(mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.01, 24), paint("#e8cf7a"), (m) => m.position.set(-0.12, 0.955, 0)));
+  props.add(mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.32, 6), paint("#9aa0a4"), (m) => {
+    m.position.set(-0.05, 1.04, 0.02);
+    m.rotation.z = -0.6;
+  }));
+  props.add(mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.07, 18, 1, true), paint("#b8925a", { side: THREE.DoubleSide }), (m) => m.position.set(0.22, 0.82, 0.02)));
+  [[0.19, 0.0], [0.25, 0.04], [0.22, -0.04]].forEach(([x, z]) => props.add(mesh(lumpy(new THREE.SphereGeometry(0.04, 10, 8), 0.15), paint("#d9a35a"), (m) => {
+    m.position.set(x, 0.86, z);
+    m.scale.y = 0.7;
+  })));
   seatsAt(props, ([bx, bz], facing) => {
     const stool = group(mesh(new THREE.CylinderGeometry(0.17, 0.15, 0.05, 20), paint("#a4743f"), (m) => m.position.set(bx, SEAT.height - 0.025, bz)));
     [0, 1, 2].forEach((leg) => {
@@ -975,10 +1007,53 @@ function tableToday() {
   const top = counter(1.6);
   top.position.set(-1.7, 0, -1.65);
   props.add(top);
+  // The kitchen round the table: tiles behind the counter with a hob, a pan and the sink under the wall cupboards, a window with a curtain
+  // and a plant, a shelf of jars, a clock, notes on the fridge, a lamp over the table and a tiled floor.
+  const wall = -1.99;
+  const tile = paint("#f1efe8");
+  props.add(mesh(new THREE.BoxGeometry(1.7, 0.7, 0.01), tile, (m) => m.position.set(-1.7, 1.27, wall)));
+  for (let line = 0; 5 > line; line++) props.add(mesh(new THREE.BoxGeometry(1.7, 0.008, 0.012), paint("#c9c4b8"), (m) => m.position.set(-1.7, 0.92 + line * 0.15, wall + 0.002)));
+  for (let line = 0; 12 > line; line++) props.add(mesh(new THREE.BoxGeometry(0.008, 0.7, 0.012), paint("#c9c4b8"), (m) => m.position.set(-2.55 + line * 0.15, 1.27, wall + 0.002)));
+  [[-2.15, -1.55], [-1.95, -1.55], [-2.15, -1.75], [-1.95, -1.75]].forEach(([x, z]) => props.add(mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.012, 18), paint("#2b2a28"), (m) => m.position.set(x, 0.937, z))));
+  props.add(mesh(new THREE.CylinderGeometry(0.11, 0.1, 0.12, 20), paint("#9aa0a4"), (m) => m.position.set(-2.15, 1.0, -1.55)));
+  props.add(mesh(new THREE.BoxGeometry(0.5, 0.02, 0.36), paint("#7d8287"), (m) => m.position.set(-1.25, 0.935, -1.62)));
+  props.add(mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.26, 8), paint("#b9bec2"), (m) => m.position.set(-1.25, 1.06, -1.86)));
+  props.add(mesh(new THREE.TorusGeometry(0.08, 0.013, 6, 14, Math.PI), paint("#b9bec2"), (m) => m.position.set(-1.25, 1.19, -1.78)));
+  props.add(mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.1, 18), paint("#e9e2d2"), (m) => m.position.set(-1.65, 0.98, -1.55)));
+  [[-1.69, -1.55], [-1.62, -1.5], [-1.63, -1.6]].forEach(([x, z]) => props.add(mesh(lumpy(new THREE.SphereGeometry(0.038, 10, 8), 0.1), paint("#e98a2c"), (m) => m.position.set(x, 1.05, z))));
+  [-2.2, -1.65, -1.1].forEach((x) => {
+    props.add(mesh(new THREE.BoxGeometry(0.53, 0.6, 0.34), paint("#8e9f86"), (m) => m.position.set(x, 2.0, -1.82)));
+    props.add(mesh(new THREE.BoxGeometry(0.02, 0.14, 0.02), paint("#5f6b59"), (m) => m.position.set(x + 0.2, 1.8, -1.64)));
+  });
+  props.add(mesh(new THREE.BoxGeometry(0.95, 0.8, 0.04), paint("#f6f1e6"), (m) => m.position.set(0.15, 1.75, wall)));
+  props.add(mesh(new THREE.BoxGeometry(0.83, 0.68, 0.03), paint("#bcd3d6"), (m) => m.position.set(0.15, 1.75, wall + 0.012)));
+  props.add(mesh(new THREE.BoxGeometry(0.03, 0.68, 0.035), paint("#f6f1e6"), (m) => m.position.set(0.15, 1.75, wall + 0.016)));
+  [-1, 1].forEach((side) => props.add(mesh(new THREE.BoxGeometry(0.26, 0.92, 0.04), paint("#c8432a"), (m) => m.position.set(0.15 + side * 0.5, 1.72, wall + 0.05))));
+  props.add(mesh(new THREE.BoxGeometry(1.0, 0.04, 0.16), paint("#f6f1e6"), (m) => m.position.set(0.15, 1.33, wall + 0.07)));
+  props.add(mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.12, 14), paint("#b5633d"), (m) => m.position.set(0.4, 1.41, wall + 0.07)));
+  props.add(mesh(lumpy(new THREE.SphereGeometry(0.11, 12, 9), 0.35), paint("#5f8a4a"), (m) => m.position.set(0.4, 1.55, wall + 0.07)));
+  props.add(mesh(new THREE.BoxGeometry(0.8, 0.03, 0.2), paint("#a4743f"), (m) => m.position.set(1.1, 2.15, wall + 0.1)));
+  [0.8, 0.98, 1.16, 1.36].forEach((x, index) => props.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.14 + (index % 2) * 0.04, 14), paint(["#e0a43a", "#c8432a", "#efe6c8", "#4f7a4a"][index]), (m) => m.position.set(x, 2.24 + (index % 2) * 0.02, wall + 0.1))));
+  props.add(mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.03, 24), paint("#f6f1e6"), (m) => {
+    m.position.set(-0.9, 2.3, wall + 0.02);
+    m.rotation.x = Math.PI / 2;
+  }));
+  props.add(mesh(new THREE.BoxGeometry(0.012, 0.1, 0.01), paint("#2b2a28"), (m) => m.position.set(-0.9, 2.34, wall + 0.04)));
+  props.add(mesh(new THREE.BoxGeometry(0.07, 0.012, 0.01), paint("#2b2a28"), (m) => m.position.set(-0.87, 2.3, wall + 0.04)));
+  props.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.9, 5), paint("#2b2a28"), (m) => m.position.set(0, 2.75, 0)));
+  props.add(mesh(new THREE.ConeGeometry(0.22, 0.2, 20, 1, true), paint("#c8432a", { side: THREE.DoubleSide }), (m) => m.position.set(0, 2.22, 0)));
+  for (let line = -2; 3 > line; line++) {
+    props.add(mesh(new THREE.BoxGeometry(6, 0.004, 0.012), paint("#c8bfa9"), (m) => m.position.set(0, 0.003, line * 0.8)));
+  }
+  for (let line = -3; 4 > line; line++) props.add(mesh(new THREE.BoxGeometry(0.012, 0.004, 4), paint("#c8bfa9"), (m) => m.position.set(line * 0.8, 0.003, 0)));
   scene.add(outline(merged(props)));
   const fridge = fridgeBody();
   fridge.position.set(1.75, 0, -1.6);
+  [[-0.12, 0.98, "#e0a43a"], [0.1, 0.9, "#4f7a4a"], [-0.05, 0.76, "#efe6c8"]].forEach(([x, y, color]) => fridge.userData.door.add(mesh(new THREE.BoxGeometry(0.1, 0.1, 0.006), paint(color), (m) => m.position.set(FRIDGE.W / 2 + x, y - 0.04, 0.064))));
   scene.add(fridge);
+  const bulb = new THREE.PointLight("#ffd98a", 1.4, 3.2, 1.6);
+  bulb.position.set(0, 2.05, 0);
+  scene.add(bulb);
   const family = crowd(
     PLACES.map((place, index) => ({ ...place, act: index % 3 ? "Sit" : "SitTalk", kind: ["vecino", "vecina", "vecina", "vecino"][index] })),
     { looks: 4, seed: 21, era: 2026 },
@@ -1015,19 +1090,42 @@ function tableThen() {
   [-0.8, 0.8].forEach((x) => {
     props.add(mesh(new THREE.BoxGeometry(0.08, 0.72, 0.9), wood, (m) => m.position.set(x, 0.36, 0)));
   });
+  // Lunch in 1876: potatoes in their skins, a heap of mote, a slice of fresh cheese and ocas in each clay bowl, a gourd cup of chicha; ají
+  // in a little dish, a round of bread and the jug in the middle.
   PLATES.forEach(([px, pz], index) => {
+    const side = pz > 0 ? 1 : -1;
     props.add(mesh(new THREE.LatheGeometry([[0, 0], [0.09, 0], [0.14, 0.05], [0.15, 0.07], [0.13, 0.065], [0, 0.02]].map(([a, b]) => new THREE.Vector2(a, b)), 24), clay, (m) => m.position.set(px, 0.78, pz)));
     for (let potato = 0; 3 > potato; potato++) {
-      props.add(mesh(lumpy(new THREE.SphereGeometry(0.035, 10, 8), 0.3), paint("#c9a25e"), (m) => {
-        m.position.set(px - 0.04 + potato * 0.04, 0.83, pz + (potato % 2 ? 0.03 : -0.02));
+      props.add(mesh(lumpy(new THREE.SphereGeometry(0.035, 10, 8), 0.3), paint(potato % 2 ? "#a77a48" : "#c9a25e"), (m) => {
+        m.position.set(px - 0.05 + potato * 0.04, 0.83, pz + (potato % 2 ? 0.035 : -0.02));
         m.scale.y = 0.75;
       }));
     }
-    props.add(mesh(lumpy(new THREE.SphereGeometry(0.045, 10, 8), 0.4), paint("#efe6c8"), (m) => {
-      m.position.set(px + 0.05, 0.825, pz - 0.04 + (index % 2) * 0.02);
-      m.scale.y = 0.5;
+    for (let grain = 0; 7 > grain; grain++) props.add(mesh(new THREE.SphereGeometry(0.014, 7, 5), paint("#efe6c8"), (m) => m.position.set(px + 0.04 + (grain % 3) * 0.018, 0.825 + Math.floor(grain / 3) * 0.012, pz - 0.045 + (grain % 2) * 0.02)));
+    props.add(mesh(new THREE.BoxGeometry(0.05, 0.022, 0.035), paint("#f3ead2"), (m) => {
+      m.position.set(px + 0.02, 0.83, pz + 0.05);
+      m.rotation.y = index * 0.7;
+    }));
+    [0, 1].forEach((oca) => props.add(mesh(new THREE.CapsuleGeometry(0.012, 0.03, 4, 8), paint("#d98a9b"), (m) => {
+      m.position.set(px - 0.08 + oca * 0.025, 0.83, pz + 0.04);
+      m.rotation.z = Math.PI / 2;
+    })));
+    props.add(mesh(new THREE.SphereGeometry(0.05, 14, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), paint("#b8925a", { side: THREE.DoubleSide }), (m) => m.position.set(px + 0.2, 0.83, pz - side * 0.16)));
+    props.add(mesh(new THREE.CircleGeometry(0.045, 14), paint("#e4c98f"), (m) => {
+      m.position.set(px + 0.2, 0.822, pz - side * 0.16);
+      m.rotation.x = -Math.PI / 2;
     }));
   });
+  props.add(mesh(new THREE.LatheGeometry([[0, 0], [0.05, 0], [0.07, 0.03], [0, 0.03]].map(([a, b]) => new THREE.Vector2(a, b)), 16), clay, (m) => m.position.set(0.28, 0.78, 0.12)));
+  props.add(mesh(lumpy(new THREE.SphereGeometry(0.04, 10, 8), 0.3), paint("#c8432a"), (m) => {
+    m.position.set(0.28, 0.81, 0.12);
+    m.scale.y = 0.4;
+  }));
+  props.add(mesh(lumpy(new THREE.SphereGeometry(0.09, 14, 10), 0.08), paint("#c08a4c"), (m) => {
+    m.position.set(-0.3, 0.81, 0.1);
+    m.scale.y = 0.45;
+  }));
+  props.add(mesh(new THREE.LatheGeometry([[0, 0], [0.07, 0.01], [0.1, 0.09], [0.08, 0.2], [0.04, 0.26], [0.05, 0.3], [0, 0.3]].map(([a, b]) => new THREE.Vector2(a, b)), 18), darkClay, (m) => m.position.set(0.7, 0.78, -0.05)));
   props.add(mesh(new THREE.LatheGeometry([[0, 0], [0.12, 0.01], [0.18, 0.1], [0.17, 0.18], [0.12, 0.22], [0.13, 0.25], [0, 0.25]].map(([a, b]) => new THREE.Vector2(a, b)), 24), darkClay, (m) => m.position.set(0, 0.78, 0)));
   [-1, 1].forEach((side) => props.add(mesh(new THREE.TorusGeometry(0.035, 0.012, 6, 12, Math.PI), darkClay, (m) => m.position.set(side * 0.18, 0.95, 0))));
   // A bench behind the table for the two facing out, and a stool cut from a log at each end.

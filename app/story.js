@@ -13,7 +13,7 @@ const SCENES = [
   { still: "plate", width: 960, height: 960, captions: ["landing.story.cook", "landing.story.table"] },
 ];
 
-const STORY_SCREENS = 3.2;
+const STORY_SCREENS = 3.61;
 const HOLD_SECONDS = 1.2;
 const REWIND = 2.5;
 const TAP = 250;
