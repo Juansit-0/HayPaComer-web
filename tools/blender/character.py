@@ -95,11 +95,33 @@ body.select_set(True)
 bpy.context.view_layer.objects.active = body
 weld = body.modifiers.new("Weld", "WELD")
 weld.merge_threshold = 0.0005
+bpy.ops.object.modifier_apply(modifier=weld.name)
+
+# Garment zones are read on the full mesh (tools/blender/zones.py) and ride through the simplification as material slots. The vertices on an
+# edge between two garments are held back from collapsing, so the simplified mesh keeps that edge where it was instead of cutting across it
+# with long triangles, which drew saw teeth over hands, hems and faces.
+import bmesh
+import zones
+
+for zone in zones.ZONES:
+    body.data.materials.append(bpy.data.materials.new(f"zone_{zone}"))
+first_zone = len(body.data.materials) - len(zones.ZONES)
+garments = zones.label(body.data, NAME)
+for polygon, zone in zip(body.data.polygons, garments):
+    polygon.material_index = first_zone + zone
+edge_group = body.vertex_groups.new(name="garment_edges")
+seen = {}
+for polygon, zone in zip(body.data.polygons, garments):
+    for vertex in polygon.vertices:
+        seen.setdefault(vertex, set()).add(zone)
+edge_group.add([vertex for vertex, kinds in seen.items() if len(kinds) > 1], 1.0, "REPLACE")
 decimate = body.modifiers.new("Decimate", "DECIMATE")
 decimate.ratio = TRIANGLES / len(source.data.polygons)
 decimate.use_collapse_triangulate = True
-for modifier in list(body.modifiers):
-    bpy.ops.object.modifier_apply(modifier=modifier.name)
+decimate.vertex_group = edge_group.name
+decimate.vertex_group_factor = 1000
+decimate.invert_vertex_group = True
+bpy.ops.object.modifier_apply(modifier=decimate.name)
 body.data.validate()
 bpy.ops.object.shade_smooth()
 mesh = body.data
@@ -113,25 +135,19 @@ scene.render.engine = "CYCLES"
 scene.cycles.samples = 192
 bpy.ops.object.bake(type="AO", target="VERTEX_COLORS")
 
-# Garment zones are read on the full mesh, then each simplified face takes the zone of the outermost full face under it: a ray from just
-# outside its centre, inward along its normal, so a hat crown takes the hat, not the head inside it. Stored per corner, so a vertex shared by
-# two garments splits and every face keeps its own zone; the zone is an exact step of 1/16 in a float colour.
-import bmesh
-import zones
-from mathutils.bvhtree import BVHTree
-
-garments = zones.label(source.data, NAME)
-nearest = BVHTree.FromPolygons([v.co for v in source.data.vertices], [p.vertices for p in source.data.polygons])
-shade = mesh.color_attributes.new("Shade", "FLOAT_COLOR", "CORNER")
-taken = []
-for polygon in mesh.polygons:
-    hit = nearest.ray_cast(polygon.center + polygon.normal * 0.02, -polygon.normal, 0.04)[2]
-    taken.append(garments[hit if hit is not None else nearest.find_nearest(polygon.center)[2]])
-# The larger simplified faces leave saw teeth along garment edges; one more smoothing on them files the teeth down.
+# Each simplified face keeps the zone of the faces it was made from; one smoothing pass clears the odd stray face along an edge. Stored per
+# corner, so a vertex shared by two garments splits and every face keeps its own zone; the zone is an exact step of 1/16 in a float colour.
+taken = [polygon.material_index - first_zone for polygon in mesh.polygons]
 simple = bmesh.new()
 simple.from_mesh(mesh)
-taken = zones.smooth(simple, taken, 2)
+taken = zones.smooth(simple, taken, 1)
 simple.free()
+for polygon in mesh.polygons:
+    polygon.material_index = 0
+while len(mesh.materials) > first_zone:
+    mesh.materials.pop()
+body.vertex_groups.remove(body.vertex_groups["garment_edges"])
+shade = mesh.color_attributes.new("Shade", "FLOAT_COLOR", "CORNER")
 for polygon, zone in zip(mesh.polygons, taken):
     for loop in polygon.loop_indices:
         ao = occlusion.data[mesh.loops[loop].vertex_index].color[0]
