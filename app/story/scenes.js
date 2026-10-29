@@ -1073,12 +1073,20 @@ function tableToday() {
     props.add(mesh(new THREE.BoxGeometry(0.014, 0.005, 0.17), paint("#9aa0a4"), (m) => m.position.set(px + 0.21, 0.788, pz)));
     props.add(mesh(new THREE.CylinderGeometry(0.03, 0.026, 0.1, 14), paint("#f0a640"), (m) => m.position.set(px + 0.2, 0.835, pz - side * 0.17)));
   });
-  props.add(mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.18, 24), paint("#3b3026"), (m) => m.position.set(-0.12, 0.87, 0)));
+  // An open pot, the locro filling it a little below the rim.
+  props.add(mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.18, 24, 1, true), paint("#3b3026", { side: THREE.DoubleSide }), (m) => m.position.set(-0.12, 0.87, 0)));
+  props.add(mesh(new THREE.CircleGeometry(0.13, 24), paint("#3b3026"), (m) => {
+    m.position.set(-0.12, 0.781, 0);
+    m.rotation.x = -Math.PI / 2;
+  }));
   props.add(mesh(new THREE.TorusGeometry(0.16, 0.012, 8, 24), paint("#3b3026"), (m) => {
     m.position.set(-0.12, 0.96, 0);
     m.rotation.x = Math.PI / 2;
   }));
-  props.add(mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.01, 24), paint("#e8cf7a"), (m) => m.position.set(-0.12, 0.955, 0)));
+  props.add(mesh(new THREE.CircleGeometry(0.152, 24), paint("#e8cf7a"), (m) => {
+    m.position.set(-0.12, 0.935, 0);
+    m.rotation.x = -Math.PI / 2;
+  }));
   props.add(mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.32, 6), paint("#9aa0a4"), (m) => {
     m.position.set(-0.05, 1.04, 0.02);
     m.rotation.z = -0.6;
@@ -1109,8 +1117,18 @@ function tableToday() {
   [[-2.15, -1.55], [-1.95, -1.55], [-2.15, -1.75], [-1.95, -1.75]].forEach(([x, z]) => props.add(mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.012, 18), paint("#2b2a28"), (m) => m.position.set(x, 0.937, z))));
   props.add(mesh(new THREE.CylinderGeometry(0.11, 0.1, 0.12, 20), paint("#9aa0a4"), (m) => m.position.set(-2.15, 1.0, -1.55)));
   props.add(mesh(new THREE.BoxGeometry(0.5, 0.02, 0.36), paint("#7d8287"), (m) => m.position.set(-1.25, 0.935, -1.62)));
-  props.add(mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.26, 8), paint("#b9bec2"), (m) => m.position.set(-1.25, 1.06, -1.86)));
-  props.add(mesh(new THREE.TorusGeometry(0.08, 0.013, 6, 14, Math.PI), paint("#b9bec2"), (m) => m.position.set(-1.25, 1.19, -1.78)));
+  // The tap: a pillar behind the sink, a neck curving over toward the bowl and a short spout pointing down into it.
+  const chrome = paint("#b9bec2");
+  props.add(mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.03, 12), chrome, (m) => m.position.set(-1.25, 0.95, -1.86)));
+  props.add(mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.24, 10), chrome, (m) => m.position.set(-1.25, 1.07, -1.86)));
+  // The neck turns a little toward the room, so from the table it reads as a curve and not end on.
+  const spout = new THREE.Vector3(Math.sin(-0.7), 0, Math.cos(-0.7));
+  props.add(mesh(new THREE.TorusGeometry(0.07, 0.014, 8, 16, Math.PI), chrome, (m) => {
+    m.position.set(-1.25 + spout.x * 0.07, 1.19, -1.86 + spout.z * 0.07);
+    m.rotation.y = Math.atan2(-spout.z, spout.x);
+  }));
+  props.add(mesh(new THREE.CylinderGeometry(0.014, 0.012, 0.05, 10), chrome, (m) => m.position.set(-1.25 + spout.x * 0.14, 1.165, -1.86 + spout.z * 0.14)));
+  props.add(mesh(new THREE.BoxGeometry(0.06, 0.012, 0.016), chrome, (m) => m.position.set(-1.25, 1.03, -1.85)));
   props.add(mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.1, 18), paint("#e9e2d2"), (m) => m.position.set(-1.65, 0.98, -1.55)));
   [[-1.69, -1.55], [-1.62, -1.5], [-1.63, -1.6]].forEach(([x, z]) => props.add(mesh(lumpy(new THREE.SphereGeometry(0.038, 10, 8), 0.1), paint("#e98a2c"), (m) => m.position.set(x, 1.05, z))));
   [-2.2, -1.65, -1.1].forEach((x) => {
