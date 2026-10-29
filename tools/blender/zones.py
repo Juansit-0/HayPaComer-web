@@ -28,7 +28,8 @@ def _arm(c, reach):
 # Each rule takes a face centre and the figure's height and returns a zone name.
 def campesino(c, H):
     if c.z > 0.78 * H and abs(c.x) < 0.2:
-        if c.z < 0.81 * H and math.hypot(c.x, c.y) > 0.09:
+        # Behind, the ruana's collar rides up to the hat brim; read the back of the neck as cloth, so it shows no saw-toothed skin.
+        if (c.z < 0.81 * H and math.hypot(c.x, c.y) > 0.09) or (c.y > 0.03 and c.z < 0.86 * H):
             return "top"
         return "beard" if c.y < -0.05 and c.z < 0.86 * H else "skin"
     if _arm(c, 0.5):
@@ -44,10 +45,16 @@ def campesino(c, H):
 
 
 def campesina(c, H):
+    # Her head is centred 0.11 forward of the body, with the face out to y -0.22; the hat's brim and band are welded to it, only the crown is
+    # loose, so the brim is drawn here as whatever stands out past the head above the brow.
+    behind = c.y + 0.11
+    # The back of her head pokes through the hat above the brim, so it is painted as the hat too.
+    if (c.z > 0.895 * H and (math.hypot(c.x, behind) > 0.125 or behind > -0.02)) or c.z > 0.92 * H:
+        return "hat"
     if c.z > 0.78 * H and abs(c.x) < 0.2:
-        if c.y > 0.02 and c.z < 0.84 * H:
+        if behind > 0.05 and c.z < 0.86 * H:
             return "top"
-        return "hair" if c.y > 0.02 or abs(c.x) > 0.075 else "skin"
+        return "hair" if behind > 0.01 or (abs(c.x) > 0.085 and behind > -0.06) else "skin"
     if _arm(c, 0.42):
         return "skin"
     if c.z < 0.045 * H:
@@ -69,7 +76,7 @@ def cargador(c, H):
     if c.z > 0.79 * H and abs(c.x) < 0.1 and c.y < -0.04 and c.z < 0.87 * H:
         return "beard"
     if c.z > 0.83 * H and abs(c.x) < 0.17:
-        return "skin"
+        return "top" if c.y > 0.03 and c.z < 0.86 * H else "skin"
     if _arm(c, 0.27) and c.z < 0.52 * H:
         return "skin"
     if c.z < 0.08 * H:
@@ -110,6 +117,22 @@ def vecino(c, H):
 RULES = {"CampesinoMejorHecho": campesino, "Campesina": campesina, "cargador": cargador, "vecina": vecina, "Vecino": vecino}
 # Figures whose hat is a loose part of its own; the cargador's is welded to his head, so his rule draws the line.
 HATTED = {"CampesinoMejorHecho", "Campesina"}
+
+
+def smooth(bm, zones, passes=SMOOTH):
+    """Each face takes the zone most of its edge neighbours share, a few times over."""
+    bm.faces.ensure_lookup_table()
+    neighbours = [[other.index for edge in face.edges for other in edge.link_faces if other is not face] for face in bm.faces]
+    for _ in range(passes):
+        settled = list(zones)
+        for face in bm.faces:
+            around = [zones[index] for index in neighbours[face.index]]
+            if around:
+                common = max(set(around), key=around.count)
+                if around.count(common) > len(around) / 2:
+                    settled[face.index] = common
+        zones = settled
+    return zones
 
 
 def label(mesh, name):
@@ -159,16 +182,7 @@ def label(mesh, name):
             for index in members:
                 zones[index] = winner
         count += 1
-    neighbours = [[other.index for edge in face.edges for other in edge.link_faces if other is not face] for face in bm.faces]
-    for _ in range(SMOOTH):
-        settled = list(zones)
-        for face in bm.faces:
-            around = [zones[index] for index in neighbours[face.index]]
-            if around:
-                common = max(set(around), key=around.count)
-                if around.count(common) > len(around) / 2:
-                    settled[face.index] = common
-        zones = settled
+    zones = smooth(bm, zones)
     for index in hat:
         zones[index] = zone_index("hat")
     bm.free()

@@ -113,16 +113,26 @@ scene.render.engine = "CYCLES"
 scene.cycles.samples = 192
 bpy.ops.object.bake(type="AO", target="VERTEX_COLORS")
 
-# Garment zones are read on the full mesh, then each simplified face takes the zone of the full face nearest its centre. Stored per corner, so
-# a vertex shared by two garments splits and every face keeps its own zone; the zone is an exact step of 1/16 in a float colour.
+# Garment zones are read on the full mesh, then each simplified face takes the zone of the outermost full face under it: a ray from just
+# outside its centre, inward along its normal, so a hat crown takes the hat, not the head inside it. Stored per corner, so a vertex shared by
+# two garments splits and every face keeps its own zone; the zone is an exact step of 1/16 in a float colour.
+import bmesh
 import zones
 from mathutils.bvhtree import BVHTree
 
 garments = zones.label(source.data, NAME)
 nearest = BVHTree.FromPolygons([v.co for v in source.data.vertices], [p.vertices for p in source.data.polygons])
 shade = mesh.color_attributes.new("Shade", "FLOAT_COLOR", "CORNER")
+taken = []
 for polygon in mesh.polygons:
-    zone = garments[nearest.find_nearest(polygon.center)[2]]
+    hit = nearest.ray_cast(polygon.center + polygon.normal * 0.02, -polygon.normal, 0.04)[2]
+    taken.append(garments[hit if hit is not None else nearest.find_nearest(polygon.center)[2]])
+# The larger simplified faces leave saw teeth along garment edges; one more smoothing on them files the teeth down.
+simple = bmesh.new()
+simple.from_mesh(mesh)
+taken = zones.smooth(simple, taken, 2)
+simple.free()
+for polygon, zone in zip(mesh.polygons, taken):
     for loop in polygon.loop_indices:
         ao = occlusion.data[mesh.loops[loop].vertex_index].color[0]
         shade.data[loop].color = (ao, zone / 16, 0, 1)
