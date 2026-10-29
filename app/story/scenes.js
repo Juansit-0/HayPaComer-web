@@ -1,6 +1,6 @@
 import * as THREE from "../vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "../vendor/RoundedBoxGeometry.js";
-import { engrave, foodModel, group, hash, instance, lumpy, merged, mesh, outline, paint } from "../engrave.js";
+import { engrave, foodModel, group, hash, instance, lumpy, merged, mesh, naranjilla, oca, outline, paint, potato, treeTomato } from "../engrave.js";
 import { crowd } from "./people.js";
 
 export const PAPER = "#f3ecdf";
@@ -9,94 +9,6 @@ let density = 1;
 
 export function setDensity(value) {
   density = value;
-}
-
-// A tuber or fruit body: a sphere stretched to its size and dented by a few slow waves, so it reads as grown, not chipped like a stone.
-function grown(size, seed, wobble = 0.09) {
-  const geometry = new THREE.SphereGeometry(1, 20, 14);
-  const position = geometry.attributes.position;
-  for (let index = 0; position.count > index; index++) {
-    const x = position.getX(index);
-    const y = position.getY(index);
-    const z = position.getZ(index);
-    const dent = 1 + wobble * (Math.sin(x * 2.3 + seed) * Math.sin(y * 1.9 + seed * 1.7) + 0.6 * Math.sin(z * 2.9 + seed * 2.3));
-    position.setXYZ(index, x * size[0] * dent, y * size[1] * dent, z * size[2] * dent);
-  }
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-// Eyes on a potato's skin: a few small dark dimples set on its surface.
-function eyes(size, seed, color) {
-  return [0, 1, 2].map((eye) => {
-    const angle = random(seed * 3 + eye) * Math.PI * 2;
-    const rise = (random(seed * 5 + eye) - 0.5) * 1.2;
-    const point = new THREE.Vector3(Math.cos(angle), rise, Math.sin(angle)).normalize();
-    return mesh(new THREE.CircleGeometry(size[0] * 0.09, 8), paint(color), (m) => {
-      m.position.set(point.x * size[0] * 1.01, point.y * size[1] * 1.01, point.z * size[2] * 1.01);
-      m.lookAt(m.position.clone().multiplyScalar(2));
-    });
-  });
-}
-
-// Andean potatoes as Pasto's market sells them: the big pale pastusa, the red-skinned parda and the small round yellow criolla.
-const POTATOES = [
-  { size: [0.045, 0.032, 0.036], color: "#cfa868", eye: "#8a6a3c" },
-  { size: [0.04, 0.03, 0.033], color: "#9a5a3c", eye: "#5e3220" },
-  { size: [0.024, 0.022, 0.024], color: "#e4bb45", eye: "#9a7a2a" },
-];
-function potato(variant = 0) {
-  const { size, color, eye } = POTATOES[variant % POTATOES.length];
-  const body = mesh(grown(size, variant * 3.7 + 1), paint(color));
-  // The eyes go in as one mesh with no ink edge, so a heap of potatoes costs one more draw call per variety, not three.
-  const dimples = merged(group(...eyes(size, variant + 4, eye)));
-  dimples.traverse((child) => (child.userData.noOutline = true));
-  const tuber = group(body, dimples);
-  tuber.position.y = size[1];
-  return tuber;
-}
-
-// An oca: a short, knobbly tuber ringed with ridges, rose, yellow or ivory.
-function oca(color) {
-  const geometry = new THREE.CapsuleGeometry(0.022, 0.055, 6, 14);
-  const position = geometry.attributes.position;
-  for (let index = 0; position.count > index; index++) {
-    const y = position.getY(index);
-    const ring = 1 + 0.07 * Math.sin(y * 115);
-    const taper = 1 - Math.max(0, y) * 4;
-    position.setX(index, position.getX(index) * ring * taper);
-    position.setZ(index, position.getZ(index) * ring * taper);
-  }
-  geometry.computeVertexNormals();
-  return mesh(geometry, paint(color), (m) => {
-    m.rotation.z = Math.PI / 2;
-    m.position.y = 0.024;
-  });
-}
-
-// A tree tomato (tamarillo): an egg drawn to a point, glossy red, a green star of sepals and a long stalk at the top.
-function treeTomato() {
-  const profile = [[0, 0], [0.018, 0.004], [0.036, 0.02], [0.044, 0.048], [0.04, 0.078], [0.026, 0.1], [0.008, 0.112], [0, 0.114]];
-  const sepals = new THREE.ConeGeometry(0.02, 0.01, 5);
-  return group(
-    mesh(new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), 24), paint("#c8432a")),
-    mesh(sepals, paint("#4b5a2a"), (m) => (m.position.y = 0.116)),
-    mesh(new THREE.CylinderGeometry(0.0018, 0.0028, 0.018, 6), paint("#4b5a2a"), (m) => {
-      m.position.set(0.002, 0.126, 0);
-      m.rotation.z = -0.25;
-    }),
-  );
-}
-
-// A naranjilla (lulo): a round orange fruit under a fine fuzz, with its dry green calyx on top.
-function naranjilla() {
-  const fruit = mesh(grown([0.045, 0.042, 0.045], 2.2, 0.03), paint("#e8a13a"));
-  fruit.position.y = 0.042;
-  const calyx = mesh(new THREE.ConeGeometry(0.024, 0.012, 5), paint("#6a7a3a"), (m) => {
-    m.position.y = 0.088;
-    m.rotation.x = Math.PI;
-  });
-  return group(fruit, calyx);
 }
 
 function heap(make, count, radius, seed, kinds = 3) {
