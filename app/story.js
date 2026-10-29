@@ -14,9 +14,10 @@ const SCENES = [
 ];
 
 const STORY_SCREENS = 3.61;
-const HOLD_SECONDS = 1.2;
-const REWIND = 2.5;
-const TAP = 250;
+// The fridge opens by dragging its handle: past OPEN_AT the door is let go and swings open, short of it the handle springs back.
+const OPEN_AT = 0.85;
+const SPRING_BACK = 3;
+const TAP = 6;
 
 function chapterName(id) {
   return {
@@ -119,7 +120,7 @@ export function mountStory(main) {
         <nav class="story-chapters" data-film aria-label="${t("landing.story.chapters")}">${timeline.chapters
           .map((chapter, index) => `<button type="button" data-chapter="${index}">${chapterName(chapter.id)}</button>`)
           .join("")}</nav>
-        <button class="button story-hold" type="button" data-film data-story-hold hidden><span class="hold-ring" aria-hidden="true"></span>${t("landing.story.hold")}</button>`,
+        <div class="story-hold" data-film data-story-hold hidden role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="${t("landing.story.drag")}"><span class="drag-track" aria-hidden="true"><span class="drag-knob"></span></span><span class="drag-label">${t("landing.story.drag")}</span></div>`,
       );
       const captions = [...stage.querySelectorAll(".film-captions [data-from]")];
       const rail = stage.querySelector(".story-rail span");
@@ -196,62 +197,79 @@ export function mountStory(main) {
       });
 
       let held = 0;
-      let pressedAt = 0;
-      let pressing = false;
+      let drag = null;
+      let releasing = false;
       let frameId = 0;
       let last = 0;
+      const track = holdButton.querySelector(".drag-track");
+      const show = (value) => {
+        held = Math.min(1, Math.max(0, value));
+        holdButton.style.setProperty("--held", held.toFixed(4));
+        holdButton.setAttribute("aria-valuenow", String(Math.round(held * 100)));
+        film?.setHeld(held);
+      };
       const openGate = () => {
         const gate = closedGate();
         if (!gate) return;
         gate.open = true;
         play("door");
-        held = 0;
-        holdButton.style.setProperty("--held", 0);
+        show(0);
         holdButton.hidden = true;
         scroller.set(gate.at + 0.05, { jump: true });
       };
+      // Let go: past the mark the door swings the rest of the way and opens; short of it the handle springs back shut.
       const step = (now) => {
         const dt = Math.min(0.05, (now - last) / 1000);
         last = now;
-        held = Math.min(1, Math.max(0, held + (pressing ? dt / HOLD_SECONDS : -dt * REWIND / HOLD_SECONDS)));
-        holdButton.style.setProperty("--held", held.toFixed(4));
-        holdButton.classList.toggle("holding", pressing);
-        film?.setHeld(held);
-        if (held >= 1) {
-          pressing = false;
+        const opening = held >= OPEN_AT;
+        show(held + (opening ? dt * 4 : -dt * SPRING_BACK));
+        if (opening && held >= 1) {
+          releasing = false;
           frameId = 0;
           openGate();
           return;
         }
-        frameId = pressing || held > 0 ? requestAnimationFrame(step) : 0;
+        frameId = held > 0 ? requestAnimationFrame(step) : 0;
+        if (!frameId) releasing = false;
       };
-      const press = () => {
-        if (pressing) return;
-        pressing = true;
-        pressedAt = performance.now();
+      const letGo = () => {
+        releasing = true;
         if (!frameId) {
-          last = pressedAt;
+          last = performance.now();
           frameId = requestAnimationFrame(step);
         }
       };
-      const release = () => {
-        if (!pressing) return;
-        pressing = false;
-        if (TAP > performance.now() - pressedAt) toast(t("landing.story.hold-hint"));
-      };
       holdButton.addEventListener("pointerdown", (event) => {
         holdButton.setPointerCapture(event.pointerId);
-        press();
+        cancelAnimationFrame(frameId);
+        frameId = 0;
+        releasing = false;
+        drag = { x: event.clientX, from: held, moved: 0 };
+        holdButton.classList.add("dragging");
       });
-      ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => holdButton.addEventListener(type, release));
+      holdButton.addEventListener("pointermove", (event) => {
+        if (!drag) return;
+        const width = track.getBoundingClientRect().width || 1;
+        drag.moved = Math.max(drag.moved, Math.abs(event.clientX - drag.x));
+        show(drag.from + (event.clientX - drag.x) / width);
+      });
+      const endDrag = () => {
+        if (!drag) return;
+        if (TAP > drag.moved) toast(t("landing.story.drag-hint"));
+        drag = null;
+        holdButton.classList.remove("dragging");
+        letGo();
+      };
+      ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => holdButton.addEventListener(type, endDrag));
       holdButton.addEventListener("contextmenu", (event) => event.preventDefault());
       holdButton.addEventListener("keydown", (event) => {
-        if (event.key !== " " && event.key !== "Enter") return;
+        const nudge = { ArrowRight: 0.1, ArrowUp: 0.1, ArrowLeft: -0.1, ArrowDown: -0.1, End: 1, Home: -1 }[event.key];
+        if (nudge === undefined && event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
-        if (!event.repeat) press();
-      });
-      holdButton.addEventListener("keyup", (event) => {
-        if (event.key === " " || event.key === "Enter") release();
+        cancelAnimationFrame(frameId);
+        frameId = 0;
+        show(nudge === undefined ? 1 : held + nudge);
+        if (held >= OPEN_AT) letGo();
       });
       page.defer(() => cancelAnimationFrame(frameId));
 

@@ -613,6 +613,23 @@ export function kitchen() {
   const tote = bag();
   tote.position.set(-1.0, 0.93, 0);
   scene.add(tote);
+  const room = new THREE.Group();
+  wallDecor(room, -2.49, { windowX: -2.2, shelfX: 1.6, clockX: -0.9 });
+  floorTiles(room, 8, 5);
+  counterDecor(room, -1.55, 0.93, -0.05);
+  scene.add(outline(merged(room)));
+  // What is already in the fridge before the market bag goes in: milk and cheese up top, eggs below, carrots in the bottom.
+  const { SHELVES } = FRIDGE;
+  [
+    ["Milk", -0.22, SHELVES[0], -0.12],
+    ["Cheese", -0.05, SHELVES[0], -0.14],
+    ["Egg", 0.05, SHELVES[2], -0.1],
+    ["Carrot", -0.16, SHELVES[2], 0.02],
+  ].forEach(([name, x, y, z]) => {
+    const food = foodModel(name, undefined, name === "Egg" ? 360 : 300);
+    food.position.set(x, y + 0.012, z);
+    fridge.add(food);
+  });
   // The neighbour home from the market, the same as in the street, stands by the handle and opens the door with her left hand.
   const home = crowd([{ at: [0.62, 0.42], facing: -1.88, kind: "vecina" }], { looks: 1, seed: 9, era: 2026 });
   const neighbour = home.children.find((child) => child.userData.reach);
@@ -644,8 +661,8 @@ export function kitchen() {
   scene.userData.play = (k) => {
     const held = scene.userData.held;
     const opening = THREE.MathUtils.smoothstep(k, 0.2, 0.42);
-    const tremble = opening > 0 ? 0 : Math.sin(held * 70) * 0.025 * held;
-    fridge.userData.door.rotation.y = -1.9 * Math.max(held * 0.22, opening) + tremble;
+    // The door follows the dragged handle all the way, then the scroll carries it on: one swing, no jump between the two.
+    fridge.userData.door.rotation.y = -1.9 * Math.max(held, opening);
     const burst = k > 0.19 ? 1 - THREE.MathUtils.smoothstep(k, 0.24, 0.4) : 0;
     glow.intensity = Math.max(held * 5, opening * 3);
     mist.userData.play(Math.max(held, burst), held + k * 3);
@@ -694,6 +711,11 @@ export function scaleScene() {
   const top = counter(2.2);
   top.position.set(0, 0, 0);
   scene.add(top);
+  const room = new THREE.Group();
+  wallDecor(room, -1.49, { windowX: 0.5, shelfX: -0.7, clockX: 1.25 });
+  floorTiles(room, 4, 3);
+  counterDecor(room, -0.55, 0.93, 0.02);
+  scene.add(outline(merged(room)));
   const grams = gramsTexture();
   // An enamelled kitchen scale: a body with a broad, gently sloped front panel that faces whoever stands over it, a steel pan with a rolled
   // lip, a recessed display, two buttons and feet.
@@ -793,6 +815,19 @@ export function plateScene() {
   );
   cup.position.set(0.42, 0, -0.18);
   scene.add(cup);
+  // The place set round the plate: a folded napkin with fork and knife, a glass of juice, salt and a sprig of flowers in a little vase.
+  const setting = new THREE.Group();
+  setting.add(mesh(new THREE.BoxGeometry(0.12, 0.008, 0.2), paint("#efe6c8"), (m) => m.position.set(-0.33, 0.785, 0.02)));
+  setting.add(mesh(new THREE.BoxGeometry(0.014, 0.006, 0.18), paint("#9aa0a4"), (m) => m.position.set(-0.32, 0.792, 0.02)));
+  setting.add(mesh(new THREE.BoxGeometry(0.016, 0.006, 0.19), paint("#9aa0a4"), (m) => m.position.set(0.3, 0.784, 0.06)));
+  setting.add(mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.12, 16), paint("#f0a640"), (m) => m.position.set(0.3, 0.84, -0.2)));
+  setting.add(mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.06, 12), paint("#f6f1e6"), (m) => m.position.set(-0.28, 0.81, -0.24)));
+  setting.add(mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.09, 14), paint("#3f6f8f"), (m) => m.position.set(-0.5, 0.825, -0.3)));
+  [[-0.51, -0.3, "#c8432a"], [-0.48, -0.29, "#f2c94c"], [-0.5, -0.32, "#d98a9b"]].forEach(([x, z, color], index) => {
+    setting.add(mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.12, 4), paint("#4f7a4a"), (m) => m.position.set(x, 0.92, z)));
+    setting.add(mesh(lumpy(new THREE.SphereGeometry(0.018, 8, 6), 0.3), paint(color), (m) => m.position.set(x, 0.98 + index * 0.012, z)));
+  });
+  scene.add(outline(merged(setting)));
   scene.userData.play = (k) => {
     food.position.y = (1 - THREE.MathUtils.smoothstep(k, 0.05, 0.3)) * 0.25;
     food.rotation.y = k * 0.6;
@@ -950,6 +985,57 @@ function seatsAt(props, seat) {
   });
 }
 
+// Today's kitchen walls: a window with curtains and a plant on the sill, a shelf of jars and a clock, placed along a wall at z = wall.
+function wallDecor(props, wall, { windowX, shelfX, clockX, sill = 1.33 }) {
+  const lift = sill - 1.33;
+  props.add(mesh(new THREE.BoxGeometry(0.95, 0.8, 0.04), paint("#f6f1e6"), (m) => m.position.set(windowX, 1.75 + lift, wall)));
+  props.add(mesh(new THREE.BoxGeometry(0.83, 0.68, 0.03), paint("#bcd3d6"), (m) => m.position.set(windowX, 1.75 + lift, wall + 0.012)));
+  props.add(mesh(new THREE.BoxGeometry(0.03, 0.68, 0.035), paint("#f6f1e6"), (m) => m.position.set(windowX, 1.75 + lift, wall + 0.016)));
+  [-1, 1].forEach((side) => props.add(mesh(new THREE.BoxGeometry(0.26, 0.92, 0.04), paint("#c8432a"), (m) => m.position.set(windowX + side * 0.5, 1.72 + lift, wall + 0.05))));
+  props.add(mesh(new THREE.BoxGeometry(1.0, 0.04, 0.16), paint("#f6f1e6"), (m) => m.position.set(windowX, sill, wall + 0.07)));
+  props.add(mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.12, 14), paint("#b5633d"), (m) => m.position.set(windowX + 0.25, sill + 0.08, wall + 0.07)));
+  props.add(mesh(lumpy(new THREE.SphereGeometry(0.11, 12, 9), 0.35), paint("#5f8a4a"), (m) => m.position.set(windowX + 0.25, sill + 0.22, wall + 0.07)));
+  props.add(mesh(new THREE.BoxGeometry(0.8, 0.03, 0.2), paint("#a4743f"), (m) => m.position.set(shelfX, 2.15, wall + 0.1)));
+  [-0.3, -0.12, 0.06, 0.26].forEach((x, index) => props.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.14 + (index % 2) * 0.04, 14), paint(["#e0a43a", "#c8432a", "#efe6c8", "#4f7a4a"][index]), (m) => m.position.set(shelfX + x, 2.24 + (index % 2) * 0.02, wall + 0.1))));
+  props.add(mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.03, 24), paint("#f6f1e6"), (m) => {
+    m.position.set(clockX, 2.3, wall + 0.02);
+    m.rotation.x = Math.PI / 2;
+  }));
+  props.add(mesh(new THREE.BoxGeometry(0.012, 0.1, 0.01), paint("#2b2a28"), (m) => m.position.set(clockX, 2.34, wall + 0.04)));
+  props.add(mesh(new THREE.BoxGeometry(0.07, 0.012, 0.01), paint("#2b2a28"), (m) => m.position.set(clockX + 0.03, 2.3, wall + 0.04)));
+}
+
+// Floor tiles, 0.8 a side, drawn as their joints.
+function floorTiles(props, width, depth) {
+  for (let line = -Math.floor(depth / 1.6); depth / 1.6 >= line; line++) props.add(mesh(new THREE.BoxGeometry(width, 0.004, 0.012), paint("#c8bfa9"), (m) => m.position.set(0, 0.003, line * 0.8)));
+  for (let line = -Math.floor(width / 1.6); width / 1.6 >= line; line++) props.add(mesh(new THREE.BoxGeometry(0.012, 0.004, depth), paint("#c8bfa9"), (m) => m.position.set(line * 0.8, 0.003, 0)));
+}
+
+// What sits on a counter while someone cooks: a cutting board with a knife and a halved tree tomato, a bowl of fruit, salt and a towel.
+function counterDecor(props, x, top, z) {
+  props.add(mesh(new RoundedBoxGeometry(0.32, 0.02, 0.22, 2, 0.008), paint("#b8925a"), (m) => m.position.set(x, top + 0.01, z)));
+  props.add(mesh(new THREE.BoxGeometry(0.16, 0.004, 0.025), paint("#b9bec2"), (m) => {
+    m.position.set(x + 0.03, top + 0.024, z + 0.05);
+    m.rotation.y = 0.3;
+  }));
+  props.add(mesh(new THREE.BoxGeometry(0.07, 0.012, 0.02), paint("#3b3026"), (m) => {
+    m.position.set(x - 0.08, top + 0.026, z + 0.075);
+    m.rotation.y = 0.3;
+  }));
+  props.add(mesh(new THREE.SphereGeometry(0.035, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), paint("#c8432a"), (m) => m.position.set(x - 0.05, top + 0.02, z - 0.04)));
+  props.add(mesh(new THREE.CircleGeometry(0.034, 14), paint("#f0a640"), (m) => {
+    m.position.set(x - 0.05, top + 0.021, z - 0.04);
+    m.rotation.x = -Math.PI / 2;
+  }));
+  props.add(mesh(new THREE.CylinderGeometry(0.1, 0.07, 0.07, 18), paint("#e9e2d2"), (m) => m.position.set(x - 0.32, top + 0.035, z - 0.05)));
+  [[-0.35, -0.04, "#e98a2c"], [-0.29, -0.07, "#e98a2c"], [-0.31, 0.0, "#f2c94c"]].forEach(([dx, dz, color]) => props.add(mesh(lumpy(new THREE.SphereGeometry(0.036, 10, 8), 0.1), paint(color), (m) => m.position.set(x + dx, top + 0.09, z + dz))));
+  props.add(mesh(new THREE.CylinderGeometry(0.02, 0.022, 0.07, 12), paint("#f6f1e6"), (m) => m.position.set(x + 0.24, top + 0.035, z - 0.06)));
+  props.add(mesh(new THREE.BoxGeometry(0.16, 0.012, 0.12), paint("#e0a43a"), (m) => {
+    m.position.set(x + 0.3, top + 0.006, z + 0.06);
+    m.rotation.y = -0.4;
+  }));
+}
+
 // The family's table today: a kitchen with the fridge of the story, a red cloth, white plates and the pot.
 function tableToday() {
   const scene = group(kitchenFloor(6, 4));
@@ -1025,27 +1111,10 @@ function tableToday() {
     props.add(mesh(new THREE.BoxGeometry(0.53, 0.6, 0.34), paint("#8e9f86"), (m) => m.position.set(x, 2.0, -1.82)));
     props.add(mesh(new THREE.BoxGeometry(0.02, 0.14, 0.02), paint("#5f6b59"), (m) => m.position.set(x + 0.2, 1.8, -1.64)));
   });
-  props.add(mesh(new THREE.BoxGeometry(0.95, 0.8, 0.04), paint("#f6f1e6"), (m) => m.position.set(0.15, 1.75, wall)));
-  props.add(mesh(new THREE.BoxGeometry(0.83, 0.68, 0.03), paint("#bcd3d6"), (m) => m.position.set(0.15, 1.75, wall + 0.012)));
-  props.add(mesh(new THREE.BoxGeometry(0.03, 0.68, 0.035), paint("#f6f1e6"), (m) => m.position.set(0.15, 1.75, wall + 0.016)));
-  [-1, 1].forEach((side) => props.add(mesh(new THREE.BoxGeometry(0.26, 0.92, 0.04), paint("#c8432a"), (m) => m.position.set(0.15 + side * 0.5, 1.72, wall + 0.05))));
-  props.add(mesh(new THREE.BoxGeometry(1.0, 0.04, 0.16), paint("#f6f1e6"), (m) => m.position.set(0.15, 1.33, wall + 0.07)));
-  props.add(mesh(new THREE.CylinderGeometry(0.07, 0.055, 0.12, 14), paint("#b5633d"), (m) => m.position.set(0.4, 1.41, wall + 0.07)));
-  props.add(mesh(lumpy(new THREE.SphereGeometry(0.11, 12, 9), 0.35), paint("#5f8a4a"), (m) => m.position.set(0.4, 1.55, wall + 0.07)));
-  props.add(mesh(new THREE.BoxGeometry(0.8, 0.03, 0.2), paint("#a4743f"), (m) => m.position.set(1.1, 2.15, wall + 0.1)));
-  [0.8, 0.98, 1.16, 1.36].forEach((x, index) => props.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.14 + (index % 2) * 0.04, 14), paint(["#e0a43a", "#c8432a", "#efe6c8", "#4f7a4a"][index]), (m) => m.position.set(x, 2.24 + (index % 2) * 0.02, wall + 0.1))));
-  props.add(mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.03, 24), paint("#f6f1e6"), (m) => {
-    m.position.set(-0.9, 2.3, wall + 0.02);
-    m.rotation.x = Math.PI / 2;
-  }));
-  props.add(mesh(new THREE.BoxGeometry(0.012, 0.1, 0.01), paint("#2b2a28"), (m) => m.position.set(-0.9, 2.34, wall + 0.04)));
-  props.add(mesh(new THREE.BoxGeometry(0.07, 0.012, 0.01), paint("#2b2a28"), (m) => m.position.set(-0.87, 2.3, wall + 0.04)));
+  wallDecor(props, wall, { windowX: 0.15, shelfX: 1.1, clockX: -0.9 });
+  floorTiles(props, 6, 4);
   props.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.9, 5), paint("#2b2a28"), (m) => m.position.set(0, 2.75, 0)));
   props.add(mesh(new THREE.ConeGeometry(0.22, 0.2, 20, 1, true), paint("#c8432a", { side: THREE.DoubleSide }), (m) => m.position.set(0, 2.22, 0)));
-  for (let line = -2; 3 > line; line++) {
-    props.add(mesh(new THREE.BoxGeometry(6, 0.004, 0.012), paint("#c8bfa9"), (m) => m.position.set(0, 0.003, line * 0.8)));
-  }
-  for (let line = -3; 4 > line; line++) props.add(mesh(new THREE.BoxGeometry(0.012, 0.004, 4), paint("#c8bfa9"), (m) => m.position.set(line * 0.8, 0.003, 0)));
   scene.add(outline(merged(props)));
   const fridge = fridgeBody();
   fridge.position.set(1.75, 0, -1.6);
