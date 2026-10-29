@@ -522,6 +522,34 @@ export function streetScene() {
 
 const FRIDGE = { W: 0.72, H: 1.7, D: 0.66, T: 0.035, SHELVES: [0.89, 0.62, 0.35] };
 
+// A kitchen corner: the floor runs toward the viewer from a back wall at z = back, and a side wall closes it at x = side, so the counter
+// and the fridge stand against the walls instead of out in the middle of a room.
+function kitchenCorner(back, side) {
+  const wall = paint("#efe8d8");
+  return group(
+    mesh(new THREE.PlaneGeometry(10, 8), paint("#ddd3bd"), (m) => {
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(0, 0, back + 4);
+    }),
+    mesh(new THREE.PlaneGeometry(10, 3.2), wall, (m) => m.position.set(0, 1.6, back)),
+    mesh(new THREE.PlaneGeometry(8, 3.2), wall, (m) => {
+      m.rotation.y = Math.PI / 2;
+      m.position.set(side, 1.6, back + 4);
+    }),
+  );
+}
+
+// Wall cupboards over a counter, with their handles.
+function cupboards(props, from, to, z) {
+  const doors = Math.max(1, Math.round((to - from) / 0.5));
+  const width = (to - from) / doors;
+  for (let index = 0; doors > index; index++) {
+    const x = from + width * (index + 0.5);
+    props.add(mesh(new THREE.BoxGeometry(width - 0.02, 0.6, 0.34), paint("#8e9f86"), (m) => m.position.set(x, 1.95, z + 0.17)));
+    props.add(mesh(new THREE.BoxGeometry(0.02, 0.14, 0.02), paint("#5f6b59"), (m) => m.position.set(x + width / 2 - 0.08, 1.75, z + 0.35)));
+  }
+}
+
 function kitchenFloor(width, depth) {
   return group(
     mesh(new THREE.PlaneGeometry(width, depth), paint("#ddd3bd"), (m) => (m.rotation.x = -Math.PI / 2)),
@@ -604,7 +632,10 @@ function coldMist() {
 
 // A hand in a red ruana sleeve that reaches for the handle, grips it while the visitor holds, and lets go once the door is open.
 export function kitchen() {
-  const scene = group(kitchenFloor(8, 5));
+  // The corner: the back wall right behind the fridge and the counter, the side wall where the counter ends.
+  const BACK = -0.36;
+  const SIDE = -1.87;
+  const scene = group(kitchenCorner(BACK, SIDE));
   const fridge = fridgeBody();
   scene.add(fridge);
   const top = counter(1.4);
@@ -614,7 +645,8 @@ export function kitchen() {
   tote.position.set(-1.0, 0.93, 0);
   scene.add(tote);
   const room = new THREE.Group();
-  wallDecor(room, -2.49, { windowX: -2.2, shelfX: 1.6, clockX: -0.9 });
+  wallDecor(room, BACK, { windowX: 1.05, shelfX: 1.2, clockX: 0.75, sill: 1.05 });
+  cupboards(room, SIDE + 0.02, -0.45, BACK);
   floorTiles(room, 8, 5);
   counterDecor(room, -1.55, 0.93, -0.05);
   scene.add(outline(merged(room)));
@@ -713,12 +745,12 @@ function gramsTexture() {
 }
 
 export function scaleScene() {
-  const scene = group(kitchenFloor(4, 3));
+  const scene = group(kitchenCorner(-0.32, -1.12));
   const top = counter(2.2);
   top.position.set(0, 0, 0);
   scene.add(top);
   const room = new THREE.Group();
-  wallDecor(room, -1.49, { windowX: 0.5, shelfX: -0.7, clockX: 1.25 });
+  wallDecor(room, -0.32, { windowX: 0.45, shelfX: -0.55, clockX: 1.25, sill: 1.05 });
   floorTiles(room, 4, 3);
   counterDecor(room, -0.55, 0.93, 0.02);
   scene.add(outline(merged(room)));
