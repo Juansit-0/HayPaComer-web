@@ -635,9 +635,11 @@ export function kitchen() {
   const neighbour = home.children.find((child) => child.userData.reach);
   neighbour?.userData.pose("Rest", 0);
   scene.add(home);
-  // The front of the handle bar, where her palm closes on it.
+  // The front of the handle bar, where her palm closes on it, and the point behind the bar her fingers curl round to.
   const grip = new THREE.Vector3(FRIDGE.W - 0.06, 0.9, 0.11);
+  const behind = new THREE.Vector3(FRIDGE.W - 0.06, 0.9, 0.065);
   const handle = new THREE.Vector3();
+  const wrap = new THREE.Vector3();
   const travellers = [
     ["Potato", [-1.05, 1.18, 0], [-0.2, FRIDGE.SHELVES[1] + 0.012, 0.05]],
     ["Potato", [-0.98, 1.2, 0.02], [-0.08, FRIDGE.SHELVES[1] + 0.012, 0.06]],
@@ -670,10 +672,10 @@ export function kitchen() {
     mist.userData.play(Math.max(held, burst), held + k * 3);
     // She takes the handle, pulls the door a third of the way, and lets it swing on.
     fridge.userData.door.updateMatrixWorld(true);
-    // Her hand lets go of the handle once the door swings past the reach of her arm (0.4 of the swing).
+    // Her hand lets go of the handle once the door swings past the reach of her arm (a quarter of the swing).
     const swing = Math.max(held, opening);
-    const share = THREE.MathUtils.smoothstep(k, 0.04, 0.16) * (1 - THREE.MathUtils.smoothstep(k, 0.27, 0.4)) * (1 - THREE.MathUtils.smoothstep(swing, 0.38, 0.55));
-    neighbour?.userData.reach("L", fridge.userData.door.localToWorld(handle.copy(grip)), share);
+    const share = THREE.MathUtils.smoothstep(k, 0.04, 0.16) * (1 - THREE.MathUtils.smoothstep(k, 0.27, 0.4)) * (1 - THREE.MathUtils.smoothstep(swing, 0.24, 0.45));
+    neighbour?.userData.reach("L", fridge.userData.door.localToWorld(handle.copy(grip)), share, fridge.userData.door.localToWorld(wrap.copy(behind)));
     travellers.forEach((model, index) => {
       const t = THREE.MathUtils.smoothstep(k, 0.36 + index * 0.07, 0.62 + index * 0.07);
       model.position.copy(model.userData.path.getPoint(t));

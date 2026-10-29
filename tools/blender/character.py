@@ -188,6 +188,19 @@ for side, sign in (("L", 1), ("R", -1)):
     reach = tip - shoulder
     elbow = shoulder + reach * 0.42
     wrist = shoulder + reach * 0.76
+    # The hand splits at the knuckles, so the fingers can close on what the hand holds; the thumb is the part of the hand that stands out
+    # farthest from its line, between the wrist and the knuckles.
+    palm = tip - wrist
+    knuckle = wrist + palm * 0.5
+    span = palm.length
+    near = []
+    for p in points:
+        t = (p - wrist).dot(palm) / span ** 2
+        if 0.05 < t < 0.75:
+            near.append(((p - (wrist + palm * t)).length, p))
+    near = [entry for entry in near if 0.45 * span > entry[0]]
+    thumb_tip = max(near, key=lambda entry: entry[0])[1] if near else knuckle
+    thumb_base = wrist + palm * 0.15 + (thumb_tip - (wrist + palm * 0.15)) * 0.3
     ankle_x = abs(ankles[1 if sign > 0 else 0])
     knee_x = 0.055 * H + (ankle_x - 0.055 * H) * (hip_z - knee_z) / (hip_z - ankle_z)
     foot = [p for p in points if p.z < 0.03 * H and p.x * sign > 0]
@@ -198,7 +211,9 @@ for side, sign in (("L", 1), ("R", -1)):
         f"shoulder.{side}": ((0.025 * H * sign, Y, shoulder_z - 0.01 * H), tuple(shoulder), "chest"),
         f"upper_arm.{side}": (tuple(shoulder), tuple(elbow), f"shoulder.{side}"),
         f"forearm.{side}": (tuple(elbow), tuple(wrist), f"upper_arm.{side}"),
-        f"hand.{side}": (tuple(wrist), tuple(tip), f"forearm.{side}"),
+        f"hand.{side}": (tuple(wrist), tuple(knuckle), f"forearm.{side}"),
+        f"fingers.{side}": (tuple(knuckle), tuple(tip), f"hand.{side}"),
+        f"thumb.{side}": (tuple(thumb_base), tuple(thumb_tip), f"hand.{side}"),
         f"thigh.{side}": ((0.055 * H * sign, Y, hip_z), (knee_x * sign, Y, knee_z), "hips"),
         f"shin.{side}": ((knee_x * sign, Y, knee_z), ankle, f"thigh.{side}"),
         f"foot.{side}": (ankle, (ankle_x * sign * 1.08, toe_y + 0.03, 0.012 * H), f"shin.{side}"),
@@ -260,7 +275,7 @@ def reassign(vertex, keep):
         groups[torso_for(vertex.co.z)].add([vertex.index], given, "ADD")
 
 
-ARM_PARTS = ("upper_arm", "forearm", "hand")
+ARM_PARTS = ("upper_arm", "forearm", "hand", "fingers", "thumb")
 if "sleeve" in FIGURE:
     inner, outer = (value * H / 1.7 for value in FIGURE["sleeve"])
     for vertex in mesh.vertices:

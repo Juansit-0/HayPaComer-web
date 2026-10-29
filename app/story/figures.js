@@ -247,10 +247,11 @@ export function figure(kind, look) {
     aim(upper, elbowAt, elbow);
     aim(fore, hand.getWorldPosition(new THREE.Vector3()), shoulder.clone().addScaledVector(toward, span));
   };
-  // The wrist is aimed, then moved by however far the palm landed from the target, a few times over, so the palm itself rests on it.
-  root.userData.reach = (side, target, share) => {
-    const [upper, fore, hand] = ["upper_arm", "forearm", "hand"].map((part) => root.getObjectByName(part + side));
-    if (!still.size) [upper, fore].forEach((bone) => still.set(bone, bone.quaternion.clone()));
+  // The wrist is aimed, then moved by however far the palm landed from the target, a few times over, so the palm itself rests on it. With
+  // a wrap point (behind a bar the palm lies on) the fingers and the thumb then close toward it, as a hand takes a handle.
+  root.userData.reach = (side, target, share, wrap) => {
+    const [upper, fore, hand, fingers, thumb] = ["upper_arm", "forearm", "hand", "fingers", "thumb"].map((part) => root.getObjectByName(part + side));
+    if (!still.size) [upper, fore, fingers, thumb].filter(Boolean).forEach((bone) => still.set(bone, bone.quaternion.clone()));
     const rest = () => {
       still.forEach((turn, bone) => bone.quaternion.copy(turn));
       root.updateMatrixWorld(true);
@@ -267,6 +268,15 @@ export function figure(kind, look) {
     }
     rest();
     solve(upper, fore, hand, wrist);
+    if (!wrap) return;
+    // The fingers curl behind the bar; the thumb lies across its front.
+    [[fingers, wrap], [thumb, target]].forEach(([bone, toward]) => {
+      if (!bone) return;
+      const base = bone.getWorldPosition(new THREE.Vector3());
+      const tip = bone.localToWorld(new THREE.Vector3(0, 0.05, 0));
+      const closed = base.clone().add(toward.clone().sub(base).normalize().multiplyScalar(tip.distanceTo(base)));
+      aim(bone, tip, tip.clone().lerp(closed, share));
+    });
   };
   root.userData.pose(clips.Walk ? "Walk" : Object.keys(clips)[0], 0);
   return root;

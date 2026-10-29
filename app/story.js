@@ -16,7 +16,7 @@ const SCENES = [
 const STORY_SCREENS = 3.61;
 // The fridge opens by pulling its door: the hand keeps the handle up to OPEN_AT of the swing, as far as the arm reaches; there the door
 // is let go by itself and swings the rest of the way. Let go sooner and it springs back shut.
-const OPEN_AT = 0.4;
+const OPEN_AT = 0.26;
 const SPRING_BACK = 3;
 const TAP = 6;
 
