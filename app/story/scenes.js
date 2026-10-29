@@ -635,7 +635,8 @@ export function kitchen() {
   const neighbour = home.children.find((child) => child.userData.reach);
   neighbour?.userData.pose("Rest", 0);
   scene.add(home);
-  const grip = new THREE.Vector3(FRIDGE.W - 0.06 + 0.03, 0.9, 0.1);
+  // The front of the handle bar, where her palm closes on it.
+  const grip = new THREE.Vector3(FRIDGE.W - 0.06, 0.9, 0.11);
   const handle = new THREE.Vector3();
   const travellers = [
     ["Potato", [-1.05, 1.18, 0], [-0.2, FRIDGE.SHELVES[1] + 0.012, 0.05]],

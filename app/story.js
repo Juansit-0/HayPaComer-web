@@ -224,6 +224,7 @@ export function mountStory(main) {
         show(1);
         settle = { at: gate.at + 0.045, done: () => show(0) };
         holdButton.hidden = true;
+        story.classList.remove("pulling");
         scroller.set(gate.at + 0.05, { jump: true });
       };
       // Let go: past the mark the door swings the rest of the way and opens; short of it the door springs back shut.
@@ -264,7 +265,7 @@ export function mountStory(main) {
         if (!drag) return;
         if (TAP > drag.moved) toast(t("landing.story.drag-hint"));
         drag = null;
-        story.classList.remove("pulling");
+        if (OPEN_AT > held) story.classList.remove("pulling");
         canvas.style.cursor = "";
         letGo();
       };

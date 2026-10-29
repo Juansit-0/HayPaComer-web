@@ -229,16 +229,12 @@ export function figure(kind, look) {
     bone.quaternion.premultiply(parent.clone().invert().multiply(turn).multiply(parent));
     bone.updateMatrixWorld(true);
   };
-  root.userData.reach = (side, target, share) => {
-    const [upper, fore, hand] = ["upper_arm", "forearm", "hand"].map((part) => root.getObjectByName(part + side));
-    if (!still.size) [upper, fore].forEach((bone) => still.set(bone, bone.quaternion.clone()));
-    still.forEach((turn, bone) => bone.quaternion.copy(turn));
-    root.updateMatrixWorld(true);
-    if (!(share > 0)) return;
+  // The palm, a little way along the hand bone from the wrist: this is the point laid on what she reaches for.
+  const PALM = new THREE.Vector3(0, 0.06, 0);
+  const solve = (upper, fore, hand, goal) => {
     const shoulder = upper.getWorldPosition(new THREE.Vector3());
     const elbowAt = fore.getWorldPosition(new THREE.Vector3());
     const wristAt = hand.getWorldPosition(new THREE.Vector3());
-    const goal = wristAt.clone().lerp(target, share);
     const upperLength = shoulder.distanceTo(elbowAt);
     const foreLength = elbowAt.distanceTo(wristAt);
     const toward = goal.clone().sub(shoulder);
@@ -250,6 +246,27 @@ export function figure(kind, look) {
     const elbow = shoulder.clone().addScaledVector(toward, along).addScaledVector(bend, lift);
     aim(upper, elbowAt, elbow);
     aim(fore, hand.getWorldPosition(new THREE.Vector3()), shoulder.clone().addScaledVector(toward, span));
+  };
+  // The wrist is aimed, then moved by however far the palm landed from the target, a few times over, so the palm itself rests on it.
+  root.userData.reach = (side, target, share) => {
+    const [upper, fore, hand] = ["upper_arm", "forearm", "hand"].map((part) => root.getObjectByName(part + side));
+    if (!still.size) [upper, fore].forEach((bone) => still.set(bone, bone.quaternion.clone()));
+    const rest = () => {
+      still.forEach((turn, bone) => bone.quaternion.copy(turn));
+      root.updateMatrixWorld(true);
+    };
+    rest();
+    if (!(share > 0)) return;
+    const start = hand.localToWorld(PALM.clone());
+    const goal = start.clone().lerp(target, share);
+    const wrist = goal.clone();
+    for (let pass = 0; 4 > pass; pass++) {
+      rest();
+      solve(upper, fore, hand, wrist);
+      wrist.add(goal.clone().sub(hand.localToWorld(PALM.clone())));
+    }
+    rest();
+    solve(upper, fore, hand, wrist);
   };
   root.userData.pose(clips.Walk ? "Walk" : Object.keys(clips)[0], 0);
   return root;
