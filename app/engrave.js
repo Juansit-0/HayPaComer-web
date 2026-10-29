@@ -30,6 +30,8 @@ const hatchScale = { value: Math.min(devicePixelRatio, 2) };
 export const setHatchScale = (pixelRatio) => (hatchScale.value = pixelRatio);
 export const inkTime = { value: 0 };
 export const inkBias = { value: 0 };
+// How far the picture has turned into old footage: sepia over everything engraved, set per frame by the story.
+export const filmTone = { value: 0 };
 export const boil = (now) => (inkTime.value = Math.floor(now / 125) % 8);
 const INK = "vec3(0.11, 0.09, 0.08)";
 
@@ -37,8 +39,9 @@ export function engrave(shader) {
   shader.uniforms.hatchScale = hatchScale;
   shader.uniforms.inkTime = inkTime;
   shader.uniforms.inkBias = inkBias;
+  shader.uniforms.filmTone = filmTone;
   shader.fragmentShader = shader.fragmentShader
-    .replace("void main() {", "uniform float hatchScale;\nuniform float inkTime;\nuniform float inkBias;\nvoid main() {")
+    .replace("void main() {", "uniform float hatchScale;\nuniform float inkTime;\nuniform float inkBias;\nuniform float filmTone;\nvoid main() {")
     .replace(
       "#include <dithering_fragment>",
       `#include <dithering_fragment>
@@ -57,7 +60,9 @@ export function engrave(shader) {
       vec2 cell = floor(p / 3.0) + inkTime;
       float speck = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
       ink = max(ink, step(length(fract(p / 3.0) - 0.5), 0.28) * step(speck, 0.009 * smoothstep(0.1, 0.2, shade) * (1.0 - smoothstep(0.2, 0.28, shade))));
-      gl_FragColor.rgb = mix(base * mix(0.86, 1.0, clamp(lit, 0.0, 1.0)) + glow, ${INK}, ink * 0.88);`,
+      gl_FragColor.rgb = mix(base * mix(0.86, 1.0, clamp(lit, 0.0, 1.0)) + glow, ${INK}, ink * 0.88);
+      float grey = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, mix(grey * vec3(1.07, 0.93, 0.72) + vec3(0.04, 0.025, 0.0), gl_FragColor.rgb, 0.14), filmTone);`,
     );
 }
 

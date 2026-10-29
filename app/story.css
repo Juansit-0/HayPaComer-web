@@ -19,7 +19,7 @@
 .column:has(.land-story[data-captured] .story-intro.gone) > .bar { translate: 0 -100%; opacity: 0; }
 html:has(.land-story[data-captured]) { overscroll-behavior: none; }
 
-.story-canvas, .film-captions, .story-rail, .story-chapters { display: none; }
+.story-canvas, .film-captions, .film-grain, .film-roll, .story-rail, .story-chapters { display: none; }
 .land-story.filming { height: 100svh; overflow: hidden; }
 .land-story.filming .story-stage { position: absolute; inset: 0; display: block; padding: 0; }
 .land-story.filming .story-frame, .land-story.filming .story-credit { display: none; }
@@ -34,6 +34,12 @@ html:has(.land-story[data-captured]) { overscroll-behavior: none; }
 :root[data-ready] .land-story.filming .story-intro > :nth-child(2) { transition-delay: calc(var(--stagger) * 2); }
 :root[data-ready] .land-story.filming .story-intro > :nth-child(3) { transition-delay: calc(var(--stagger) * 4); }
 
+/* Old footage over the 1876 chapters: a brown vignette, scanlines and grain, all at the strength the story sets in --film; the tuning
+   band rolls down with --roll while the picture changes era */
+.land-story.filming .film-grain { display: block; position: absolute; inset: 0; overflow: hidden; pointer-events: none; opacity: var(--film, 0); }
+.film-grain::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 75% 70% at 50% 50%, transparent 55%, rgb(70 44 18 / 0.5) 100%), repeating-linear-gradient(to bottom, rgb(50 32 14 / 0.07) 0 1px, transparent 1px 3px); }
+.film-grain::after { content: ""; position: absolute; inset: -60px; opacity: 0.32; translate: var(--grain, 0 0); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.2 0 0 0 0 0.13 0 0 0 0 0.05 0 0 0 1.6 -0.55'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.land-story.filming .film-roll { display: block; position: absolute; pointer-events: none; inset-inline: 0; top: 0; height: 22%; translate: 0 calc(var(--roll, -1) * 560% - 120%); background: linear-gradient(to bottom, transparent, rgb(255 246 222 / 0.55) 45%, rgb(40 26 12 / 0.35) 52%, transparent); opacity: calc(var(--roll, -1) * (1 - var(--roll, -1)) * 4); }
 .land-story.filming .film-captions { display: block; position: absolute; inset: 0; pointer-events: none; }
 /* The news pans in: a caption slides in from ahead with a slight turn, settles, and slides on out the other way when its moment passes */
 .film-captions .story-caption { opacity: 0; translate: 9% 0; rotate: 2.5deg; transition: opacity var(--duration-base) var(--ease-standard), translate var(--duration-caption) var(--ease-spring), rotate var(--duration-caption) var(--ease-spring); }

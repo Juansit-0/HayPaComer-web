@@ -1,5 +1,5 @@
 import * as THREE from "./vendor/three.module.min.js";
-import { boil, inkBias, setHatchScale } from "./engrave.js";
+import { boil, filmTone, inkBias, setHatchScale } from "./engrave.js";
 import { createTrack } from "./camerapath.js";
 import { damp, loop, reduced } from "./motion.js";
 import { TIERS, createGovernor, pixelRatioFor } from "./quality.js";
@@ -50,7 +50,7 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
       winds.push(wind);
     }
     const keys = chapter.camera.map((key) => ({ ...key, pos: [key.pos[0] + offset, key.pos[1], key.pos[2]], look: [key.look[0] + offset, key.look[1], key.look[2]] }));
-    const entry = { id: chapter.id, world, wind, light: chapter.light, track: createTrack(keys), from: start, to: start + chapter.share };
+    const entry = { id: chapter.id, world, wind, light: chapter.light, film: chapter.film ?? 0, track: createTrack(keys), from: start, to: start + chapter.share };
     start += chapter.share;
     return entry;
   });
@@ -106,6 +106,14 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     },
   });
 
+  const PAPER_COLOR = new THREE.Color(PAPER);
+  const AGED_PAPER = new THREE.Color("#e6d3ad");
+  const paper = new THREE.Color();
+  const stage = canvas.parentElement;
+  let shownTone = -1;
+  let shownRoll = -2;
+  let shownGrain = -1;
+
   function tick(dt, now) {
     const before = state.progress;
     state.progress = damp(state.progress, state.goal, follow, dt);
@@ -126,11 +134,16 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     const width = story.cut.width;
     let sweep = 0;
     let neighbour = -1;
+    let tone = chapter.film;
+    let roll = -1;
     for (let cut = 1; last >= cut; cut += 1) {
       const distance = (share - chapters[cut].from) / width;
       if (1 > Math.abs(distance)) {
         sweep = (distance + 1) / 2;
         neighbour = distance >= 0 ? cut - 1 : cut;
+        const [before, after] = [chapters[cut - 1].film, chapters[cut].film];
+        tone = before + (after - before) * THREE.MathUtils.smoothstep(sweep, 0.15, 0.85);
+        if (before !== after) roll = sweep;
       }
     }
     for (let other = 0; last >= other; other += 1) chapters[other].world.visible = other === index || other === neighbour;
@@ -159,7 +172,24 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     sun.position.fromArray(chapter.light.sun);
     inkBias.value = chapter.light.inkBias;
 
+    // The old footage: sepia in the shader, aged paper behind it, and over the canvas a vignette, scanlines and grain that jumps with the
+    // 8 Hz ink boil; leaving 1876 a tuning band rolls down the screen with the scroll.
+    if (tone !== shownTone || roll !== shownRoll) {
+      shownTone = tone;
+      shownRoll = roll;
+      filmTone.value = tone;
+      paper.copy(PAPER_COLOR).lerp(AGED_PAPER, tone);
+      renderer.setClearColor(paper);
+      scene.fog.color.copy(paper);
+      stage.style.setProperty("--film", tone.toFixed(3));
+      stage.style.setProperty("--roll", roll.toFixed(3));
+    }
     const stepped = Math.floor(now * 8) / 8;
+    if (tone > 0 && stepped !== shownGrain) {
+      shownGrain = stepped;
+      const jump = Math.round(stepped * 8);
+      stage.style.setProperty("--grain", `${((jump * 37) % 100) - 50}px ${((jump * 61) % 100) - 50}px`);
+    }
     boil(now * 1000);
     for (const wind of winds) wind.uniforms.uTime.value = stepped;
     ink.uniforms.uSweep.value = sweep;

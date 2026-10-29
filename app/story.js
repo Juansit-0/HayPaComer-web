@@ -111,7 +111,9 @@ export function mountStory(main) {
 
       stage.insertAdjacentHTML(
         "beforeend",
-        `<div class="film-captions" data-film>${timeline.captions.map(caption).join("")}</div>
+        `<div class="film-grain" data-film aria-hidden="true"></div>
+        <div class="film-roll" data-film aria-hidden="true"></div>
+        <div class="film-captions" data-film>${timeline.captions.map(caption).join("")}</div>
         <div class="story-rail" data-film aria-hidden="true"><span></span></div>
         <nav class="story-chapters" data-film aria-label="${t("landing.story.chapters")}">${timeline.chapters
           .map((chapter, index) => `<button type="button" data-chapter="${index}">${chapterName(chapter.id)}</button>`)
