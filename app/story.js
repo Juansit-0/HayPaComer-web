@@ -120,7 +120,7 @@ export function mountStory(main) {
         <nav class="story-chapters" data-film aria-label="${t("landing.story.chapters")}">${timeline.chapters
           .map((chapter, index) => `<button type="button" data-chapter="${index}">${chapterName(chapter.id)}</button>`)
           .join("")}</nav>
-        <div class="story-hold" data-film data-story-hold hidden role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="${t("landing.story.drag")}"><span class="drag-track" aria-hidden="true"><span class="drag-knob"></span></span><span class="drag-label">${t("landing.story.drag")}</span></div>`,
+        <div class="story-hold" data-film data-story-hold hidden role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="${t("landing.story.drag")}"><span class="drag-hand" aria-hidden="true"></span><span class="drag-label">${t("landing.story.drag")}</span></div>`,
       );
       const captions = [...stage.querySelectorAll(".film-captions [data-from]")];
       const rail = stage.querySelector(".story-rail span");
@@ -156,6 +156,8 @@ export function mountStory(main) {
         chapterButtons.forEach((button, index) => (index === active ? button.setAttribute("aria-current", "step") : button.removeAttribute("aria-current")));
         const gate = closedGate();
         holdButton.hidden = !(gate && value > gate.at - 0.012);
+        // No ink trail while the door is in hand or swinging open.
+        document.documentElement.toggleAttribute("data-quiet-pointer", !holdButton.hidden || timeline.gates.some((entry) => value > entry.at - 0.012 && entry.at + 0.06 > value));
         listen(value);
       };
       const syncCaptured = () => story.toggleAttribute("data-captured", Boolean(scroller?.captured()));
@@ -201,7 +203,6 @@ export function mountStory(main) {
       let releasing = false;
       let frameId = 0;
       let last = 0;
-      const track = holdButton.querySelector(".drag-track");
       const show = (value) => {
         held = Math.min(1, Math.max(0, value));
         holdButton.style.setProperty("--held", held.toFixed(4));
@@ -239,28 +240,39 @@ export function mountStory(main) {
           frameId = requestAnimationFrame(step);
         }
       };
-      holdButton.addEventListener("pointerdown", (event) => {
-        holdButton.setPointerCapture(event.pointerId);
+      // The door itself is the handle: press on it and pull it toward the left, the way it swings. The note below only says so; it is
+      // also the keyboard control.
+      const onDoor = (event) => !holdButton.hidden && film?.doorAt(event.clientX, event.clientY);
+      canvas.addEventListener("pointerdown", (event) => {
+        if (!onDoor(event)) return;
+        canvas.setPointerCapture(event.pointerId);
         cancelAnimationFrame(frameId);
         frameId = 0;
         releasing = false;
-        drag = { x: event.clientX, from: held, moved: 0 };
-        holdButton.classList.add("dragging");
+        drag = { x: event.clientX, from: held, moved: 0, width: film.doorWidth() };
+        story.classList.add("pulling");
       });
-      holdButton.addEventListener("pointermove", (event) => {
-        if (!drag) return;
-        const width = track.getBoundingClientRect().width || 1;
+      canvas.addEventListener("pointermove", (event) => {
+        if (!drag) {
+          canvas.style.cursor = onDoor(event) ? "grab" : "";
+          return;
+        }
         drag.moved = Math.max(drag.moved, Math.abs(event.clientX - drag.x));
-        show(drag.from + (event.clientX - drag.x) / width);
+        show(drag.from + (drag.x - event.clientX) / drag.width);
       });
+      // A touch that starts on the door belongs to the door, not to the story's scroll.
+      canvas.addEventListener("touchstart", (event) => {
+        if (event.touches.length === 1 && onDoor(event.touches[0])) event.stopPropagation();
+      }, { passive: true });
       const endDrag = () => {
         if (!drag) return;
         if (TAP > drag.moved) toast(t("landing.story.drag-hint"));
         drag = null;
-        holdButton.classList.remove("dragging");
+        story.classList.remove("pulling");
+        canvas.style.cursor = "";
         letGo();
       };
-      ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => holdButton.addEventListener(type, endDrag));
+      ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => canvas.addEventListener(type, endDrag));
       holdButton.addEventListener("contextmenu", (event) => event.preventDefault());
       holdButton.addEventListener("keydown", (event) => {
         const nudge = { ArrowRight: 0.1, ArrowUp: 0.1, ArrowLeft: -0.1, ArrowDown: -0.1, End: 1, Home: -1 }[event.key];
@@ -281,6 +293,7 @@ export function mountStory(main) {
             window.scrollTo(0, 0);
             scroller.set(value, { jump: true });
           },
+          door: (x, y) => Boolean(film?.doorAt(x, y)),
         });
       }
       return Promise.all([import("./story3d.js"), Promise.resolve(timeline)]);

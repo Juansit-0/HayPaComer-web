@@ -59,6 +59,12 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
 
   const ink = createInkPass({ cover: matchMedia("(pointer: coarse)").matches ? 1.5 : 2 });
   const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 120);
+  const picker = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const kitchenDoor = () => {
+    const kitchen = chapters.find((chapter) => chapter.id === "kitchen");
+    return kitchen?.world.visible ? kitchen.world.userData.door : null;
+  };
   const look = new THREE.Vector3();
   const fine = matchMedia("(pointer: fine)").matches;
   const state = { goal: 0, progress: 0, speed: 0, pitch: 0, pointerX: 0, pointerY: 0, gazeX: 0, gazeY: 0, override: null };
@@ -269,6 +275,24 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     },
     hold(seconds) {
       governor.hold(seconds);
+    },
+    // The fridge door on screen: whether a point (client pixels) falls on it while the kitchen is showing, and how wide it looks, so a drag
+    // across most of its width swings it fully open.
+    doorAt(x, y) {
+      const door = kitchenDoor();
+      if (!door) return false;
+      const box = canvas.getBoundingClientRect();
+      pointer.set(((x - box.left) / box.width) * 2 - 1, -((y - box.top) / box.height) * 2 + 1);
+      picker.setFromCamera(pointer, camera);
+      return picker.intersectObject(door, true).length > 0;
+    },
+    doorWidth() {
+      const door = kitchenDoor();
+      if (!door) return 1;
+      const span = new THREE.Box3().setFromObject(door);
+      const left = span.min.clone().project(camera);
+      const right = span.max.clone().project(camera);
+      return Math.max(80, (Math.abs(right.x - left.x) / 2) * canvas.clientWidth * 0.7);
     },
     setHeld(value) {
       const kitchen = chapters.find((chapter) => chapter.id === "kitchen");

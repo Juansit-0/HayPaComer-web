@@ -127,6 +127,10 @@ export function createInkTrail() {
   };
 
   const onMove = (event) => {
+    if (document.documentElement.hasAttribute("data-quiet-pointer")) {
+      last = null;
+      return;
+    }
     const x = event.clientX;
     const y = event.clientY;
     if (last) {

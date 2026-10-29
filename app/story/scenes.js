@@ -658,6 +658,7 @@ export function kitchen() {
   const mist = coldMist();
   scene.add(mist);
   scene.userData.held = 0;
+  scene.userData.door = fridge.userData.door;
   scene.userData.play = (k) => {
     const held = scene.userData.held;
     const opening = THREE.MathUtils.smoothstep(k, 0.2, 0.42);
