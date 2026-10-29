@@ -287,7 +287,8 @@ function volcano() {
     position.setZ(index, Math.max(0, cone - crater + ridges + hills * (r > 0.85 ? 1 : 0.4)));
   }
   land.computeVertexNormals();
-  const material = paint("#ffffff");
+  // Both faces drawn: from a low street the ridges show their backs, which would otherwise open holes in the mountain.
+  const material = paint("#ffffff", { side: THREE.DoubleSide });
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vLand;")
@@ -303,23 +304,29 @@ function volcano() {
   }), clouds());
 }
 
-// A few clouds snagged on the volcano, drawn like the rest: soft paper lumps with an ink edge.
+// Clouds as the engravers of the time drew them over the Andes: long flat banks lying along the slopes of Galeras and thin streaks high
+// above, paper-toned and shaded only by the hatching on their undersides, with no ink outline to cut them out of the sky.
 function clouds() {
   const sky = new THREE.Group();
-  [[-13, 7.4, -36, 2.4], [-1, 6.4, -33, 1.6], [11, 7, -37, 2.2]].forEach(([x, y, z, size], index) => {
-    const cloud = new THREE.Group();
-    for (let puff = 0; 5 > puff; puff++) {
-      const spread = (puff - 2) / 2;
-      cloud.add(mesh(lumpy(new THREE.SphereGeometry(0.5 + (1 - Math.abs(spread)) * 0.4, 14, 10), 0.2), paint("#f8f3e8"), (m) => {
-        m.position.set(spread * 1.1, (1 - Math.abs(spread)) * 0.25 + random(index * 9 + puff) * 0.15, random(index * 5 + puff) * 0.3);
-        m.scale.y = 0.55;
+  const bank = (x, y, z, width, thickness, seed) => {
+    const puffs = Math.round(width / 1.1);
+    for (let puff = 0; puffs > puff; puff++) {
+      const along = (puff / (puffs - 1) - 0.5) * width;
+      const swell = 1 - Math.abs(along / width) * 1.4;
+      sky.add(mesh(lumpy(new THREE.SphereGeometry(0.9 + random(seed * 7 + puff) * 0.5, 14, 9), 0.15), paint("#efe7d6"), (m) => {
+        m.position.set(x + along, y + random(seed * 3 + puff) * thickness * 0.4, z + (random(seed * 5 + puff) - 0.5) * 1.2);
+        m.scale.set(1.5, thickness * Math.max(0.35, swell), 0.9);
       }));
     }
-    cloud.position.set(x, y, z);
-    cloud.scale.setScalar(size);
-    sky.add(cloud);
-  });
-  return outline(merged(sky));
+  };
+  bank(-9, 4.2, -21, 11, 0.32, 1);
+  bank(3, 3.3, -18, 8, 0.26, 2);
+  bank(-1, 6.6, -26, 7, 0.22, 3);
+  bank(12, 8.8, -38, 12, 0.14, 4);
+  bank(-16, 9.6, -40, 9, 0.12, 5);
+  const merged_ = merged(sky);
+  merged_.traverse((child) => (child.userData.noOutline = true));
+  return merged_;
 }
 
 // Trodden earth: patches of darker soil and dust under the cobbles and the stalls.
@@ -897,39 +904,9 @@ export function plateScene() {
   // The place set round the plate: a folded napkin with a fork on it, a knife and a spoon on the right, a glass of juice, salt and a
   // sprig of flowers in a little vase.
   const setting = new THREE.Group();
-  const steel = paint("#a9afb3");
-  const fork = (x, z) => {
-    setting.add(mesh(new RoundedBoxGeometry(0.014, 0.005, 0.11, 1, 0.002), steel, (m) => m.position.set(x, 0, z + 0.04)));
-    setting.add(mesh(new THREE.BoxGeometry(0.022, 0.004, 0.03), steel, (m) => m.position.set(x, 0, z - 0.028)));
-    [-0.008, -0.0027, 0.0027, 0.008].forEach((dx) => setting.add(mesh(new THREE.BoxGeometry(0.0035, 0.004, 0.04), steel, (m) => m.position.set(x + dx, 0, z - 0.06))));
-  };
-  // A table knife: a wooden handle toward the diner, a broad steel blade beyond it, its tip cut on a slant.
-  const knife = (x, z) => {
-    setting.add(mesh(new RoundedBoxGeometry(0.014, 0.008, 0.08, 1, 0.003), paint("#6b4a2a"), (m) => m.position.set(x, 0.001, z + 0.065)));
-    const blade = new THREE.Shape();
-    blade.moveTo(-0.009, 0);
-    blade.lineTo(0.009, 0);
-    blade.lineTo(0.009, 0.085);
-    blade.quadraticCurveTo(0.008, 0.112, -0.003, 0.118);
-    blade.lineTo(-0.009, 0.1);
-    blade.lineTo(-0.009, 0);
-    setting.add(mesh(new THREE.ExtrudeGeometry(blade, { depth: 0.003, bevelEnabled: false, curveSegments: 8 }), steel, (m) => {
-      m.rotation.x = -Math.PI / 2;
-      m.position.set(x, -0.0015, z + 0.026);
-    }));
-  };
-  const spoon = (x, z) => {
-    setting.add(mesh(new RoundedBoxGeometry(0.012, 0.005, 0.12, 1, 0.002), steel, (m) => m.position.set(x, 0, z + 0.035)));
-    setting.add(mesh(new THREE.SphereGeometry(0.02, 14, 8), steel, (m) => {
-      m.position.set(x, 0, z - 0.045);
-      m.scale.set(0.8, 0.22, 1.2);
-    }));
-  };
   setting.add(mesh(new RoundedBoxGeometry(0.13, 0.01, 0.21, 2, 0.003), paint("#efe6c8"), (m) => m.position.set(-0.34, -0.004, 0.02)));
   setting.add(mesh(new THREE.BoxGeometry(0.004, 0.012, 0.21), paint("#d9cfb0"), (m) => m.position.set(-0.31, -0.003, 0.02)));
-  fork(-0.35, 0.02);
-  knife(0.3, 0.04);
-  spoon(0.34, 0.04);
+  setting.add(fork(-0.35, 0.002, 0.02), knife(0.3, 0, 0.04), spoon(0.34, 0, 0.04));
   setting.add(mesh(new THREE.CylinderGeometry(0.018, 0.02, 0.06, 12), paint("#f6f1e6"), (m) => m.position.set(-0.28, 0.026, -0.24)));
   setting.add(mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.008, 12), paint("#9aa0a4"), (m) => m.position.set(-0.28, 0.06, -0.24)));
   setting.add(mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.09, 14), paint("#3f6f8f"), (m) => m.position.set(-0.5, 0.04, -0.3)));
@@ -1045,10 +1022,13 @@ function wires(from, to, z) {
 
 export function homeScene() {
   const scene = new THREE.Group();
-  scene.add(mesh(new THREE.PlaneGeometry(40, 40), paint("#ddd3bd"), (m) => (m.rotation.x = -Math.PI / 2)));
+  // Behind the blocks the ground is pasture running to the foot of the mountains, so the cross street opens onto green and not onto bare
+  // paper; the street, the pavement and the asphalt lie over it.
+  scene.add(mesh(new THREE.PlaneGeometry(200, 200), paint("#a9ac78"), (m) => (m.rotation.x = -Math.PI / 2)));
   // The same mountains, today, above the roofs of the blocks: a little taller in the frame, so Galeras still shows over three floors.
   const hills = volcano();
-  hills.position.set(2, 0, -6);
+  // Lifted so its lowest fields meet the street level instead of sinking under the ground, which left a band of bare ground below the slopes.
+  hills.position.set(2, 0.56, -6);
   hills.scale.set(1.3, 2.6, 1);
   scene.add(hills);
   const props = new THREE.Group();
@@ -1138,17 +1118,79 @@ function floorTiles(props, width, depth) {
   for (let line = -Math.floor(width / 1.6); width / 1.6 >= line; line++) props.add(mesh(new THREE.BoxGeometry(0.012, 0.004, depth), paint("#c8bfa9"), (m) => m.position.set(line * 0.8, 0.003, 0)));
 }
 
+// Cutlery, lying flat with the handle toward the diner (+z): each returns a group placed at (x, y, z) and turned by turn about the vertical.
+const STEEL = "#a9afb3";
+const laidAt = (item, x, y, z, turn) => {
+  item.position.set(x, y, z);
+  item.rotation.y = turn;
+  return item;
+};
+function fork(x, y, z, turn = 0) {
+  const steel = paint(STEEL);
+  const item = group(
+    mesh(new RoundedBoxGeometry(0.014, 0.005, 0.1, 1, 0.002), steel, (m) => (m.position.z = 0.045)),
+    mesh(new THREE.BoxGeometry(0.008, 0.004, 0.02), steel, (m) => (m.position.z = -0.012)),
+    mesh(new RoundedBoxGeometry(0.024, 0.004, 0.018, 1, 0.002), steel, (m) => (m.position.z = -0.028)),
+  );
+  [-0.0085, -0.0028, 0.0028, 0.0085].forEach((dx) => item.add(mesh(new THREE.BoxGeometry(0.0035, 0.004, 0.038), steel, (m) => m.position.set(dx, 0, -0.055))));
+  return laidAt(item, x, y, z, turn);
+}
+// A table knife: a wooden handle, a broad steel blade beyond it, its tip curving to a point.
+function knife(x, y, z, turn = 0, handle = "#6b4a2a") {
+  const blade = new THREE.Shape();
+  blade.moveTo(-0.009, 0);
+  blade.lineTo(0.009, 0);
+  blade.lineTo(0.009, 0.085);
+  blade.quadraticCurveTo(0.008, 0.112, -0.003, 0.118);
+  blade.lineTo(-0.009, 0.1);
+  blade.lineTo(-0.009, 0);
+  const item = group(
+    mesh(new RoundedBoxGeometry(0.014, 0.008, 0.08, 1, 0.003), paint(handle), (m) => m.position.set(0, 0.001, 0.065)),
+    mesh(new THREE.ExtrudeGeometry(blade, { depth: 0.003, bevelEnabled: false, curveSegments: 8 }), paint(STEEL), (m) => {
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(0, -0.0015, 0.026);
+    }),
+  );
+  return laidAt(item, x, y, z, turn);
+}
+// A spoon: a slim handle widening toward its tip and an oval bowl; wood gives the wooden spoon of 1876.
+function spoon(x, y, z, turn = 0, color = STEEL, size = 1) {
+  const metal = paint(color);
+  const item = group(
+    mesh(new RoundedBoxGeometry(0.012, 0.005, 0.1, 1, 0.002), metal, (m) => (m.position.z = 0.04)),
+    mesh(new RoundedBoxGeometry(0.018, 0.005, 0.03, 1, 0.003), metal, (m) => (m.position.z = 0.085)),
+    mesh(new THREE.SphereGeometry(0.02, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), paint(color, { side: THREE.DoubleSide }), (m) => {
+      m.position.set(0, 0.006, -0.03);
+      m.scale.set(0.85, 0.4, 1.25);
+    }),
+  );
+  item.scale.setScalar(size);
+  return laidAt(item, x, y, z, turn);
+}
+// A ladle standing in a pot: its long handle leans out over the rim, its bowl down in the soup.
+function ladle(x, y, z, lean = 0.55, turn = 0) {
+  const metal = paint(STEEL);
+  const reach = 0.34;
+  const item = group(
+    mesh(new THREE.SphereGeometry(0.045, 16, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), paint(STEEL, { side: THREE.DoubleSide })),
+    mesh(new RoundedBoxGeometry(0.014, reach, 0.006, 1, 0.003), metal, (m) => {
+      m.position.set(Math.sin(lean) * reach * 0.5, Math.cos(lean) * reach * 0.5, 0);
+      m.rotation.z = -lean;
+    }),
+    mesh(new THREE.TorusGeometry(0.012, 0.003, 6, 12), metal, (m) => {
+      m.position.set(Math.sin(lean) * reach, Math.cos(lean) * reach + 0.01, 0);
+      m.rotation.z = -lean;
+    }),
+  );
+  item.position.set(x, y, z);
+  item.rotation.y = turn;
+  return item;
+}
+
 // What sits on a counter while someone cooks: a cutting board with a knife and a halved tree tomato, a bowl of fruit, salt and a towel.
 function counterDecor(props, x, top, z) {
   props.add(mesh(new RoundedBoxGeometry(0.32, 0.02, 0.22, 2, 0.008), paint("#b8925a"), (m) => m.position.set(x, top + 0.01, z)));
-  props.add(mesh(new THREE.BoxGeometry(0.16, 0.004, 0.025), paint("#b9bec2"), (m) => {
-    m.position.set(x + 0.03, top + 0.024, z + 0.05);
-    m.rotation.y = 0.3;
-  }));
-  props.add(mesh(new THREE.BoxGeometry(0.07, 0.012, 0.02), paint("#3b3026"), (m) => {
-    m.position.set(x - 0.08, top + 0.026, z + 0.075);
-    m.rotation.y = 0.3;
-  }));
+  props.add(knife(x + 0.02, top + 0.024, z + 0.05, 1.3, "#3b3026"));
   props.add(mesh(new THREE.SphereGeometry(0.035, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), paint("#c8432a"), (m) => m.position.set(x - 0.05, top + 0.02, z - 0.04)));
   props.add(mesh(new THREE.CircleGeometry(0.034, 14), paint("#f0a640"), (m) => {
     m.position.set(x - 0.05, top + 0.021, z - 0.04);
@@ -1190,8 +1232,9 @@ function tableToday() {
       m.rotation.y = 0.6;
     }));
     [0, 1].forEach((slice) => props.add(mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.01, 14), paint("#d2492f"), (m) => m.position.set(px + 0.09 + slice * 0.02, 0.807, pz + 0.03 + slice * 0.025))));
-    props.add(mesh(new THREE.BoxGeometry(0.012, 0.005, 0.16), paint("#9aa0a4"), (m) => m.position.set(px - 0.21, 0.788, pz)));
-    props.add(mesh(new THREE.BoxGeometry(0.014, 0.005, 0.17), paint("#9aa0a4"), (m) => m.position.set(px + 0.21, 0.788, pz)));
+    // Fork on the left and knife on the right, as seen by the diner, handles toward them.
+    const facing = pz > 0 ? 0 : Math.PI;
+    props.add(fork(px - side * 0.21, 0.789, pz, facing), knife(px + side * 0.21, 0.788, pz, facing), spoon(px + side * 0.24, 0.788, pz, facing));
     props.add(mesh(new THREE.CylinderGeometry(0.03, 0.026, 0.1, 14), paint("#f0a640"), (m) => m.position.set(px + 0.2, 0.835, pz - side * 0.17)));
   });
   // An open pot, the locro filling it a little below the rim.
@@ -1208,10 +1251,7 @@ function tableToday() {
     m.position.set(-0.12, 0.935, 0);
     m.rotation.x = -Math.PI / 2;
   }));
-  props.add(mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.32, 6), paint("#9aa0a4"), (m) => {
-    m.position.set(-0.05, 1.04, 0.02);
-    m.rotation.z = -0.6;
-  }));
+  props.add(ladle(-0.13, 0.95, 0.01, 0.6));
   props.add(mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.07, 18, 1, true), paint("#b8925a", { side: THREE.DoubleSide }), (m) => m.position.set(0.22, 0.82, 0.02)));
   [[0.19, 0.0], [0.25, 0.04], [0.22, -0.04]].forEach(([x, z]) => props.add(mesh(lumpy(new THREE.SphereGeometry(0.04, 10, 8), 0.15), paint("#d9a35a"), (m) => {
     m.position.set(x, 0.86, z);
@@ -1304,10 +1344,11 @@ function tableThen() {
   [-0.8, 0.8].forEach((x) => {
     props.add(mesh(new THREE.BoxGeometry(0.08, 0.72, 0.9), wood, (m) => m.position.set(x, 0.36, 0)));
   });
-  // Lunch in 1876: potatoes in their skins, a heap of mote, a slice of fresh cheese and ocas in each clay bowl, a gourd cup of chicha; ají
-  // in a little dish, a round of bread and the jug in the middle.
+  // Lunch in 1876: potatoes in their skins, a heap of mote, a slice of fresh cheese and ocas in each clay bowl, a gourd cup of chicha and a
+  // carved wooden spoon; ají in a little dish, a round of bread and the jug in the middle.
   PLATES.forEach(([px, pz], index) => {
     const side = pz > 0 ? 1 : -1;
+    props.add(spoon(px - side * 0.21, 0.784, pz, pz > 0 ? 0 : Math.PI, "#a77a48", 1.15));
     props.add(mesh(new THREE.LatheGeometry([[0, 0], [0.09, 0], [0.14, 0.05], [0.15, 0.07], [0.13, 0.065], [0, 0.02]].map(([a, b]) => new THREE.Vector2(a, b)), 24), clay, (m) => m.position.set(px, 0.78, pz)));
     for (let potato = 0; 3 > potato; potato++) {
       props.add(mesh(lumpy(new THREE.SphereGeometry(0.035, 10, 8), 0.3), paint(potato % 2 ? "#a77a48" : "#c9a25e"), (m) => {
