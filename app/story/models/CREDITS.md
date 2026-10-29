@@ -2,7 +2,7 @@
 
 | File | Source | Author | Changes |
 |---|---|---|---|
-| `campesino.glb` | Generated with [Hyper3D Rodin](https://hyper3d.ai) | Juan Camilo López Díaz | Simplified to 8000 triangles, ambient occlusion baked into vertex colours, 19-bone skeleton, Mixamo clips carried onto it, garment zones per face (`tools/blender/zones.py`) |
+| `campesino.glb` | Generated with [Hyper3D Rodin](https://hyper3d.ai) | Juan Camilo López Díaz | Simplified to 8000 triangles, ambient occlusion baked into vertex colours, 23-bone skeleton with fingers and thumbs, Mixamo clips carried onto it, garment zones per face (`tools/blender/zones.py`) |
 | `campesina.glb` | Generated with [Hyper3D Rodin](https://hyper3d.ai) | Juan Camilo López Díaz | Same as above, skirt and ruana weighted to the hips and arms |
 | `cargador.glb` | Generated with [Hyper3D Rodin](https://hyper3d.ai) | Juan Camilo López Díaz | Same as above, centred on the feet, the sack held by the right hand |
 | `vecina.glb` | Generated with [Hyper3D Rodin](https://hyper3d.ai) | Juan Camilo López Díaz | Same as above |
