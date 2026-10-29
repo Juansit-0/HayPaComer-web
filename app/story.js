@@ -113,6 +113,7 @@ export function mountStory(main) {
         "beforeend",
         `<div class="film-grain" data-film aria-hidden="true"></div>
         <div class="film-roll" data-film aria-hidden="true"></div>
+        <div class="film-tear" data-film aria-hidden="true"></div>
         <div class="film-captions" data-film>${timeline.captions.map(caption).join("")}</div>
         <div class="story-rail" data-film aria-hidden="true"><span></span></div>
         <nav class="story-chapters" data-film aria-label="${t("landing.story.chapters")}">${timeline.chapters

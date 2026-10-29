@@ -113,6 +113,7 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
   let shownTone = -1;
   let shownRoll = -2;
   let shownGrain = -1;
+  let shownSeam = -1;
 
   function tick(dt, now) {
     const before = state.progress;
@@ -147,6 +148,14 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
       }
     }
     for (let other = 0; last >= other; other += 1) chapters[other].world.visible = other === index || other === neighbour;
+    // The table is two worlds, 1876 and today; once the cut has passed, a seam crosses from the left edge to the middle of the screen and
+    // today takes the screen behind it.
+    const split = chapter.world.userData.split;
+    const seam = split && neighbour === -1 ? 0.5 * THREE.MathUtils.smoothstep(k, 0.1, 0.5) : 0;
+    if (split) {
+      split.then.visible = true;
+      split.today.visible = false;
+    }
 
     if (state.override) {
       camera.position.fromArray(state.override.pos);
@@ -184,6 +193,11 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
       stage.style.setProperty("--film", tone.toFixed(3));
       stage.style.setProperty("--roll", roll.toFixed(3));
     }
+    if (seam !== shownSeam) {
+      shownSeam = seam;
+      stage.style.setProperty("--seam", seam.toFixed(4));
+      stage.style.setProperty("--tear", seam > 0 ? "1" : "0");
+    }
     const stepped = Math.floor(now * 8) / 8;
     if (tone > 0 && stepped !== shownGrain) {
       shownGrain = stepped;
@@ -197,7 +211,28 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     ink.uniforms.uTime.value = stepped;
 
     renderer.clear();
-    renderer.render(scene, camera);
+    if (seam > 0) {
+      const width = canvas.clientWidth;
+      const edge = Math.round(width * seam);
+      const pass = (show, hide, value, x, span) => {
+        show.visible = true;
+        hide.visible = false;
+        filmTone.value = value;
+        paper.copy(PAPER_COLOR).lerp(AGED_PAPER, value);
+        renderer.setClearColor(paper);
+        scene.fog.color.copy(paper);
+        renderer.setScissor(x, 0, span, canvas.clientHeight);
+        renderer.clear();
+        renderer.render(scene, camera);
+      };
+      renderer.setScissorTest(true);
+      pass(split.then, split.today, 1, edge, width - edge);
+      pass(split.today, split.then, 0, 0, edge);
+      renderer.setScissorTest(false);
+      shownTone = -1;
+    } else {
+      renderer.render(scene, camera);
+    }
     if (sweep > 0) renderer.render(ink.scene, ink.camera);
     return state.progress !== state.goal || Math.abs(state.gazeX - state.pointerX) + Math.abs(state.gazeY - state.pointerY) > 0.001;
   }
