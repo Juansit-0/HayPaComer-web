@@ -151,7 +151,7 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
       camera.rotateX(state.pitch * 0.05);
     }
     camera.updateProjectionMatrix();
-    chapter.world.userData.play?.(k);
+    chapter.world.userData.play?.(k, still ? 0 : now);
     if (chapter.wind) {
       chapter.wind.uniforms.uDraw.value = Math.min(1, k * 1.6);
       chapter.wind.uniforms.uFade.value = 1 - Math.max(0, k - 0.75) * 4;
@@ -172,7 +172,8 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
     return state.progress !== state.goal || Math.abs(state.gazeX - state.pointerX) + Math.abs(state.gazeY - state.pointerY) > 0.001;
   }
 
-  film = loop(canvas, tick, { gpu: true, onFrameTime: (dt) => governor.sample(dt) });
+  // Idle ticks at 24 a second keep people at rest breathing and talking for the few seconds the loop stays awake after the last input.
+  film = loop(canvas, tick, { gpu: true, idleHz: 24, onFrameTime: (dt) => governor.sample(dt) });
   resize();
 
   if (location.search.includes("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { story: { tier, renderer } });

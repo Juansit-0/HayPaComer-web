@@ -1,7 +1,7 @@
 // People of the story: each look is one vertex-coloured mesh, and a crowd is instances of a few looks, so a street full of people stays a few draw calls.
 import * as THREE from "../vendor/three.module.min.js";
 import { hash, instance, outline, paint } from "../engrave.js";
-import { figure, figureLook, figureReady } from "./figures.js";
+import { figure, figureHas, figureLook, figureReady } from "./figures.js";
 
 const SKIN = ["#e0aa82", "#c99168", "#ecc09c", "#b07a54"];
 const RUANA = ["#a8361f", "#3f6f8f", "#6b4a2a", "#4f7a4a", "#b8862f", "#5b2a3a"];
@@ -156,16 +156,19 @@ const JACKETS = ["#2f3b4a", "#7a3b26", "#4f5d3a", "#8a8f96", "#3d3a6b"];
 const DENIM = ["#3d4f6b", "#2a2f3a", "#5b6170"];
 const HAIR = ["#1c1712", "#4a2f1f", "#2b211a"];
 const SNEAKERS = ["#f1ece2", "#1c1712", "#6b4a2a"];
-// Who walks in each era: the Blender figures of tools/blender/character.py.
+// Who lives in each era: the Blender figures of tools/blender/character.py.
 const WALKERS = { 1876: ["campesino", "campesina", "cargador"], 2026: ["vecina", "vecino"] };
+const ERA = Object.fromEntries(Object.entries(WALKERS).flatMap(([era, kinds]) => kinds.map((kind) => [kind, Number(era)])));
 const walkerLooks = new Map();
-// Walkers share a few recoloured figures, so a street of them costs one geometry per look, not per person.
-function walker(era, seed) {
+// People share a few recoloured figures, so a street of them costs one geometry per look, not per person. Without a kind given, the figure is
+// one of the era's that knows the act.
+function walker(era, seed, act, kind) {
   const pick = (list, salt) => list[Math.floor(random(seed * salt) * list.length) % list.length];
-  const kinds = WALKERS[era].filter(figureReady);
-  if (!kinds.length) return null;
-  const kind = pick(kinds, 11);
-  const colors = era === 2026
+  const known = WALKERS[era].filter(figureReady);
+  const able = known.filter((option) => figureHas(option, act));
+  kind ??= pick(able.length ? able : known, 11);
+  if (!figureReady(kind)) return null;
+  const colors = ERA[kind] === 2026
     ? { skin: pick(SKIN, 7), hair: pick(HAIR, 13), top: pick(JACKETS, 3), inner: "#e9e2d2", bottom: pick(DENIM, 5), shoes: pick(SNEAKERS, 17) }
     : { skin: pick(SKIN, 7), hat: pick(HATS, 5), top: pick(RUANA, 3), inner: "#efe7d6", belt: pick(RUANA, 23), beard: "#d9d2c3", held: "#b8956a",
         bottom: kind === "campesina" ? pick(SKIRTS, 19) : "#e8dcc2", shoes: kind === "cargador" ? "#3a2a1c" : "#5a3b22" };
@@ -174,30 +177,33 @@ function walker(era, seed) {
   return figure(kind, walkerLooks.get(key));
 }
 
-// A crowd: people placed as [x, z, facing, walk] with walk a [dx, dz] distance travelled over the chapter; play(k) sways and walks them.
+// A held breath after the scroll stops, then walkers ease into standing; any scroll sets them walking again.
+const SETTLE = 0.15;
+const EASE = 7;
+
+// A crowd: people placed as { at: [x, z], facing, walk, act, kind, carry } with walk a [dx, dz] distance travelled over the chapter, act the
+// clip a figure plays (Walk for walkers, Rest otherwise; Talk, Argue, Point, Sit, SitTalk, Haul, Carry, Old where the figure has it), kind a
+// figure to cast and carry an object held in the hands. play(k, now) walks them by k and lets the rest move with the clock.
 export function crowd(people, { looks = 6, seed = 1, era = 1876 } = {}) {
   const root = new THREE.Group();
-  // The modelled figures play everyone, walking or standing; the drawn bodies only stand in when the models could not load.
+  // The modelled figures play everyone; the drawn bodies only stand in when the models could not load.
   const modelled = WALKERS[era].some(figureReady);
-  const walking = modelled ? people.filter((person) => person.walk) : [];
-  const idling = modelled ? people.filter((person) => !person.walk) : [];
+  const cast = modelled ? people : [];
   const standing = modelled ? [] : people;
   const bodies = standing.length ? Array.from({ length: looks }, (_, index) => look(seed * 31 + index)) : [];
   const groups = bodies.map(() => []);
   standing.forEach((person, index) => groups[index % looks].push({ ...person, phase: random(seed + index) * 6.28, scale: 0.9 + random(seed * 3 + index) * 0.16 }));
-  const walkers = walking.map((person, index) => {
-    const body = walker(era, seed * 17 + index);
-    body.scale.multiplyScalar(0.92 + random(seed * 5 + index) * 0.14);
-    root.add(body);
-    return { person, figure: body, offset: random(seed * 7 + index) };
-  });
-  const idlers = idling.map((person, index) => {
-    const body = walker(era, seed * 19 + index + 101);
-    body.scale.multiplyScalar(0.92 + random(seed * 11 + index) * 0.14);
+  const actors = cast.map((person, index) => {
+    const wanted = person.act ?? (person.walk ? "Walk" : "Rest");
+    const body = walker(person.kind ? ERA[person.kind] : era, seed * 17 + index, wanted, person.kind);
+    const act = body.userData.has(wanted) ? wanted : person.walk ? "Walk" : "Rest";
+    // Seated people keep one size, so all sit at the height of their chairs.
+    body.scale.multiplyScalar(act.startsWith("Sit") ? 1 : 0.92 + random(seed * 5 + index) * 0.14);
     body.position.set(person.at[0], 0, person.at[1]);
     body.rotation.y = person.facing ?? 0;
     root.add(body);
-    return { figure: body, offset: random(seed * 13 + index) };
+    if (person.carry) body.userData.hold(person.carry, act);
+    return { person, figure: body, act, offset: random(seed * 7 + index), rest: 0, moved: -1, last: null, then: 0 };
   });
   const matrix = new THREE.Matrix4();
   const place = new THREE.Vector3();
@@ -220,15 +226,26 @@ export function crowd(people, { looks = 6, seed = 1, era = 1876 } = {}) {
     root.add(instanced);
     return { members, meshes: instanced.children.filter((child) => child.isInstancedMesh) };
   });
-  root.userData.play = (k) => {
-    walkers.forEach(({ person, figure, offset }) => {
+  root.userData.play = (k, now = 0) => {
+    actors.forEach((actor) => {
+      const { person, figure, act, offset } = actor;
+      // Each figure keeps its own pace and its own place in its clip, so a crowd never moves in step.
+      const clock = (name) => figure.userData.loops(name, now * (0.9 + offset * 0.2), true) + offset;
+      if (!person.walk) {
+        figure.userData.pose(act, clock(act));
+        return;
+      }
       const [x, z] = person.at;
       const [dx, dz] = person.walk;
       figure.position.set(x + dx * k, 0, z + dz * k);
-      figure.rotation.y = person.facing ?? 0;
-      figure.userData.walk(Math.hypot(dx, dz) * k, offset);
+      if (k !== actor.last) actor.moved = now;
+      actor.last = k;
+      const target = now - actor.moved > SETTLE ? 1 : 0;
+      actor.rest += (target - actor.rest) * (1 - Math.exp(-EASE * Math.max(0, now - actor.then)));
+      actor.then = now;
+      const walked = figure.userData.loops(act, Math.hypot(dx, dz) * k) / (0.92 + offset * 0.16) + offset;
+      figure.userData.pose(act, walked, "Rest", clock("Rest"), actor.rest);
     });
-    idlers.forEach(({ figure, offset }) => figure.userData.stand(k * 30, offset));
     sets.forEach((set) => {
       if (!set) return;
       set.members.forEach((person, index) => {

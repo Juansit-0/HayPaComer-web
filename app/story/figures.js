@@ -1,4 +1,4 @@
-// Walking people modelled in Blender (tools/blender/character.py): each is one skinned mesh, one skeleton and one walk clip, read by a small
+// People modelled in Blender (tools/blender/character.py): each is one skinned mesh, one skeleton and its Mixamo clips, read by a small
 // loader that only knows that shape, so three's 4000-line GLTFLoader isn't needed. Folds baked in Blender arrive as COLOR_0 and darken the light
 // the hatching reads, not the colour; garment colours are painted per vertex here, so one model serves many looks.
 import * as THREE from "../vendor/three.module.min.js";
@@ -138,24 +138,27 @@ function parse(buffer) {
 
   const skin = json.skins[0];
   const names = json.nodes.map((node) => node.name ?? "");
-  const animation = json.animations.find((clip) => clip.name === "Walk") ?? json.animations[0];
-  const tracks = animation.channels.map((channel) => {
-    const sampler = animation.samplers[channel.sampler];
-    const name = `${THREE.PropertyBinding.sanitizeNodeName(names[channel.target.node])}.${PATHS[channel.target.path]}`;
-    const Track = channel.target.path === "rotation" ? THREE.QuaternionKeyframeTrack : THREE.VectorKeyframeTrack;
-    return new Track(name, read(sampler.input).array, unit(read(sampler.output)), sampler.interpolation === "STEP" ? THREE.InterpolateDiscrete : THREE.InterpolateLinear);
-  });
+  // The Blender pipeline stores on the rig, per clip, how many frames it loops over and how far one loop carries the feet.
+  const extras = json.nodes.find((node) => node.extras?.frames_Walk)?.extras ?? {};
+  const clips = Object.fromEntries(
+    json.animations.map((animation) => {
+      const tracks = animation.channels.map((channel) => {
+        const sampler = animation.samplers[channel.sampler];
+        const name = `${THREE.PropertyBinding.sanitizeNodeName(names[channel.target.node])}.${PATHS[channel.target.path]}`;
+        const Track = channel.target.path === "rotation" ? THREE.QuaternionKeyframeTrack : THREE.VectorKeyframeTrack;
+        return new Track(name, read(sampler.input).array, unit(read(sampler.output)), sampler.interpolation === "STEP" ? THREE.InterpolateDiscrete : THREE.InterpolateLinear);
+      });
+      const { name } = animation;
+      return [name, { clip: new THREE.AnimationClip(name, -1, tracks), frames: extras[`frames_${name}`], stride: extras[`stride_${name}`] }];
+    }),
+  );
   const inverses = read(skin.inverseBindMatrices).array;
-  // The Blender pipeline stores on the rig how far one walk cycle carries the feet and how many frames it loops over.
-  const extras = json.nodes.find((node) => node.extras?.stride_Walk)?.extras ?? {};
   return {
-    stride: extras.stride_Walk,
-    frames: extras.frames_Walk,
+    clips,
     json,
     meshNode,
     skin,
     geometry: flat,
-    clip: new THREE.AnimationClip("walk", -1, tracks),
     binds: skin.joints.map((_, index) => new THREE.Matrix4().fromArray(inverses, index * 16)),
     dominant: dominantJoints(flat, skin.joints.map((node) => names[node])),
   };
@@ -219,9 +222,16 @@ outline.onBeforeCompile = (shader) => {
   );
 };
 
-// One walker: its own skeleton and mixer over a shared look; walk(distance) poses the stride for the ground covered, so feet don't slide.
+export const figureHas = (kind, act) => Boolean(models.get(kind)?.clips[act]);
+
+// What a clip's hands hold: the bones that grip, how far up the object they grip it (0 its base, 1 its top) and its turn about the body's
+// up axis (a bag at the side hangs with its broad face along the way the figure walks).
+const HOLDS = { Carry: { hands: ["handR"], grip: 1, turn: Math.PI / 2 }, Haul: { hands: ["handL", "handR"], grip: 0.6, turn: 0 } };
+
+// One person: its own skeleton and mixer over a shared look. pose() shows a clip, or two crossfading, each at a count of loops: walks count
+// the ground covered over their stride, so feet don't slide, and everything else counts time.
 export function figure(kind, look) {
-  const { json, meshNode, skin, clip, binds, stride, frames } = models.get(kind);
+  const { json, meshNode, skin, clips, binds } = models.get(kind);
   const nodes = json.nodes.map((node, index) => {
     const object = skin.joints.includes(index) ? new THREE.Bone() : new THREE.Object3D();
     object.name = THREE.PropertyBinding.sanitizeNodeName(node.name ?? "");
@@ -244,44 +254,86 @@ export function figure(kind, look) {
   root.scale.setScalar(HEIGHT_SCALE);
   [shape, line].forEach((mesh) => (mesh.frustumCulled = false));
   line.raycast = () => {};
+  // Every clip plays at weight 0 until shown: the mixer skips evaluating an action whose weight is 0, so idle clips cost nothing.
   const mixer = new THREE.AnimationMixer(root);
-  mixer.clipAction(clip).play();
-
-  const bones = skeleton.bones;
-  const head = root.getObjectByName("head");
-  const spine = root.getObjectByName("spine");
+  const actions = Object.fromEntries(Object.entries(clips).map(([name, { clip }]) => [name, mixer.clipAction(clip).play().setEffectiveWeight(0)]));
+  let shown = [];
+  const held = [];
+  const upright = new THREE.Quaternion();
   // The motion capture is keyed from frame 1 at 30 fps and its last frame repeats the first.
-  const at = (cycles) => (1 + (cycles - Math.floor(cycles)) * frames) / 30;
-  const capture = (cycles) => {
-    mixer.setTime(at(cycles));
-    return bones.map((bone) => [bone.quaternion.clone(), bone.position.clone()]);
-  };
-  // Half a cycle apart the two steps mirror each other, so between them every swing cancels: legs under the hips, arms at the sides.
-  const left = capture(0);
-  const right = capture(0.5);
-  const turn = new THREE.Quaternion();
-  const axis = new THREE.Vector3();
-  const nudge = (bone, x, y) => {
-    if (!bone) return;
-    bone.quaternion.multiply(turn.setFromAxisAngle(axis.set(1, 0, 0), x));
-    bone.quaternion.multiply(turn.setFromAxisAngle(axis.set(0, 1, 0), y));
-  };
-  // Each walker keeps its own pace. Nothing is added on top of the clip: the mixer only rewrites a bone when its value changes, so a
-  // rotation multiplied in here would pile up every frame while the scroll stands still.
-  root.userData.walk = (distance, offset = 0) => {
-    const pace = 0.92 + offset * 0.16;
-    mixer.setTime(at(distance / (stride * root.scale.y * pace) + offset));
-  };
-  // Standing: the still pose, a slow shift of weight from one leg to the other, breath in the chest and a glance around.
-  root.userData.stand = (time, offset = 0) => {
-    const weight = 0.5 + Math.sin(time * 0.8 + offset * 6.3) * 0.07;
-    bones.forEach((bone, index) => {
-      bone.quaternion.copy(left[index][0]).slerp(right[index][0], weight);
-      bone.position.copy(left[index][1]).lerp(right[index][1], weight);
+  const at = (name, loops) => (1 + (loops - Math.floor(loops)) * clips[name].frames) / 30;
+
+  root.userData.has = (name) => Boolean(clips[name]);
+  root.userData.loops = (name, amount, clock = false) => (clock ? (amount * 30) / clips[name].frames : amount / (clips[name].stride * root.scale.y));
+  root.userData.pose = (name, loops, other, otherLoops = 0, share = 0) => {
+    shown.forEach((action) => action.setEffectiveWeight(0));
+    shown = [actions[name]];
+    actions[name].time = at(name, loops);
+    actions[name].setEffectiveWeight(1 - share);
+    if (other && share > 0.001) {
+      shown.push(actions[other]);
+      actions[other].time = at(other, otherLoops);
+      actions[other].setEffectiveWeight(share);
+    }
+    mixer.update(0);
+    // A held load hangs plumb from the hand whatever angle the wrist takes.
+    held.forEach(({ object, hand, turn }) => {
+      hand.updateWorldMatrix(true, false);
+      root.getWorldQuaternion(upright).multiply(turn);
+      object.quaternion.copy(hand.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(upright));
     });
-    nudge(spine, Math.sin(time * 2.6 + offset * 9) * 0.012, 0);
-    nudge(head, Math.sin(time * 0.7 + offset * 4) * 0.05, Math.sin(time * 0.45 + offset * 8) ** 3 * 0.45);
   };
-  root.userData.walk(0);
+  // An object held for the length of a clip: gripped at the hands in the clip's first pose, then carried by the first hand.
+  root.userData.hold = (object, name) => {
+    if (!HOLDS[name]) return;
+    const { hands, grip, turn } = HOLDS[name];
+    root.userData.pose(name, 0);
+    root.updateMatrixWorld(true);
+    const bones = hands.map((hand) => root.getObjectByName(hand));
+    const grasp = bones.reduce((sum, bone) => sum.add(bone.localToWorld(new THREE.Vector3(0, 0.07, 0))), new THREE.Vector3()).divideScalar(bones.length);
+    const twist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), turn);
+    // Hung from a pivot at the grip, so keeping it plumb turns it about the hand, not about its base.
+    object.position.set(0, 0, 0);
+    const box = new THREE.Box3().setFromObject(object);
+    object.position.set(-(box.min.x + box.max.x) / 2, -(box.min.y + (box.max.y - box.min.y) * grip), -(box.min.z + box.max.z) / 2);
+    const pivot = new THREE.Group().add(object);
+    pivot.position.copy(grasp);
+    pivot.quaternion.copy(root.quaternion).multiply(twist);
+    bones[0].attach(pivot);
+    held.push({ object: pivot, hand: bones[0], turn: twist });
+  };
+  // Reaching: the arm bends at the elbow so the wrist lands on a point, share easing between the arm as last posed and the reach. The elbow
+  // drops below the line from shoulder to wrist, as it does when someone pulls a door.
+  const still = new Map();
+  const aim = (bone, from, to) => {
+    const origin = bone.getWorldPosition(new THREE.Vector3());
+    const turn = new THREE.Quaternion().setFromUnitVectors(from.clone().sub(origin).normalize(), to.clone().sub(origin).normalize());
+    const parent = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+    bone.quaternion.premultiply(parent.clone().invert().multiply(turn).multiply(parent));
+    bone.updateMatrixWorld(true);
+  };
+  root.userData.reach = (side, target, share) => {
+    const [upper, fore, hand] = ["upper_arm", "forearm", "hand"].map((part) => root.getObjectByName(part + side));
+    if (!still.size) [upper, fore].forEach((bone) => still.set(bone, bone.quaternion.clone()));
+    still.forEach((turn, bone) => bone.quaternion.copy(turn));
+    root.updateMatrixWorld(true);
+    if (!(share > 0)) return;
+    const shoulder = upper.getWorldPosition(new THREE.Vector3());
+    const elbowAt = fore.getWorldPosition(new THREE.Vector3());
+    const wristAt = hand.getWorldPosition(new THREE.Vector3());
+    const goal = wristAt.clone().lerp(target, share);
+    const upperLength = shoulder.distanceTo(elbowAt);
+    const foreLength = elbowAt.distanceTo(wristAt);
+    const toward = goal.clone().sub(shoulder);
+    const span = Math.min(toward.length(), (upperLength + foreLength) * 0.999);
+    toward.normalize();
+    const along = (upperLength ** 2 - foreLength ** 2 + span ** 2) / (2 * span);
+    const lift = Math.sqrt(Math.max(0, upperLength ** 2 - along ** 2));
+    const bend = new THREE.Vector3(0, -1, 0).addScaledVector(toward, toward.y).normalize();
+    const elbow = shoulder.clone().addScaledVector(toward, along).addScaledVector(bend, lift);
+    aim(upper, elbowAt, elbow);
+    aim(fore, hand.getWorldPosition(new THREE.Vector3()), shoulder.clone().addScaledVector(toward, span));
+  };
+  root.userData.pose(clips.Walk ? "Walk" : Object.keys(clips)[0], 0);
   return root;
 }

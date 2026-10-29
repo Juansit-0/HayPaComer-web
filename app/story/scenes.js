@@ -1,6 +1,6 @@
 import * as THREE from "../vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "../vendor/RoundedBoxGeometry.js";
-import { foodModel, group, hash, instance, lumpy, merged, mesh, outline, paint } from "../engrave.js";
+import { engrave, foodModel, group, hash, instance, lumpy, merged, mesh, outline, paint } from "../engrave.js";
 import { crowd } from "./people.js";
 
 export const PAPER = "#f3ecdf";
@@ -90,6 +90,17 @@ function basket(seed) {
   }
   item.rotation.y = random(seed) * 6;
   return item;
+}
+
+// A basket of potatoes carried to market in both arms.
+function load(seed) {
+  const mound = mesh(lumpy(new THREE.SphereGeometry(0.19, 14, 10), 0.25), paint("#b8925a"), (m) => {
+    m.position.y = 0.22;
+    m.scale.y = 0.45;
+  });
+  const item = group(basket(seed), mound);
+  item.scale.setScalar(0.85);
+  return outline(group(item));
 }
 
 function stall(seed, produce) {
@@ -205,6 +216,48 @@ export function house(seed, { floors = 1 + Math.round(random(seed * 5)), width =
   return group(...parts);
 }
 
+// Colours per triangle, so neighbouring fields keep a crisp edge instead of blending into each other.
+function tinted(geometry, colorAt) {
+  const flat = geometry.index ? geometry.toNonIndexed() : geometry;
+  const position = flat.attributes.position;
+  const colors = new Float32Array(position.count * 3);
+  const centre = new THREE.Vector3();
+  const corner = new THREE.Vector3();
+  const color = new THREE.Color();
+  for (let first = 0; position.count > first; first += 3) {
+    centre.set(0, 0, 0);
+    for (let index = first; first + 3 > index; index++) centre.add(corner.fromBufferAttribute(position, index));
+    color.set(colorAt(centre.divideScalar(3))).convertSRGBToLinear();
+    for (let index = first; first + 3 > index; index++) colors.set([color.r, color.g, color.b], index * 3);
+  }
+  flat.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  flat.computeVertexNormals();
+  const material = paint("#ffffff");
+  material.vertexColors = true;
+  return mesh(flat, material);
+}
+
+// Galeras and the land round it as the people of Pasto see it: the lower slopes a patchwork of potato, wheat and fallow fields stitched
+// by hedges, the páramo above them and bare rock at the crater. The fields are drawn per pixel, so their edges stay clean at any distance.
+const LAND = `
+varying vec3 vLand;
+float landHash(vec2 cell) { return fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453); }
+vec3 landColor(vec3 p) {
+  float wild = sin(p.x * 1.7 + sin(p.y * 1.1) * 2.0) * 0.5 + sin(p.y * 2.3 - p.x * 0.7) * 0.5;
+  if (p.z > 6.4 + wild * 0.6) return mix(vec3(0.64, 0.6, 0.53), vec3(0.58, 0.54, 0.48), wild * 0.5 + 0.5);
+  if (p.z > 3.8 + wild * 0.8) return mix(vec3(0.72, 0.7, 0.57), vec3(0.66, 0.65, 0.52), wild * 0.5 + 0.5);
+  float along = p.x * 0.94 + p.y * 0.34 + sin(p.y * 0.8) * 0.5;
+  float across = p.y * 0.94 - p.x * 0.34 + sin(p.x * 0.6) * 0.35;
+  vec2 uv = vec2(along / 2.1, across / 1.25);
+  vec2 edge = min(fract(uv), 1.0 - fract(uv)) * vec2(2.1, 1.25);
+  if (0.07 > min(edge.x, edge.y)) return vec3(0.5, 0.56, 0.4);
+  float crop = landHash(floor(uv) + 7.0);
+  vec3 field = crop > 0.82 ? vec3(0.84, 0.75, 0.52) : crop > 0.66 ? vec3(0.7, 0.58, 0.44) : crop > 0.48 ? vec3(0.74, 0.69, 0.48)
+    : crop > 0.3 ? vec3(0.6, 0.66, 0.46) : crop > 0.14 ? vec3(0.66, 0.7, 0.5) : vec3(0.55, 0.62, 0.43);
+  return field;
+}
+`;
+
 function volcano() {
   const land = new THREE.PlaneGeometry(70, 34, 140, 68);
   const position = land.attributes.position;
@@ -219,15 +272,54 @@ function volcano() {
     position.setZ(index, Math.max(0, cone - crater + ridges + hills * (r > 0.85 ? 1 : 0.4)));
   }
   land.computeVertexNormals();
-  return mesh(land, paint("#cfc7ae"), (m) => {
+  const material = paint("#ffffff");
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vLand;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLand = position;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\n${LAND}`)
+      .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = pow(landColor(vLand), vec3(2.2));");
+    engrave(shader);
+  };
+  return group(mesh(land, material, (m) => {
     m.rotation.x = -Math.PI / 2;
     m.position.set(0, -0.2, -30);
+  }), clouds());
+}
+
+// A few clouds snagged on the volcano, drawn like the rest: soft paper lumps with an ink edge.
+function clouds() {
+  const sky = new THREE.Group();
+  [[-13, 7.4, -36, 2.4], [-1, 6.4, -33, 1.6], [11, 7, -37, 2.2]].forEach(([x, y, z, size], index) => {
+    const cloud = new THREE.Group();
+    for (let puff = 0; 5 > puff; puff++) {
+      const spread = (puff - 2) / 2;
+      cloud.add(mesh(lumpy(new THREE.SphereGeometry(0.5 + (1 - Math.abs(spread)) * 0.4, 14, 10), 0.2), paint("#f8f3e8"), (m) => {
+        m.position.set(spread * 1.1, (1 - Math.abs(spread)) * 0.25 + random(index * 9 + puff) * 0.15, random(index * 5 + puff) * 0.3);
+        m.scale.y = 0.55;
+      }));
+    }
+    cloud.position.set(x, y, z);
+    cloud.scale.setScalar(size);
+    sky.add(cloud);
   });
+  return outline(merged(sky));
+}
+
+// Trodden earth: patches of darker soil and dust under the cobbles and the stalls.
+function earth(width, depth, base, seed) {
+  const ground = tinted(new THREE.PlaneGeometry(width, depth, Math.round(width * 1.5), Math.round(depth * 1.5)), ({ x, y }) => {
+    const patch = Math.sin(x * 0.7 + seed) * Math.sin(y * 0.9 - seed) + Math.sin(x * 2.1 + y * 1.3) * 0.35 + (hash(Math.floor(x * 1.5), Math.floor(y * 1.5), seed) - 0.5) * 0.5;
+    return new THREE.Color(base).offsetHSL(0, 0, patch * 0.035).getStyle();
+  });
+  ground.rotation.x = -Math.PI / 2;
+  return ground;
 }
 
 export function market() {
   const scene = new THREE.Group();
-  const ground = mesh(new THREE.PlaneGeometry(60, 60, 1, 1), paint("#e7dfcd"), (m) => (m.rotation.x = -Math.PI / 2));
+  const ground = earth(60, 60, "#e3d9c4", 2);
   scene.add(ground);
   scene.add(volcano());
   const street = new THREE.Group();
@@ -266,15 +358,20 @@ export function market() {
   const people = [];
   layout.forEach(([x, , z], index) => {
     const turn = (random(index * 13) - 0.5) * 0.5;
-    people.push({ at: [x + Math.sin(turn) * -0.7, z - Math.cos(turn) * 0.7], facing: turn });
+    // Behind each stall a seller points out the produce or haggles; across the table a buyer answers.
+    people.push({ at: [x + Math.sin(turn) * -0.7, z - Math.cos(turn) * 0.7], facing: turn, act: ["Point", "Argue", "Talk"][index % 3] });
     if (index === 0) return;
-    people.push({ at: [x - 0.3 + random(index) * 0.6, z + 0.85], facing: Math.PI + (random(index * 5) - 0.5) * 0.6 });
+    people.push({ at: [x - 0.3 + random(index) * 0.6, z + 0.85], facing: Math.PI + (random(index * 5) - 0.5) * 0.6, act: index % 2 ? "Talk" : "Rest" });
     if (index % 2 === 0) people.push({ at: [x + 0.55, z + 1.1], facing: Math.PI - 0.5 });
   });
-  for (let index = 0; 5 > index; index++) people.push({ at: [-6 + index * 2.4, -5.5 - random(index * 3) * 1.5], facing: Math.PI / 2, walk: [1.6, 0] });
+  // Passers-by; an old man takes short steps over less ground, one carries a basket to sell.
+  for (let index = 0; 5 > index; index++) {
+    const old = index === 3;
+    people.push({ at: [-6 + index * 2.4, -5.5 - random(index * 3) * 1.5], facing: Math.PI / 2, walk: [old ? 0.55 : 1.6, 0], act: old ? "Old" : index === 1 ? "Haul" : undefined, carry: index === 1 ? load(index) : undefined });
+  }
   const folk = crowd(people, { seed: 2 });
   scene.add(folk);
-  scene.userData.play = (k) => folk.userData.play(k);
+  scene.userData.play = (k, now) => folk.userData.play(k, now);
   return scene;
 }
 
@@ -303,7 +400,7 @@ const UP_AXIS = new THREE.Vector3(0, 1, 0);
 // Arrival: a cobbled street of whitewashed houses leading to San Juan, Galeras behind, people walking to the market.
 export function streetScene() {
   const scene = new THREE.Group();
-  scene.add(mesh(new THREE.PlaneGeometry(60, 80), paint("#e7dfcd"), (m) => (m.rotation.x = -Math.PI / 2)));
+  scene.add(earth(60, 80, "#e3d9c4", 5));
   scene.add(mesh(new THREE.PlaneGeometry(3.2, 40), paint("#9c8f78"), (m) => {
     m.rotation.x = -Math.PI / 2;
     m.position.set(0, 0.005, -8);
@@ -347,12 +444,16 @@ export function streetScene() {
   const people = [];
   for (let index = 0; 14 > index; index++) {
     const lane = (random(index * 3) - 0.5) * 2.4;
-    people.push({ at: [lane, 2 - index * 1.4], facing: Math.PI + (random(index) - 0.5) * 0.3, walk: index % 3 === 2 ? undefined : [0, -3 - random(index * 9) * 2] });
+    const old = index === 7;
+    const haul = index % 5 === 4;
+    const walk = index % 3 === 2 ? undefined : [0, (-3 - random(index * 9) * 2) * (old ? 0.35 : 1)];
+    people.push({ at: [lane, 2 - index * 1.4], facing: Math.PI + (random(index) - 0.5) * 0.3, walk, act: walk && (old ? "Old" : haul ? "Haul" : undefined), carry: walk && haul ? load(index) : undefined });
   }
-  [[-1.9, 1.2, Math.PI / 2], [1.9, -3.5, -Math.PI / 2], [-1.9, -7.5, Math.PI / 2]].forEach(([x, z, facing]) => people.push({ at: [x, z], facing }));
+  // By the houses: two talking at a door, two more standing alone.
+  [[-1.9, 1.2, Math.PI / 2, "Talk"], [-1.3, 1.2, -Math.PI / 2, "Talk"], [1.9, -3.5, -Math.PI / 2], [-1.9, -7.5, Math.PI / 2]].forEach(([x, z, facing, act]) => people.push({ at: [x, z], facing, act }));
   const folk = crowd(people, { seed: 5 });
   scene.add(folk);
-  scene.userData.play = (k) => folk.userData.play(k);
+  scene.userData.play = (k, now) => folk.userData.play(k, now);
   return scene;
 }
 
@@ -401,8 +502,8 @@ function fridgeBody() {
   const hinge = new THREE.Group();
   hinge.position.set(-W / 2, 0.04, D / 2);
   hinge.add(box(W, 1.09, 0.06, W / 2, 0.545, 0.03));
-  hinge.add(box(0.022, 0.26, 0.022, W - 0.06, 0.74, 0.085, paint("#b9b4a6")));
-  [0.64, 0.84].forEach((y) => hinge.add(box(0.016, 0.016, 0.03, W - 0.06, y, 0.07, paint("#b9b4a6"))));
+  hinge.add(box(0.022, 0.26, 0.022, W - 0.06, 0.9, 0.085, paint("#b9b4a6")));
+  [0.8, 1.0].forEach((y) => hinge.add(box(0.016, 0.016, 0.03, W - 0.06, y, 0.07, paint("#b9b4a6"))));
   body.add(hinge);
   body.userData.door = hinge;
   return outline(body);
@@ -439,36 +540,6 @@ function coldMist() {
 }
 
 // A hand in a red ruana sleeve that reaches for the handle, grips it while the visitor holds, and lets go once the door is open.
-function hand() {
-  const skin = paint("#c98d68");
-  const palm = mesh(new RoundedBoxGeometry(0.05, 0.1, 0.035, 2, 0.014), skin, (m) => m.position.set(0.012, 0, 0.012));
-  const fingers = [0.033, 0.011, -0.011, -0.033].map((y, index) => {
-    const finger = new THREE.Group();
-    finger.position.set(-0.012, y, 0.03);
-    finger.add(mesh(new THREE.CapsuleGeometry(0.0095, 0.04 - index * 0.003, 4, 8), skin, (m) => {
-      m.rotation.z = Math.PI / 2;
-      m.position.x = -0.026;
-    }));
-    return finger;
-  });
-  const thumb = mesh(new THREE.CapsuleGeometry(0.01, 0.034, 4, 8), skin, (m) => {
-    m.position.set(-0.006, 0.058, 0.03);
-    m.rotation.set(0, 0, 0.9);
-  });
-  const cuff = mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 12), paint("#e8c35a"), (m) => {
-    m.rotation.z = Math.PI / 2;
-    m.position.set(0.05, 0, 0.012);
-  });
-  const sleeve = mesh(new THREE.CylinderGeometry(0.038, 0.046, 0.42, 12), paint("#a8361f"), (m) => {
-    m.rotation.z = Math.PI / 2;
-    m.position.set(0.27, 0, 0.012);
-  });
-  const root = group(palm, ...fingers, thumb, cuff, sleeve);
-  root.scale.setScalar(1.35);
-  root.userData.fingers = fingers;
-  return outline(root);
-}
-
 export function kitchen() {
   const scene = group(kitchenFloor(8, 5));
   const fridge = fridgeBody();
@@ -479,10 +550,13 @@ export function kitchen() {
   const tote = bag();
   tote.position.set(-1.0, 0.93, 0);
   scene.add(tote);
-  const reach = hand();
-  fridge.userData.door.add(reach);
-  const grip = new THREE.Vector3(FRIDGE.W - 0.06 + 0.045, 0.74, 0.085);
-  const away = new THREE.Vector3();
+  // The neighbour home from the market, the same as in the street, stands by the handle and opens the door with her left hand.
+  const home = crowd([{ at: [0.62, 0.42], facing: -1.88, kind: "vecina" }], { looks: 1, seed: 9, era: 2026 });
+  const neighbour = home.children.find((child) => child.userData.reach);
+  neighbour?.userData.pose("Rest", 0);
+  scene.add(home);
+  const grip = new THREE.Vector3(FRIDGE.W - 0.06 + 0.03, 0.9, 0.1);
+  const handle = new THREE.Vector3();
   const travellers = [
     ["Potato", [-1.05, 1.18, 0], [-0.2, FRIDGE.SHELVES[1] + 0.012, 0.05]],
     ["Potato", [-0.98, 1.2, 0.02], [-0.08, FRIDGE.SHELVES[1] + 0.012, 0.06]],
@@ -512,10 +586,10 @@ export function kitchen() {
     const burst = k > 0.19 ? 1 - THREE.MathUtils.smoothstep(k, 0.24, 0.4) : 0;
     glow.intensity = Math.max(held * 5, opening * 3);
     mist.userData.play(Math.max(held, burst), held + k * 3);
-    const out = 1 - THREE.MathUtils.smoothstep(k, 0.06, 0.16) + THREE.MathUtils.smoothstep(k, 0.42, 0.56);
-    reach.visible = 1 > out;
-    reach.position.copy(grip).add(away.set(0.5, -0.1, 0.25).multiplyScalar(Math.min(1, out)));
-    reach.userData.fingers.forEach((finger, index) => (finger.rotation.y = -(0.5 + held * 0.6) - index * 0.06));
+    // She takes the handle, pulls the door a third of the way, and lets it swing on.
+    fridge.userData.door.updateMatrixWorld(true);
+    const share = THREE.MathUtils.smoothstep(k, 0.04, 0.16) * (1 - THREE.MathUtils.smoothstep(k, 0.27, 0.4));
+    neighbour?.userData.reach("L", fridge.userData.door.localToWorld(handle.copy(grip)), share);
     travellers.forEach((model, index) => {
       const t = THREE.MathUtils.smoothstep(k, 0.36 + index * 0.07, 0.62 + index * 0.07);
       model.position.copy(model.userData.path.getPoint(t));
@@ -535,12 +609,16 @@ function gramsTexture() {
   texture.userData.show = (value) => {
     if (value === shown) return;
     shown = value;
+    // A reflective LCD, grey-green glass with ink digits, the kind a kitchen scale has always had.
     const context = canvas.getContext("2d");
-    context.fillStyle = "#1c1712";
+    const glass = context.createLinearGradient(0, 0, 0, 96);
+    glass.addColorStop(0, "#c9cfb6");
+    glass.addColorStop(1, "#b2b99d");
+    context.fillStyle = glass;
     context.fillRect(0, 0, 256, 96);
-    context.fillStyle = "#f3c443";
     context.font = "700 64px 'Hanken Grotesk', sans-serif";
     context.textAlign = "right";
+    context.fillStyle = "#2a2620";
     context.fillText(`${value} g`, 236, 72);
     texture.needsUpdate = true;
   };
@@ -554,14 +632,41 @@ export function scaleScene() {
   top.position.set(0, 0, 0);
   scene.add(top);
   const grams = gramsTexture();
-  const scale = outline(
-    group(
-      mesh(new RoundedBoxGeometry(0.36, 0.05, 0.3, 2, 0.012), paint("#e9e3d6"), (m) => (m.position.y = 0.955)),
-      mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.012, 48), paint("#c9d0d3"), (m) => (m.position.y = 0.987)),
-    ),
-  );
-  const display = mesh(new THREE.PlaneGeometry(0.12, 0.045), new THREE.MeshBasicMaterial({ map: grams }), (m) => {
-    m.position.set(0.09, 0.955, 0.151);
+  // An enamelled kitchen scale: a body with a broad, gently sloped front panel that faces whoever stands over it, a steel pan with a rolled
+  // lip, a recessed display, two buttons and feet.
+  const enamel = paint("#ece4d3");
+  const steel = paint("#c7c9c3");
+  const dark = paint("#3b3026");
+  const profile = new THREE.Shape();
+  profile.moveTo(-0.18, 0);
+  profile.lineTo(0.15, 0);
+  profile.lineTo(0.15, 0.03);
+  profile.quadraticCurveTo(0.15, 0.048, 0.13, 0.048);
+  profile.lineTo(-0.08, 0.048);
+  profile.lineTo(-0.18, 0.03);
+  profile.lineTo(-0.18, 0);
+  const body = mesh(new THREE.ExtrudeGeometry(profile, { depth: 0.32, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 3, curveSegments: 6 }), enamel, (m) => {
+    m.rotation.y = Math.PI / 2;
+    m.position.set(-0.16, 0.938, 0);
+  });
+  const tilt = Math.atan2(0.018, 0.1);
+  const normal = new THREE.Vector3(0, Math.cos(tilt), Math.sin(tilt));
+  const onPanel = (x, lift) => new THREE.Vector3(x, 0.977, 0.13).addScaledVector(normal, 0.008 + lift);
+  const pan = mesh(new THREE.LatheGeometry([[0, 0], [0.11, 0], [0.122, 0.004], [0.128, 0.011], [0.131, 0.015], [0.125, 0.013], [0.117, 0.006], [0, 0.006]].map(([x, y]) => new THREE.Vector2(x, y)), 64), steel, (m) => m.position.set(0, 0.997, -0.035));
+  const stem = mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.006, 24), dark, (m) => m.position.set(0, 0.996, -0.035));
+  const bezel = mesh(new RoundedBoxGeometry(0.16, 0.068, 0.006, 2, 0.003), dark, (m) => {
+    m.position.copy(onPanel(0.035, 0.003));
+    m.rotation.x = tilt - Math.PI / 2;
+  });
+  const buttons = [-0.075, -0.11].map((x, index) => mesh(new THREE.CylinderGeometry(0.01, 0.011, 0.006, 20), paint(index ? "#3b3026" : "#c8432a"), (m) => {
+    m.position.copy(onPanel(x, 0.003));
+    m.rotation.x = tilt;
+  }));
+  const feet = [[-0.14, -0.14], [0.14, -0.14], [-0.14, 0.16], [0.14, 0.16]].map(([x, z]) => mesh(new THREE.CylinderGeometry(0.012, 0.014, 0.01, 12), dark, (m) => m.position.set(x, 0.933, z)));
+  const scale = outline(group(body, stem, pan, bezel, ...buttons, ...feet));
+  const display = mesh(new THREE.PlaneGeometry(0.144, 0.054), new THREE.MeshBasicMaterial({ map: grams }), (m) => {
+    m.position.copy(onPanel(0.035, 0.0065));
+    m.rotation.x = tilt - Math.PI / 2;
     m.userData.noOutline = true;
   });
   scale.add(display);
@@ -581,7 +686,7 @@ export function scaleScene() {
   scene.add(load);
   scene.userData.play = (k) => {
     const drop = THREE.MathUtils.smoothstep(k, 0.05, 0.4);
-    load.position.set(0, 0.993 + (1 - drop) * 0.45, 0);
+    load.position.set(0, 1.01 + (1 - drop) * 0.45, -0.035);
     grams.userData.show(Math.round(842 * THREE.MathUtils.smoothstep(k, 0.35, 0.65)));
   };
   return scene;
@@ -636,6 +741,10 @@ export function plateScene() {
 export function homeScene() {
   const scene = new THREE.Group();
   scene.add(mesh(new THREE.PlaneGeometry(40, 40), paint("#ddd3bd"), (m) => (m.rotation.x = -Math.PI / 2)));
+  // The same mountains, today, behind the roofs.
+  const hills = volcano();
+  hills.position.set(4, 0, -2);
+  scene.add(hills);
   const props = new THREE.Group();
   let x = -9;
   for (let index = 0; 8 > index; index++) {
@@ -655,20 +764,21 @@ export function homeScene() {
   road.position.set(-10, 0, 0.9);
   scene.add(road);
   scene.add(outline(merged(props)));
-  const walker = crowd([{ at: [-5, -0.4], facing: Math.PI / 2, walk: [6.2, 0] }], { looks: 1, seed: 9, era: 2026 });
   const tote = bag();
   tote.scale.setScalar(0.85);
-  scene.add(walker, tote);
+  const walker = crowd([{ at: [-5, -0.4], facing: Math.PI / 2, walk: [6.2, 0], act: "Carry", kind: "vecina", carry: tote }], { looks: 1, seed: 9, era: 2026 });
+  scene.add(walker);
   // Two neighbours talking at a door, face to face.
-  const neighbours = crowd([{ at: [3.35, -1.2], facing: Math.PI / 2 }, { at: [3.95, -1.2], facing: -Math.PI / 2 }], { looks: 2, seed: 13, era: 2026 });
+  const neighbours = crowd([{ at: [3.35, -1.2], facing: Math.PI / 2, act: "Talk", kind: "vecino" }, { at: [3.95, -1.2], facing: -Math.PI / 2, act: "Talk", kind: "vecina" }], { looks: 2, seed: 13, era: 2026 });
   scene.add(neighbours);
-  scene.userData.play = (k) => {
-    walker.userData.play(k);
-    neighbours.userData.play(k);
-    tote.position.set(-5 + 6.2 * k + 0.12, 0.3 + Math.abs(Math.sin(k * 90)) * 0.03, -0.2);
+  scene.userData.play = (k, now) => {
+    walker.userData.play(k, now);
+    neighbours.userData.play(k, now);
   };
   return scene;
 }
+
+const SEAT = { height: 0.42, back: 0.06 };
 
 // The table: the family round the plates and the pot, the food that went into the fridge eaten instead of thrown away.
 export function tableScene() {
@@ -691,18 +801,25 @@ export function tableScene() {
     m.position.set(0, 0.96, 0);
     m.rotation.x = Math.PI / 2;
   }));
+  // Grandparents from 1876 and parents from today, each on a stool just behind where they sit.
+  const seats = [
+    { at: [-0.55, -0.95], facing: 0, act: "SitTalk", kind: "campesino" },
+    { at: [0.55, -0.95], facing: 0, act: "Sit", kind: "campesina" },
+    { at: [-1.35, 0], facing: Math.PI / 2, act: "Sit", kind: "vecino" },
+    { at: [1.35, 0.05], facing: -Math.PI / 2, act: "SitTalk", kind: "vecina" },
+  ];
+  seats.forEach(({ at: [px, pz], facing }) => {
+    const back = [px - Math.sin(facing) * SEAT.back, pz - Math.cos(facing) * SEAT.back];
+    props.add(mesh(new THREE.CylinderGeometry(0.17, 0.15, 0.05, 20), paint("#a4743f"), (m) => m.position.set(back[0], SEAT.height - 0.025, back[1])));
+    [0, 1, 2].forEach((leg) => {
+      const angle = facing + (leg * Math.PI * 2) / 3;
+      props.add(mesh(new THREE.CylinderGeometry(0.02, 0.025, SEAT.height - 0.05, 8), paint("#7c5530"), (m) => m.position.set(back[0] + Math.sin(angle) * 0.1, (SEAT.height - 0.05) / 2, back[1] + Math.cos(angle) * 0.1)));
+    });
+  });
   scene.add(outline(merged(props)));
-  const family = crowd(
-    [
-      { at: [-0.55, -0.85], facing: 0 },
-      { at: [0.55, -0.85], facing: 0 },
-      { at: [-1.25, 0], facing: Math.PI / 2 },
-      { at: [1.25, 0.05], facing: -Math.PI / 2 },
-    ],
-    { looks: 4, seed: 21 },
-  );
+  const family = crowd(seats, { looks: 4, seed: 21 });
   scene.add(family);
-  scene.userData.play = (k) => family.userData.play(k);
+  scene.userData.play = (k, now) => family.userData.play(k, now);
   return scene;
 }
 
