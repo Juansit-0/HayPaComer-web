@@ -14,11 +14,10 @@ const part = (joint) => joint.split(".")[0];
 const ARM = ["hand", "forearm", "upper_arm", "shoulder"];
 const HEAD = ["head", "neck"];
 
-// Per figure: one walk cycle (two steps) in model units, about 1.63 times the hip height, and which garment slot each vertex wears,
+// Per figure: which garment slot each vertex wears,
 // from the bone that moves it most and where it sits (y up, facing +z).
 const FIGURES = {
   campesino: {
-    cycle: 1.4,
     paint(p, joint) {
       if (HEAD.includes(part(joint))) {
         if (p.y > 1.63 || (p.y > 1.57 && Math.hypot(p.x, p.z + 0.02) > 0.105)) return "hat";
@@ -34,7 +33,6 @@ const FIGURES = {
     },
   },
   campesina: {
-    cycle: 1.39,
     paint(p, joint) {
       if (HEAD.includes(part(joint))) {
         if (p.y > 1.6 || (p.y > 1.54 && Math.hypot(p.x, p.z) > 0.1)) return "hat";
@@ -50,7 +48,6 @@ const FIGURES = {
     },
   },
   cargador: {
-    cycle: 1.41,
     paint(p, joint) {
       if (joint === "hand.R" && p.x < -0.22) return "held";
       if (HEAD.includes(part(joint))) {
@@ -67,7 +64,6 @@ const FIGURES = {
     },
   },
   vecina: {
-    cycle: 1.39,
     paint(p, joint) {
       if (HEAD.includes(part(joint))) return p.z > 0.03 && p.y < 1.62 && p.y > 1.42 ? "skin" : p.y < 1.45 ? "inner" : "hair";
       if (part(joint) === "hand") return "skin";
@@ -78,7 +74,6 @@ const FIGURES = {
     },
   },
   vecino: {
-    cycle: 1.49,
     paint(p, joint) {
       if (HEAD.includes(part(joint))) return p.z > 0.06 && p.y < 1.74 && p.y > 1.56 ? "skin" : p.y < 1.56 ? "inner" : "hair";
       if (part(joint) === "hand") return "skin";
@@ -143,7 +138,7 @@ function parse(buffer) {
 
   const skin = json.skins[0];
   const names = json.nodes.map((node) => node.name ?? "");
-  const animation = json.animations[0];
+  const animation = json.animations.find((clip) => clip.name === "Walk") ?? json.animations[0];
   const tracks = animation.channels.map((channel) => {
     const sampler = animation.samplers[channel.sampler];
     const name = `${THREE.PropertyBinding.sanitizeNodeName(names[channel.target.node])}.${PATHS[channel.target.path]}`;
@@ -151,7 +146,11 @@ function parse(buffer) {
     return new Track(name, read(sampler.input).array, unit(read(sampler.output)), sampler.interpolation === "STEP" ? THREE.InterpolateDiscrete : THREE.InterpolateLinear);
   });
   const inverses = read(skin.inverseBindMatrices).array;
+  // The Blender pipeline stores on the rig how far one walk cycle carries the feet and how many frames it loops over.
+  const extras = json.nodes.find((node) => node.extras?.stride_Walk)?.extras ?? {};
   return {
+    stride: extras.stride_Walk,
+    frames: extras.frames_Walk,
     json,
     meshNode,
     skin,
@@ -222,7 +221,7 @@ outline.onBeforeCompile = (shader) => {
 
 // One walker: its own skeleton and mixer over a shared look; walk(distance) poses the stride for the ground covered, so feet don't slide.
 export function figure(kind, look) {
-  const { json, meshNode, skin, clip, binds } = models.get(kind);
+  const { json, meshNode, skin, clip, binds, stride, frames } = models.get(kind);
   const nodes = json.nodes.map((node, index) => {
     const object = skin.joints.includes(index) ? new THREE.Bone() : new THREE.Object3D();
     object.name = THREE.PropertyBinding.sanitizeNodeName(node.name ?? "");
@@ -247,12 +246,12 @@ export function figure(kind, look) {
   line.raycast = () => {};
   const mixer = new THREE.AnimationMixer(root);
   mixer.clipAction(clip).play();
-  const cycle = FIGURES[kind].cycle;
+
   const bones = skeleton.bones;
   const head = root.getObjectByName("head");
   const spine = root.getObjectByName("spine");
-  // Blender keyed frames 1 to 27 of a 26-frame loop at 24 fps: the cycle starts at 1/24 s and frame 27 repeats frame 1.
-  const at = (cycles) => (1 + (cycles - Math.floor(cycles)) * 26) / 24;
+  // The motion capture is keyed from frame 1 at 30 fps and its last frame repeats the first.
+  const at = (cycles) => (1 + (cycles - Math.floor(cycles)) * frames) / 30;
   const capture = (cycles) => {
     mixer.setTime(at(cycles));
     return bones.map((bone) => [bone.quaternion.clone(), bone.position.clone()]);
@@ -271,7 +270,7 @@ export function figure(kind, look) {
   // rotation multiplied in here would pile up every frame while the scroll stands still.
   root.userData.walk = (distance, offset = 0) => {
     const pace = 0.92 + offset * 0.16;
-    mixer.setTime(at(distance / (cycle * root.scale.y * pace) + offset));
+    mixer.setTime(at(distance / (stride * root.scale.y * pace) + offset));
   };
   // Standing: the still pose, a slow shift of weight from one leg to the other, breath in the chest and a glance around.
   root.userData.stand = (time, offset = 0) => {

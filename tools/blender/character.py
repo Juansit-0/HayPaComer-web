@@ -1,16 +1,17 @@
 """Turns a static A-pose figure (.glb, front facing -Y, feet on z 0) into a light, skinned, walking .glb for the story.
 
-usage: Blender -b --factory-startup -P tools/blender/character.py -- <name> <out dir> [--shots]
+usage: Blender -b --factory-startup -P tools/blender/character.py -- <name> <out dir> [<clip>=<mixamo fbx> ...] [--shots]
 reads ~/Downloads/<name>.glb, writes <out dir>/<name>.glb and <name>.blend (and review renders with --shots).
-Steps: centre on the feet, simplify to 6000 triangles, bake ambient occlusion into COLOR_0.r, place a 19-bone skeleton from body proportions
-and the arm line, skin it, hand cloth that hangs off the arms back to the torso, then key a 26-frame walk at 24 fps.
+Steps: centre on the feet, simplify to 8000 triangles, bake ambient occlusion into COLOR_0.r, place a 19-bone skeleton from body proportions
+and the arm line, skin it, hand cloth that hangs off the arms back to the torso, then carry each Mixamo clip onto the skeleton (default: a
+walk from ~/Downloads/Walking.fbx).
 """
 import math
 import os
 import sys
 
 import bpy
-from mathutils import Quaternion, Vector
+from mathutils import Matrix, Vector
 from mathutils.geometry import intersect_point_line
 
 ARGS = sys.argv[sys.argv.index("--") + 1:]
@@ -30,8 +31,7 @@ FIGURES = {
     "Vecino": {"sleeve": (0.11, 0.17), "hang": 82},
 }
 FIGURE = FIGURES[NAME]
-TRIANGLES = 6000
-FRAMES = 26
+TRIANGLES = 8000
 
 
 def clusters(points, gap=0.02):
@@ -256,70 +256,76 @@ if "hold" in FIGURE:
                 groups[names[group.group]].remove([vertex.index])
             groups[f"hand.{side}"].add([vertex.index], 1.0, "REPLACE")
 
-# The walk: legs from a phase function, arms lowered from the A-pose to their hang and swung in armature space.
-R = math.radians
-scene.render.fps = 24
-scene.frame_start, scene.frame_end = 1, FRAMES
+# Motion capture from Mixamo, carried onto this skeleton. Spine and head copy the source's change of orientation; every limb is aimed where the
+# source limb points, which absorbs the different rest poses (these figures stand in an A-pose, Mixamo's in a T-pose). Walks are kept in place
+# and their stride is stored on the rig, so the page moves the figure by exactly the ground the feet cover.
+MAP = {"hips": "Hips", "spine": "Spine1", "chest": "Spine2", "neck": "Neck", "head": "Head"}
+for side, word in (("L", "Left"), ("R", "Right")):
+    MAP.update({f"shoulder.{side}": f"{word}Shoulder", f"upper_arm.{side}": f"{word}Arm", f"forearm.{side}": f"{word}ForeArm", f"hand.{side}": f"{word}Hand",
+                f"thigh.{side}": f"{word}UpLeg", f"shin.{side}": f"{word}Leg", f"foot.{side}": f"{word}Foot"})
+TORSO = {"hips", "spine", "chest", "neck", "head"}
+ORDER = sorted(MAP, key=lambda name: len(armature.bones[name].parent_recursive))
+AXIS = Vector((0, 1, 0))
+CLIPS = [arg.split("=", 1) for arg in ARGS[2:] if "=" in arg] or [["Walk", "~/Downloads/Walking.fbx"]]
+scene.render.fps = 30
 rig.animation_data_create()
-action = bpy.data.actions.new("Walk")
-action.use_fake_user = True
-rig.animation_data.action = action
 poses = rig.pose.bones
 for bone in poses:
-    bone.rotation_mode = "XYZ"
+    bone.rotation_mode = "QUATERNION"
+for clip, path in CLIPS:
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.fbx(filepath=os.path.expanduser(path))
+    imported = [item for item in bpy.data.objects if item not in before]
+    source = next(item for item in imported if item.type == "ARMATURE")
+    for item in imported:
+        if item.type == "MESH":
+            bpy.data.objects.remove(item)
+    first, last = (int(round(frame)) for frame in source.animation_data.action.frame_range)
+    by = {bone.name.split(":")[-1]: bone for bone in source.pose.bones}
+    ratio = hip_z / (source.matrix_world @ by["Hips"].bone.head_local).z
 
+    def hips_at(frame):
+        scene.frame_set(frame)
+        return (source.matrix_world @ by["Hips"].matrix).translation.copy()
 
-def local(name, rotation):
-    rest = armature.bones[name].matrix_local.to_quaternion()
-    return rest.inverted() @ rotation @ rest
-
-
-def leg(phase):
-    thigh = -24 * math.cos(phase)
-    swing = max(0.0, -math.sin(phase))
-    stance = max(0.0, math.sin(phase))
-    knee = 4 + 42 * swing ** 1.8 + 12 * math.sin(2 * phase) ** 2 * stance
-    heel = -14 * max(0.0, math.cos(phase)) ** 6
-    push = 22 * max(0.0, math.cos(phase - 2.6)) ** 8
-    return thigh, knee, -(thigh + knee) + heel + push
-
-
-arms = {}
-for side, sign in (("L", 1), ("R", -1)):
-    for part in ("upper_arm", "forearm"):
-        poses[f"{part}.{side}"].rotation_mode = "QUATERNION"
-    reach = armature.bones[f"upper_arm.{side}"].tail_local - armature.bones[f"upper_arm.{side}"].head_local
-    rest_hang = math.degrees(math.atan2(-reach.z, abs(reach.x)))
-    forearm = armature.bones[f"forearm.{side}"]
-    hinge = (forearm.tail_local - forearm.head_local).normalized().cross(Vector((0, -1, 0))).normalized()
-    held = FIGURE.get("hold", (None,))[0] == side
-    arms[side] = (sign, max(0.0, FIGURE["hang"] - rest_hang), hinge, held)
-for frame in range(1, FRAMES + 2):
-    phase = 2 * math.pi * (frame - 1) / FRAMES
-    for side, offset in (("L", 0.0), ("R", math.pi)):
-        thigh, knee, foot = leg(phase + offset)
-        poses[f"thigh.{side}"].rotation_euler = (R(thigh), 0, 0)
-        poses[f"shin.{side}"].rotation_euler = (R(knee), 0, 0)
-        poses[f"foot.{side}"].rotation_euler = (R(foot), 0, 0)
-        sign, down, hinge, held = arms[side]
-        swing = 3 * math.cos(phase + offset) if held else 15 * math.cos(phase + offset)
-        bend = 4 if held else 12 + 10 * max(0.0, -math.cos(phase + offset))
-        poses[f"upper_arm.{side}"].rotation_quaternion = local(f"upper_arm.{side}", Quaternion((1, 0, 0), R(swing)) @ Quaternion((0, 1, 0), R(down) * sign))
-        poses[f"forearm.{side}"].rotation_quaternion = local(f"forearm.{side}", Quaternion(hinge, R(bend)))
-        for name in (f"thigh.{side}", f"shin.{side}", f"foot.{side}"):
-            poses[name].keyframe_insert("rotation_euler", frame=frame)
-        for name in (f"upper_arm.{side}", f"forearm.{side}"):
-            poses[name].keyframe_insert("rotation_quaternion", frame=frame)
-    poses["hips"].location = (0.012 * math.cos(phase - 0.6), -0.022 * math.cos(2 * phase), 0)
-    poses["hips"].rotation_euler = (R(3), R(6 * math.cos(phase)), R(-3 * math.cos(phase - 0.6)))
-    poses["spine"].rotation_euler = (R(2), R(-4 * math.cos(phase)), R(2 * math.cos(phase - 0.6)))
-    poses["chest"].rotation_euler = (R(1 + math.cos(2 * phase)), R(-5 * math.cos(phase)), 0)
-    poses["head"].rotation_euler = (R(-3 - 1.5 * math.cos(2 * phase)), R(4 * math.cos(phase)), 0)
-    poses["hips"].keyframe_insert("location", frame=frame)
-    for name in ("hips", "spine", "chest", "head"):
-        poses[name].keyframe_insert("rotation_euler", frame=frame)
-for curve in action.fcurves:
-    curve.modifiers.new("CYCLES")
+    start, end = hips_at(first), hips_at(last)
+    travel = end - start
+    travel.z = 0
+    action = bpy.data.actions.new(clip)
+    action.use_fake_user = True
+    rig.animation_data.action = action
+    for frame in range(first, last + 1):
+        scene.frame_set(frame)
+        share = (frame - first) / max(1, last - first)
+        for name in ORDER:
+            bone = poses[name]
+            # The arm that holds a load keeps its rest pose, so the load hangs at the side instead of swinging with the walk.
+            if name.endswith("." + FIGURE.get("hold", ("-",))[0]) and name.split(".")[0] in ARM_PARTS + ("shoulder",):
+                bone.rotation_quaternion = (1, 0, 0, 0)
+                bpy.context.view_layer.update()
+                continue
+            pose = source.matrix_world @ by[MAP[name]].matrix
+            rest = source.matrix_world @ by[MAP[name]].bone.matrix_local
+            turn = pose.to_quaternion() @ rest.to_quaternion().inverted() @ (rig.matrix_world @ bone.bone.matrix_local).to_quaternion()
+            if name not in TORSO:
+                turn = (turn @ AXIS).rotation_difference(pose.to_quaternion() @ AXIS) @ turn
+            if name == "hips":
+                place = (pose.translation - start - travel * share) * ratio
+                where = rig.matrix_world @ bone.bone.head_local + place
+            else:
+                where = rig.matrix_world @ bone.head
+            bone.matrix = rig.matrix_world.inverted() @ Matrix.LocRotScale(where, turn, Vector((1, 1, 1)))
+            bpy.context.view_layer.update()
+        key = frame - first + 1
+        for name in ORDER:
+            poses[name].keyframe_insert("rotation_quaternion", frame=key)
+        poses["hips"].keyframe_insert("location", frame=key)
+    rig[f"stride_{clip}"] = travel.length * ratio
+    rig[f"frames_{clip}"] = last - first
+    print("CLIP", clip, "frames", last - first, "stride", round(travel.length * ratio, 3))
+    taken = source.animation_data.action
+    bpy.data.objects.remove(source)
+    bpy.data.actions.remove(taken)
 scene.frame_set(1)
 
 os.makedirs(OUT, exist_ok=True)
@@ -329,13 +335,13 @@ body.select_set(True)
 rig.select_set(True)
 bpy.context.view_layer.objects.active = rig
 target = os.path.join(OUT, f"{NAME}.glb")
-bpy.ops.export_scene.gltf(filepath=target, export_format="GLB", use_selection=True, export_texcoords=False, export_normals=True,
-                          export_skins=True, export_animations=True, export_vertex_color="ACTIVE", export_yup=True)
+bpy.ops.export_scene.gltf(filepath=target, export_format="GLB", use_selection=True, export_texcoords=False, export_normals=True, export_extras=True,
+                          export_skins=True, export_animations=True, export_animation_mode="ACTIONS", export_vertex_color="ACTIVE", export_yup=True)
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, f"{NAME}.blend"))
 print("EXPORTED", target, os.path.getsize(target), "HIP", round(hip_z, 3), "HEIGHT", round(H, 3))
 
 if "--shots" in ARGS:
     from shot import shots
-    for frame in (1, 8, 14, 21):
+    for frame in (1, 8, 16, 23):
         scene.frame_set(frame)
         shots(os.path.join(OUT, f"{NAME}_{frame:02d}"), [body], views=(("right", (1, 0, 0.1)), ("tq", (0.8, -1, 0.35))), size=360, color="VERTEX")
