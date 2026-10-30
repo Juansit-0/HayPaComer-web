@@ -225,8 +225,8 @@ function bentLathe(profile, bend) {
 }
 
 // Eyes on a potato's skin: a few small dark dimples, merged into one mesh with no ink edge.
-function eyes(size, seed, color) {
-  const dots = [0, 1, 2].map((eye) => {
+function eyes(size, seed, color, count = 3) {
+  const dots = Array.from({ length: count }, (_, eye) => eye).map((eye) => {
     const angle = hash(seed, eye, 3) * Math.PI * 2;
     const rise = (hash(seed, eye, 5) - 0.5) * 1.2;
     const point = new THREE.Vector3(Math.cos(angle), rise, Math.sin(angle)).normalize();
@@ -242,13 +242,13 @@ function eyes(size, seed, color) {
 
 // Andean potatoes as Pasto's market sells them: the big pale pastusa, the red-skinned parda and the small round yellow criolla.
 const POTATOES = [
-  { size: [0.045, 0.032, 0.036], color: "#cfa868", eye: "#8a6a3c" },
+  { size: [0.047, 0.031, 0.035], color: "#d6b27a", eye: "#7a5a32" },
   { size: [0.04, 0.03, 0.033], color: "#9a5a3c", eye: "#5e3220" },
   { size: [0.024, 0.022, 0.024], color: "#e4bb45", eye: "#9a7a2a" },
 ];
 export function potato(variant = 0) {
   const { size, color, eye } = POTATOES[variant % POTATOES.length];
-  const tuber = group(mesh(grown(size, variant * 3.7 + 1), paint(color, { roughness: 0.95 })), eyes(size, variant + 4, eye));
+  const tuber = group(mesh(grown(size, variant * 3.7 + 1, variant ? 0.09 : 0.12), paint(color, { roughness: 0.95 })), eyes(size, variant + 4, eye, variant ? 3 : 6));
   tuber.position.y = size[1];
   return tuber;
 }
@@ -580,12 +580,18 @@ function carton(color, band) {
   return group(box, top, stripe);
 }
 
-function jar(content) {
-  const glass = mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.1, 28), paint("#ffffff", { transparent: true, opacity: 0.28, roughness: 0.05, clearcoat: 1 }), (m) => (m.position.y = 0.05));
-  const fill = mesh(new THREE.CylinderGeometry(0.031, 0.031, 0.075, 24), paint(content, { roughness: 0.9 }), (m) => (m.position.y = 0.04));
-  const lid = mesh(new THREE.CylinderGeometry(0.037, 0.037, 0.018, 28), paint("#1b1b1b", { roughness: 0.4, metalness: 0.3 }), (m) => (m.position.y = 0.105));
-  return group(glass, fill, lid);
+// A pantry jar: a glass jar with a paper label and a dark lid, full of beans or lentils that show through the glass round a solid core.
+function jar(core, piece, count = 60) {
+  return group(
+    mesh(new THREE.CylinderGeometry(piece ? 0.02 : 0.031, piece ? 0.02 : 0.031, 0.07, 20), paint(core), (m) => (m.position.y = 0.04)),
+    ...(piece ? [poured(piece, count, 0.052, 0.052, 0.07)] : []),
+    mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.1, 28), paint("#ffffff", { transparent: true, opacity: 0.3 }), (m) => (m.position.y = 0.05)),
+    mesh(new THREE.CylinderGeometry(0.0355, 0.0355, 0.03, 28, 1, true, -0.9, 1.8), paint("#efe7d6"), (m) => (m.position.y = 0.04)),
+    mesh(new THREE.CylinderGeometry(0.037, 0.037, 0.012, 28), paint(css("--color-cobre")), (m) => (m.position.y = 0.105)),
+  );
 }
+
+const bean = (color) => () => mesh(new THREE.SphereGeometry(0.0055, 8, 6), paint(color), (m) => m.scale.set(1.5, 0.8, 1));
 
 function bottle(color) {
   return group(
@@ -795,12 +801,36 @@ const FOODS = {
     top.position.set(-0.074, 0.017, 0);
     return group(root, top);
   },
-  // A bulb onion: papery golden skin drawn to a dry tip, with a tuft of roots underneath.
-  Onion: () =>
-    group(
-      mesh(lathe([[0, 0], [0.02, 0.004], [0.034, 0.026], [0.03, 0.048], [0.012, 0.064], [0.004, 0.08], [0, 0.082]]), paint("#c98f5a", { roughness: 0.35, clearcoat: 0.5 })),
-      mesh(new THREE.CylinderGeometry(0.008, 0.002, 0.008, 8), paint("#8a6a4a"), (m) => (m.position.y = 0.002)),
-    ),
+  // A bulb onion (cabezona): a round bulb under papery golden skin with faint lines from root to neck, the neck dry and twisted, a tuft of roots below.
+  Onion: () => {
+    const profile = [[0, 0.004], [0.012, 0.001], [0.027, 0.01], [0.036, 0.028], [0.035, 0.046], [0.024, 0.062], [0.01, 0.074], [0.004, 0.08], [0, 0.081]];
+    const bulb = lathe(profile, 36);
+    const position = bulb.attributes.position;
+    for (let index = 0; position.count > index; index++) {
+      const line = 1 + 0.03 * Math.cos(Math.atan2(position.getZ(index), position.getX(index)) * 14);
+      position.setX(index, position.getX(index) * line);
+      position.setZ(index, position.getZ(index) * line);
+    }
+    bulb.computeVertexNormals();
+    const roots = merged(group(...[-0.6, -0.2, 0.2, 0.6].map((lean, index) => leaning(mesh(new THREE.CylinderGeometry(0.0007, 0.0011, 0.01, 4), paint("#d8c9a0")), 0.01, Math.PI + lean, index * 1.3))));
+    roots.position.y = 0.004;
+    // Darker veins of the dry skin, running from the root to the neck.
+    const veins = merged(group(...Array.from({ length: 7 }, (_, vein) => {
+      const angle = (vein * Math.PI * 2) / 7 + 0.3;
+      const path = new THREE.CatmullRomCurve3(profile.slice(1, -1).map(([x, y]) => new THREE.Vector3(Math.cos(angle) * x * 1.02, y, Math.sin(angle) * x * 1.02)));
+      return mesh(new THREE.TubeGeometry(path, 16, 0.0007, 4), paint("#9a6434"));
+    })));
+    veins.traverse((child) => (child.userData.noOutline = true));
+    return group(
+      mesh(bulb, paint("#c98f5a")),
+      veins,
+      mesh(new THREE.ConeGeometry(0.005, 0.022, 6), paint("#a8743e"), (m) => {
+        m.rotation.z = 0.35;
+        m.position.set(-0.003, 0.088, 0);
+      }),
+      roots,
+    );
+  },
   // An avocado: a pear-shaped fruit with pebbled dark skin and the nub of its stalk.
   Avocado: () =>
     group(
@@ -874,8 +904,8 @@ const FOODS = {
       mesh(new RoundedBoxGeometry(0.06, 0.17, 0.035, 2, 0.004), paint(css("--color-cobre"), { roughness: 0.6 }), (m) => (m.position.y = 0.085)),
       mesh(new THREE.BoxGeometry(0.03, 0.09, 0.037), paint("#f0d78a"), (m) => (m.position.y = 0.09)),
     ),
-  "Black beans": () => jar("#241c1a"),
-  Lentils: () => jar("#8c5a2e"),
+  "Black beans": () => jar("#15100e", bean("#2a201d")),
+  Lentils: () => jar("#6e4522", () => mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.002, 10), paint("#9a6434")), 110),
   "Soy sauce": () => bottle("#2b1a12"),
   // A tin of tuna: rims top and bottom and a blue label round it.
   Tuna: () =>
@@ -1172,28 +1202,21 @@ const FOODS = {
     );
   },
   // Red beans (fríjol): a glass jar full of red-brown beans, each one seen through the glass.
-  "Red beans": () =>
-    group(
-      mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.07, 20), paint("#5e221c"), (m) => (m.position.y = 0.04)),
-      poured(() => mesh(new THREE.SphereGeometry(0.0055, 8, 6), paint("#7a2e24"), (m) => m.scale.set(1.5, 0.8, 1)), 60, 0.052, 0.052, 0.07),
-      mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.1, 28), paint("#ffffff", { transparent: true, opacity: 0.3 }), (m) => (m.position.y = 0.05)),
-      mesh(new THREE.CylinderGeometry(0.0355, 0.0355, 0.03, 28, 1, true, -0.9, 1.8), paint("#efe7d6"), (m) => (m.position.y = 0.04)),
-      mesh(new THREE.CylinderGeometry(0.037, 0.037, 0.018, 28), paint("#1b1b1b"), (m) => (m.position.y = 0.105)),
-    ),
+  "Red beans": () => jar("#5e221c", bean("#7a2e24")),
   // Mote: large white kernels of hulled corn in a clear bag with a yellow band, its neck twisted and tied.
   Mote: () => {
-    const kernels = poured(() => mesh(lumpy(new THREE.SphereGeometry(0.0075, 8, 6), 0.15), paint("#ebe1c2"), (m) => m.scale.set(1, 0.7, 0.9)), 55, 0.068, 0.036, 0.075);
-    kernels.traverse((child) => (child.userData.noOutline = true));
+    const sack = [[0, 0], [0.03, 0.002], [0.04, 0.02], [0.042, 0.05], [0.036, 0.076], [0.018, 0.096], [0.008, 0.104], [0, 0.104]];
+    const kernels = poured(() => mesh(lumpy(new THREE.SphereGeometry(0.0078, 8, 6), 0.15), paint("#efe7cc"), (m) => m.scale.set(1, 0.75, 0.9)), 60, 0.062, 0.04, 0.052);
     return group(
-      mesh(new RoundedBoxGeometry(0.05, 0.065, 0.022, 2, 0.008), paint("#e2d6b2"), (m) => (m.position.y = 0.042)),
+      mesh(lathe(sack.map(([x, y]) => [x * 0.55, y * 0.6]), 24), paint("#e2d6b2"), (m) => (m.scale.z = 0.7)),
       kernels,
-      mesh(lumpy(new RoundedBoxGeometry(0.085, 0.1, 0.05, 3, 0.02), 0.02), paint("#ffffff", { transparent: true, opacity: 0.3 }), (m) => (m.position.y = 0.05)),
-      mesh(new THREE.BoxGeometry(0.087, 0.018, 0.052), paint("#e0b84a"), (m) => (m.position.y = 0.016)),
-      mesh(new THREE.ConeGeometry(0.014, 0.022, 10), paint("#ffffff", { transparent: true, opacity: 0.35 }), (m) => (m.position.y = 0.11)),
-      mesh(new THREE.TorusGeometry(0.006, 0.0018, 6, 12), paint(css("--color-tomate")), (m) => {
+      mesh(lathe(sack, 24), paint("#ffffff", { transparent: true, opacity: 0.4 }), (m) => m.scale.set(1, 0.8, 0.7)),
+      mesh(lumpy(new THREE.CylinderGeometry(0.009, 0.005, 0.022, 10, 3), 0.2), paint("#ece6d6"), (m) => (m.position.y = 0.092)),
+      mesh(new THREE.TorusGeometry(0.0075, 0.0018, 6, 12), paint(css("--color-tomate")), (m) => {
         m.rotation.x = Math.PI / 2;
-        m.position.y = 0.104;
+        m.position.y = 0.086;
       }),
+      mesh(new RoundedBoxGeometry(0.04, 0.026, 0.002, 1, 0.001), paint("#e0b84a"), (m) => m.position.set(0, 0.045, 0.0305)),
     );
   },
   // Oats (avena): a round cardboard tub with a printed band and a lid.
