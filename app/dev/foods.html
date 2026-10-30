@@ -46,7 +46,9 @@ const spots = names.map((name, index) => {
 const aspect = innerWidth / innerHeight;
 const half = Math.max(columns / aspect, rows * 1.15) * cell * 0.55;
 const camera = new THREE.OrthographicCamera(-half * aspect, half * aspect, half, -half, 0.05, 50);
-camera.position.set(0, 0.6, 0.8);
+// The camera steps back along its view as the grid grows, so the nearest row stays in front of it.
+const back = Math.max(0, ((rows - 1) / 2) * cell * 1.4 - 0.4);
+camera.position.set(0, 0.6 + back * 0.6, 0.8 + back * 0.8);
 camera.lookAt(0, 0, 0);
 renderer.render(scene, camera);
 spots.forEach(({ name, at }) => {
