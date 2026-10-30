@@ -512,7 +512,8 @@ export function streetScene() {
     [-1, 1].forEach((end) => props.add(mesh(new THREE.BoxGeometry(SEAT.depth - 0.04, SEAT.height - 0.05, 0.05), paint("#6b4a2a"), (m) => m.position.set(x, PAVEMENT + (SEAT.height - 0.05) / 2, z + end * (length / 2 - 0.1)))));
     sitters.forEach((along, index) => {
       const facing = -side * Math.PI / 2 + (random(z * 7 + index) - 0.5) * 0.5;
-      people.push({ at: [x - side * SEAT.back, z + along], y: PAVEMENT, facing, act: index % 2 ? "Sit" : "SitTalk" });
+      // The men on the benches: the woman's ruana hangs from her arms, and seated, with her hands forward, it cut through her lap.
+      people.push({ at: [x - side * SEAT.back, z + along], y: PAVEMENT, facing, act: index % 2 ? "Sit" : "SitTalk", kind: "campesino" });
     });
   });
   scene.add(outline(merged(props)));

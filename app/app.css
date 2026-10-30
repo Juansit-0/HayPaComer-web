@@ -1132,9 +1132,9 @@ a.button:active { transform: scale(0.97); }
 @keyframes pop { from { opacity: 0; scale: 0.6; } }
 
 .kit { list-style: none; margin: var(--space-l) 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-l); }
-.kit-part { display: grid; gap: var(--space-s); align-content: start; }
+.kit-part { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-s); align-content: start; }
 .kit-text { display: grid; gap: 6px; }
-.kit-text b { font: 400 clamp(26px, 2.4vw, 36px)/1 var(--font-display); text-transform: uppercase; }
+.kit-text b { font: 400 clamp(21px, 2.3vw, 36px)/1 var(--font-display); text-transform: uppercase; hyphens: auto; overflow-wrap: break-word; }
 .kit-text span { font-size: 17px; line-height: 1.45; }
 
 .how-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; column-gap: var(--space-xl); }

@@ -37,7 +37,8 @@ def _hand(c, elbow, wrist, margin=0.0):
 # Each rule takes a face centre and the figure's height and returns a zone name.
 def campesino(c, H):
     # The brim stands out past the head; the crown sits above it; the back of the head pokes through the hat above the brim.
-    if c.z > 0.935 * H or (c.z > 0.895 * H and (math.hypot(c.x, c.y) > 0.14 or c.y > 0.03)):
+    # The brim droops a little behind and at the sides, below the crown's band: anything that far from the head above the collar is brim.
+    if c.z > 0.905 * H or (c.z > 0.895 * H and (math.hypot(c.x, c.y) > 0.14 or c.y > 0.03)) or (c.z > 0.862 * H and math.hypot(c.x, c.y) > 0.13):
         return "hat"
     if c.z > 0.78 * H and abs(c.x) < 0.2:
         # Behind, the ruana's collar rides up to the hat brim; read the back of the neck as cloth, so it shows no saw-toothed skin.
@@ -168,6 +169,7 @@ def label(mesh, name):
     bm.faces.ensure_lookup_table()
     H = max(v.co.z for v in bm.verts)
     zones = [zone_index(rule(face.calc_center_median(), H)) for face in bm.faces]
+    rules_said = list(zones)
     area = [face.calc_area() for face in bm.faces]
     total = sum(area)
     patch = [-1] * len(bm.faces)
@@ -197,5 +199,10 @@ def label(mesh, name):
                 zones[index] = winner
         count += 1
     zones = smooth(bm, zones)
+    # Where the head pokes through the crown, the head's patch would vote it back to skin: the rule's hat wins above the brim.
+    hat = zone_index("hat")
+    for face in bm.faces:
+        if rules_said[face.index] == hat and face.calc_center_median().z > 0.88 * H:
+            zones[face.index] = hat
     bm.free()
     return zones
