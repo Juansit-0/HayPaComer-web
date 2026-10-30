@@ -181,7 +181,7 @@ function walker(era, seed, act, kind) {
 const SETTLE = 0.15;
 const EASE = 7;
 
-// A crowd: people placed as { at: [x, z], facing, walk, act, kind, carry } with walk a [dx, dz] distance travelled over the chapter, act the
+// A crowd: people placed as { at: [x, z], y, facing, walk, act, kind, carry } with walk a [dx, dz] distance travelled over the chapter, act the
 // clip a figure plays (Walk for walkers, Rest otherwise; Talk, Argue, Point, Sit, SitTalk, Haul, Carry, Old where the figure has it), kind a
 // figure to cast and carry an object held in the hands. play(k, now) walks them by k and lets the rest move with the clock.
 export function crowd(people, { looks = 6, seed = 1, era = 1876 } = {}) {
@@ -199,7 +199,8 @@ export function crowd(people, { looks = 6, seed = 1, era = 1876 } = {}) {
     const act = body.userData.has(wanted) ? wanted : person.walk ? "Walk" : "Rest";
     // Seated people keep one size, so all sit at the height of their chairs.
     body.scale.multiplyScalar(act.startsWith("Sit") ? 1 : 0.92 + random(seed * 5 + index) * 0.14);
-    body.position.set(person.at[0], 0, person.at[1]);
+    // y lifts a figure onto a pavement or a kerb, so its feet stand on it instead of inside it.
+    body.position.set(person.at[0], person.y ?? 0, person.at[1]);
     body.rotation.y = person.facing ?? 0;
     root.add(body);
     if (person.carry) body.userData.hold(person.carry, act);

@@ -1,6 +1,6 @@
 import * as THREE from "../vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "../vendor/RoundedBoxGeometry.js";
-import { engrave, foodModel, group, hash, instance, lumpy, merged, mesh, naranjilla, oca, outline, paint, potato, treeTomato } from "../engrave.js";
+import { engrave, foodModel, group, grown, hash, instance, lumpy, merged, mesh, naranjilla, oca, outline, paint, potato, treeTomato } from "../engrave.js";
 import { crowd } from "./people.js";
 
 export const PAPER = "#f3ecdf";
@@ -135,6 +135,7 @@ function tileSlope(width, length) {
 // A whitewashed Pasto house: painted plinth, gabled tile roof with eaves, barred windows, a wooden door, and on two floors a balcony.
 // Houses and blocks are drawn at a small unit and set at the scale of the people: a storey stands well over a head (a figure is 1.6 tall).
 const HOUSE_SCALE = 2.1;
+const PAVEMENT = 0.12;
 const BLOCK_SCALE = 2.6;
 const scaled = (item, scale) => {
   item.scale.setScalar(scale);
@@ -182,8 +183,9 @@ export function house(seed, { floors = 1 + Math.round(random(seed * 5)), width =
   parts.push(mesh(new THREE.BoxGeometry(0.48, 0.9, 0.03), paint("#e2d6be"), (m) => m.position.set(doorX, 0.45, depth / 2 + 0.012)));
   parts.push(mesh(new THREE.BoxGeometry(0.36, 0.62, 0.04), wood, (m) => m.position.set(doorX, 0.31, depth / 2 + 0.025)));
   parts.push(mesh(new THREE.CircleGeometry(0.18, 18, 0, Math.PI), wood, (m) => m.position.set(doorX, 0.62, depth / 2 + 0.046)));
-  if (random(seed * 17) > 0.4) {
-    const lampX = doorX + (doorX > 0 ? -0.42 : 0.42);
+  const lamp = random(seed * 17) > 0.4;
+  const lampX = doorX + (doorX > 0 ? -0.42 : 0.42);
+  if (lamp) {
     parts.push(mesh(new THREE.BoxGeometry(0.03, 0.03, 0.16), dark, (m) => m.position.set(lampX, 0.98, depth / 2 + 0.08)));
     parts.push(mesh(new THREE.BoxGeometry(0.1, 0.14, 0.1), dark, (m) => m.position.set(lampX, 0.9, depth / 2 + 0.16)));
     parts.push(mesh(new THREE.BoxGeometry(0.075, 0.1, 0.075), paint("#f1d27a"), (m) => m.position.set(lampX, 0.9, depth / 2 + 0.16)));
@@ -196,6 +198,8 @@ export function house(seed, { floors = 1 + Math.round(random(seed * 5)), width =
   for (let floor = 0; floors > floor; floor++) {
     for (let index = 0; windows > index; index++) {
       const x = -width / 2 + (width / windows) * (index + 0.5);
+      // On the ground floor a window keeps clear of the door and of the lamp beside it.
+      if (floor === 0 && (0.6 > Math.abs(x - doorX) || (lamp && 0.34 > Math.abs(x - lampX)))) continue;
       const y = floor * 1.15 + 0.72;
       parts.push(mesh(new THREE.BoxGeometry(0.3, 0.38, 0.03), dark, (m) => m.position.set(x, y, depth / 2 + 0.015)));
       [-0.21, 0.21].forEach((side) => parts.push(mesh(new THREE.BoxGeometry(0.12, 0.38, 0.03), shutter, (m) => m.position.set(x + side, y, depth / 2 + 0.03))));
@@ -389,7 +393,8 @@ export function market() {
   layout.forEach(([x, , z], index) => {
     const turn = (random(index * 13) - 0.5) * 0.5;
     // Behind each stall a seller points out the produce or haggles; across the table a buyer answers.
-    people.push({ at: [x + Math.sin(turn) * -0.7, z - Math.cos(turn) * 0.7], facing: turn, act: ["Point", "Argue", "Talk"][index % 3] });
+    // The first stall is the one the camera comes up to: its seller rests her hands, so her arms never pass through her shawl up close.
+    people.push({ at: [x + Math.sin(turn) * -0.7, z - Math.cos(turn) * 0.7], facing: turn, act: index ? ["Point", "Argue", "Talk"][index % 3] : "Rest" });
     if (index === 0) return;
     people.push({ at: [x - 0.3 + random(index) * 0.6, z + 0.85], facing: Math.PI + (random(index * 5) - 0.5) * 0.6, act: index % 2 ? "Talk" : "Rest" });
     if (index % 2 === 0) people.push({ at: [x + 0.55, z + 1.1], facing: Math.PI - 0.5, act: "Talk" });
@@ -466,7 +471,7 @@ export function streetScene() {
       item.position.set(side * (2.5 + (1.3 * HOUSE_SCALE) / 2), 0, z - width / 2);
       item.rotation.y = -side * Math.PI / 2;
       props.add(item);
-      props.add(mesh(new THREE.BoxGeometry(0.9, 0.12, width), paint("#d6ccb4"), (m) => m.position.set(side * 2.05, 0.06, z - width / 2)));
+      props.add(mesh(new THREE.BoxGeometry(0.9, PAVEMENT, width), paint("#d6ccb4"), (m) => m.position.set(side * 2.05, PAVEMENT / 2, z - width / 2)));
       z -= width + 0.1;
     }
   });
@@ -489,7 +494,6 @@ export function streetScene() {
   church.position.set(0, 0, -22);
   church.scale.setScalar(1.3);
   props.add(church);
-  scene.add(outline(merged(props)));
   const people = [];
   // Fewer walkers, each in a lane of its own and well apart, so nobody walks through anybody: the slow ones walk ahead, the quick ones behind.
   const LANES = [-1.05, -0.35, 0.35, 1.05];
@@ -499,8 +503,19 @@ export function streetScene() {
     const lane = LANES[index % 4] + (random(index * 3) - 0.5) * 0.15;
     people.push({ at: [lane, 2.5 - index * 2.6], facing: Math.PI, walk: [0, old ? -1.2 : -3.4 - (index % 4) * 0.25], act: old ? "Old" : haul ? "Haul" : undefined, carry: haul ? load(index) : undefined });
   }
-  // By the houses: two talking at a door, two more standing alone.
-  [[-2.1, 1.2, Math.PI / 2, "Talk"], [-1.5, 1.2, -Math.PI / 2, "Talk"], [2.1, -3.5, -Math.PI / 2], [-2.1, -7.5, Math.PI / 2], [2.1, -11, -Math.PI / 2, "Talk"], [1.5, -11, Math.PI / 2, "Talk"]].forEach(([x, z, facing, act]) => people.push({ at: [x, z], facing, act }));
+  // By the houses, up on the pavement: two talking at a door, and two more pairs farther on.
+  [[-2.28, 1.2, Math.PI / 2], [-1.72, 1.25, -Math.PI / 2], [2.3, -11, -Math.PI / 2], [1.74, -10.9, Math.PI / 2]].forEach(([x, z, facing]) => people.push({ at: [x, z], y: PAVEMENT, facing, act: "Talk" }));
+  // Neighbours sitting on benches against the walls to watch the street go by, two to a bench and not spaced by rule.
+  [[1, -3.4, 1.6, [-0.52, 0.34]], [-1, -7.6, 1.5, [-0.4, 0.46]]].forEach(([side, z, length, sitters]) => {
+    const x = side * (2.5 - SEAT.depth / 2 - 0.02);
+    props.add(mesh(new THREE.BoxGeometry(SEAT.depth, 0.05, length), paint("#7a5530"), (m) => m.position.set(x, PAVEMENT + SEAT.height - 0.025, z)));
+    [-1, 1].forEach((end) => props.add(mesh(new THREE.BoxGeometry(SEAT.depth - 0.04, SEAT.height - 0.05, 0.05), paint("#6b4a2a"), (m) => m.position.set(x, PAVEMENT + (SEAT.height - 0.05) / 2, z + end * (length / 2 - 0.1)))));
+    sitters.forEach((along, index) => {
+      const facing = -side * Math.PI / 2 + (random(z * 7 + index) - 0.5) * 0.5;
+      people.push({ at: [x - side * SEAT.back, z + along], y: PAVEMENT, facing, act: index % 2 ? "Sit" : "SitTalk" });
+    });
+  });
+  scene.add(outline(merged(props)));
   const folk = crowd(people, { seed: 5 });
   scene.add(folk);
   scene.userData.play = (k, now) => folk.userData.play(k, now);
@@ -553,11 +568,21 @@ function counter(width) {
   );
 }
 
+// A paper market bag, open at the top: four walls, a bottom and a folded rim, so the food inside shows and can be lifted out of it.
 function bag() {
+  const kraft = paint("#c79a5b");
+  const W = 0.34;
+  const H = 0.36;
+  const D = 0.2;
+  const T = 0.012;
   return outline(
     group(
-      mesh(new RoundedBoxGeometry(0.34, 0.36, 0.2, 2, 0.02), paint("#c79a5b"), (m) => (m.position.y = 0.18)),
-      mesh(new THREE.TorusGeometry(0.09, 0.008, 8, 24, Math.PI), paint("#6b4a2a"), (m) => (m.position.y = 0.36)),
+      mesh(new THREE.BoxGeometry(W, T, D), kraft, (m) => (m.position.y = T / 2)),
+      ...[-1, 1].map((side) => mesh(new THREE.BoxGeometry(W, H, T), kraft, (m) => m.position.set(0, H / 2, side * (D / 2 - T / 2)))),
+      ...[-1, 1].map((side) => mesh(new THREE.BoxGeometry(T, H, D), kraft, (m) => m.position.set(side * (W / 2 - T / 2), H / 2, 0))),
+      mesh(new THREE.BoxGeometry(W + 0.006, 0.03, D + 0.006), paint("#b08548"), (m) => (m.position.y = H - 0.015)),
+      mesh(new THREE.BoxGeometry(W - 2 * T, 0.002, D - 2 * T), paint("#8a6a3e"), (m) => (m.position.y = T + 0.001)),
+      mesh(new THREE.TorusGeometry(0.09, 0.008, 8, 24, Math.PI), paint("#6b4a2a"), (m) => (m.position.y = H)),
     ),
   );
 }
@@ -669,8 +694,9 @@ export function kitchen() {
     const model = outline(group(name === "tree" ? treeTomato() : name === "oca" ? oca("#d98a9b") : foodModel(name)));
     const start = new THREE.Vector3(...from);
     const end = new THREE.Vector3(...to);
-    // Up over the open door, round to the front of the fridge, then straight in between the shelves: never through a wall.
-    model.userData.path = new THREE.CatmullRomCurve3([start, new THREE.Vector3(-0.62, 1.42, 0.55), new THREE.Vector3(end.x, end.y + 0.06, FRIDGE.D / 2 + 0.32), new THREE.Vector3(end.x, end.y + 0.02, FRIDGE.D / 2 - 0.02), end], false, "centripetal");
+    // Straight up out of the mouth of the bag, over the open door, round to the front of the fridge, then straight in between the shelves:
+    // never through the bag or a wall.
+    model.userData.path = new THREE.CatmullRomCurve3([start, new THREE.Vector3(start.x, 1.46, start.z), new THREE.Vector3(-0.62, 1.5, 0.55), new THREE.Vector3(end.x, end.y + 0.06, FRIDGE.D / 2 + 0.32), new THREE.Vector3(end.x, end.y + 0.02, FRIDGE.D / 2 - 0.02), end], false, "centripetal");
     scene.add(model);
     return model;
   });
@@ -731,7 +757,7 @@ function gramsTexture() {
   return texture;
 }
 
-export function scaleScene() {
+export function scaleScene(food = "Tree tomato") {
   const scene = group(kitchenCorner(-0.32, -1.12));
   const top = counter(2.2);
   top.position.set(0, 0, 0);
@@ -782,27 +808,37 @@ export function scaleScene() {
   scale.add(display);
   scene.add(scale);
   const load = new THREE.Group();
-  [
-    [-0.04, 0, -0.02],
-    [0.05, 0, 0.03],
-    [0.0, 0.07, 0.0],
-    [-0.05, 0, 0.06],
-  ].forEach(([x, y, z], index) => {
-    const tomato = outline(group(treeTomato()));
-    tomato.position.set(x, y, z);
-    tomato.rotation.z = (index - 1.5) * 0.4;
-    load.add(tomato);
-  });
+  const PAN = 1.003;
+  if (food === "Tree tomato") {
+    // Three lie on the pan leaning a little, the fourth rests in the hollow between them: each is lowered until its lowest point touches.
+    [
+      [-0.045, -0.025, 0.3, 0],
+      [0.048, -0.01, -0.25, 0],
+      [-0.01, 0.05, 0.15, 0],
+      [0.0, 0.005, -0.1, 0.055],
+    ].forEach(([x, z, lean, rest]) => {
+      const tomato = outline(group(treeTomato()));
+      tomato.rotation.z = lean;
+      tomato.position.set(x, 0, z);
+      tomato.updateMatrixWorld(true);
+      tomato.position.y = rest - new THREE.Box3().setFromObject(tomato).min.y;
+      load.add(tomato);
+    });
+  } else {
+    const piece = foodModel(food, undefined, 842);
+    piece.position.y = -new THREE.Box3().setFromObject(piece).min.y;
+    load.add(piece);
+  }
   scene.add(load);
   scene.userData.play = (k) => {
     const drop = THREE.MathUtils.smoothstep(k, 0.05, 0.4);
-    load.position.set(0, 1.01 + (1 - drop) * 0.45, -0.035);
+    load.position.set(0, PAN + (1 - drop) * 0.45, -0.035);
     grams.userData.show(Math.round(842 * THREE.MathUtils.smoothstep(k, 0.35, 0.65)));
   };
   return scene;
 }
 
-export function plateScene() {
+export function plateScene(dish = "pericos") {
   const scene = group(kitchenFloor(4, 3));
   const table = outline(
     group(
@@ -821,50 +857,93 @@ export function plateScene() {
   ));
   plate.position.y = 0.781;
   scene.add(plate);
-  // Breakfast: huevos pericos (soft scrambled egg folded with tomato and spring onion), an arepa toasted on the griddle with butter melting
-  // on it, and a slice of fresh cheese.
   const food = new THREE.Group();
-  const egg = paint("#f2c94c");
-  const eggLight = paint("#f7df8a");
-  for (let index = 0; 9 > index; index++) {
-    const angle = (index / 9) * Math.PI * 2 + random(index) * 0.6;
-    const reach = index ? 0.035 + random(index * 2.9) * 0.035 : 0;
-    const curd = new THREE.SphereGeometry(0.03 + random(index * 3.1) * 0.014, 14, 10);
-    food.add(mesh(lumpy(curd, 0.28), index % 3 ? egg : eggLight, (m) => {
-      m.position.set(-0.07 + Math.cos(angle) * reach, 0.808 + (index ? 0 : 0.012), Math.sin(angle) * reach * 0.85);
-      m.scale.set(1.25, 0.5, 1.05);
-      m.rotation.y = angle;
+  if (dish === "pericos") {
+    // Breakfast: huevos pericos (soft scrambled egg folded with tomato and spring onion), an arepa toasted on the griddle with butter melting
+    // on it, and a slice of fresh cheese.
+    const egg = paint("#f2c94c");
+    const eggLight = paint("#f7df8a");
+    for (let index = 0; 9 > index; index++) {
+      const angle = (index / 9) * Math.PI * 2 + random(index) * 0.6;
+      const reach = index ? 0.035 + random(index * 2.9) * 0.035 : 0;
+      const curd = new THREE.SphereGeometry(0.03 + random(index * 3.1) * 0.014, 14, 10);
+      food.add(mesh(lumpy(curd, 0.28), index % 3 ? egg : eggLight, (m) => {
+        m.position.set(-0.07 + Math.cos(angle) * reach, 0.808 + (index ? 0 : 0.012), Math.sin(angle) * reach * 0.85);
+        m.scale.set(1.25, 0.5, 1.05);
+        m.rotation.y = angle;
+      }));
+    }
+    for (let index = 0; 9 > index; index++) {
+      const angle = random(index * 4.1) * Math.PI * 2;
+      const reach = Math.sqrt(random(index * 6.7)) * 0.07;
+      food.add(mesh(new RoundedBoxGeometry(0.016, 0.01, 0.014, 1, 0.003), paint("#c8432a"), (m) => {
+        m.position.set(-0.07 + Math.cos(angle) * reach, 0.826, Math.sin(angle) * reach * 0.8);
+        m.rotation.set(random(index) * 2, angle, random(index * 3));
+      }));
+    }
+    for (let index = 0; 8 > index; index++) {
+      const angle = random(index * 7.3) * Math.PI * 2;
+      const reach = Math.sqrt(random(index * 5.1)) * 0.075;
+      food.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.012, 8), paint("#4f8a3a"), (m) => {
+        m.position.set(-0.07 + Math.cos(angle) * reach, 0.828, Math.sin(angle) * reach * 0.8);
+        m.rotation.set(Math.PI / 2, 0, angle);
+      }));
+    }
+    const arepa = new THREE.Group();
+    arepa.add(mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.026, 40), paint("#e9d3a0")));
+    [[0.03, 0.02, 0.018], [-0.035, -0.01, 0.014], [0.01, -0.045, 0.012], [-0.02, 0.045, 0.01], [0.05, -0.02, 0.009]].forEach(([x, z, r]) => arepa.add(mesh(new THREE.CircleGeometry(r, 12), paint("#b98a4c"), (m) => {
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(x, 0.0135, z);
+    })));
+    arepa.add(mesh(new RoundedBoxGeometry(0.035, 0.012, 0.028, 2, 0.004), paint("#f6e7a6"), (m) => m.position.set(-0.005, 0.019, 0.005)));
+    arepa.position.set(0.09, 0.808, 0.05);
+    food.add(arepa);
+    food.add(mesh(new RoundedBoxGeometry(0.07, 0.016, 0.05, 2, 0.004), paint("#f3ead2"), (m) => {
+      m.position.set(0.06, 0.806, -0.1);
+      m.rotation.y = 0.4;
     }));
-  }
-  for (let index = 0; 9 > index; index++) {
-    const angle = random(index * 4.1) * Math.PI * 2;
-    const reach = Math.sqrt(random(index * 6.7)) * 0.07;
-    food.add(mesh(new RoundedBoxGeometry(0.016, 0.01, 0.014, 1, 0.003), paint("#c8432a"), (m) => {
-      m.position.set(-0.07 + Math.cos(angle) * reach, 0.826, Math.sin(angle) * reach * 0.8);
-      m.rotation.set(random(index) * 2, angle, random(index * 3));
+  } else {
+    // Arroz con pollo, the dish the landing cooks with the rescued chicken: a mound of yellow rice with pieces of chicken, peas and carrot
+    // through it, and half a lime on the side.
+    food.add(mesh(lumpy(new THREE.SphereGeometry(0.1, 24, 14), 0.08), paint("#e8c25a"), (m) => {
+      m.scale.set(1.15, 0.34, 0.95);
+      m.position.set(-0.02, 0.8, 0);
     }));
+    const grains = [];
+    for (let index = 0; 70 > index; index++) {
+      const angle = random(index * 2.3) * Math.PI * 2;
+      const reach = Math.sqrt(random(index * 3.7)) * 0.1;
+      const lift = 0.034 * Math.sqrt(Math.max(0, 1 - (reach / 0.11) ** 2));
+      grains.push(mesh(new THREE.CapsuleGeometry(0.0022, 0.006, 2, 5), paint("#f3d98a"), (m) => {
+        m.position.set(-0.02 + Math.cos(angle) * reach * 1.1, 0.8 + lift, Math.sin(angle) * reach * 0.9);
+        m.rotation.set(random(index) * 3, angle, Math.PI / 2);
+      }));
+    }
+    const rice = merged(group(...grains));
+    rice.traverse((child) => (child.userData.noOutline = true));
+    food.add(rice);
+    [[-0.05, 0.02, 1.2], [0.03, -0.03, 2.6], [0.01, 0.05, 4.1], [-0.07, -0.04, 5.3]].forEach(([x, z, seed]) => food.add(mesh(grown([0.022, 0.014, 0.017], seed, 0.12), paint("#c98a4a"), (m) => m.position.set(x, 0.826, z))));
+    for (let index = 0; 14 > index; index++) {
+      const angle = random(index * 5.9) * Math.PI * 2;
+      const reach = Math.sqrt(random(index * 8.3)) * 0.085;
+      food.add(mesh(new THREE.SphereGeometry(0.006, 8, 6), paint("#6aa04a"), (m) => m.position.set(-0.02 + Math.cos(angle) * reach, 0.83, Math.sin(angle) * reach * 0.8)));
+    }
+    for (let index = 0; 10 > index; index++) {
+      const angle = random(index * 6.7) * Math.PI * 2;
+      const reach = Math.sqrt(random(index * 4.9)) * 0.08;
+      food.add(mesh(new RoundedBoxGeometry(0.011, 0.011, 0.011, 1, 0.002), paint("#e8892b"), (m) => {
+        m.position.set(-0.02 + Math.cos(angle) * reach, 0.829, Math.sin(angle) * reach * 0.8);
+        m.rotation.set(random(index) * 2, angle, 0);
+      }));
+    }
+    const lime = group(
+      mesh(new THREE.SphereGeometry(0.024, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), paint("#5f9a2e"), (m) => (m.rotation.x = Math.PI)),
+      mesh(new THREE.CircleGeometry(0.022, 20), paint("#d8e6a0"), (m) => (m.rotation.x = -Math.PI / 2)),
+    );
+    lime.rotation.z = 0.5;
+    lime.position.set(0.13, 0.81, 0.06);
+    food.add(lime);
   }
-  for (let index = 0; 8 > index; index++) {
-    const angle = random(index * 7.3) * Math.PI * 2;
-    const reach = Math.sqrt(random(index * 5.1)) * 0.075;
-    food.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.012, 8), paint("#4f8a3a"), (m) => {
-      m.position.set(-0.07 + Math.cos(angle) * reach, 0.828, Math.sin(angle) * reach * 0.8);
-      m.rotation.set(Math.PI / 2, 0, angle);
-    }));
-  }
-  const arepa = new THREE.Group();
-  arepa.add(mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.026, 40), paint("#e9d3a0")));
-  [[0.03, 0.02, 0.018], [-0.035, -0.01, 0.014], [0.01, -0.045, 0.012], [-0.02, 0.045, 0.01], [0.05, -0.02, 0.009]].forEach(([x, z, r]) => arepa.add(mesh(new THREE.CircleGeometry(r, 12), paint("#b98a4c"), (m) => {
-    m.rotation.x = -Math.PI / 2;
-    m.position.set(x, 0.0135, z);
-  })));
-  arepa.add(mesh(new RoundedBoxGeometry(0.035, 0.012, 0.028, 2, 0.004), paint("#f6e7a6"), (m) => m.position.set(-0.005, 0.019, 0.005)));
-  arepa.position.set(0.09, 0.808, 0.05);
-  food.add(arepa);
-  food.add(mesh(new RoundedBoxGeometry(0.07, 0.016, 0.05, 2, 0.004), paint("#f3ead2"), (m) => {
-    m.position.set(0.06, 0.806, -0.1);
-    m.rotation.y = 0.4;
-  }));
   scene.add(outline(food));
   // A coffee cup on its saucer, open, with coffee in it.
   const cup = outline(group(
@@ -968,7 +1047,8 @@ function block(seed, { floors = 2 + Math.round(random(seed * 5) * 2), width = 2.
   parts.push(mesh(new THREE.BoxGeometry(shopWidth * 0.6, 0.04, 0.054), paint("#f4efe3"), (m) => m.position.set(shopX, 0.91, front + 0.032)));
   const doorX = shopX + shopWidth / 2 + 0.36;
   parts.push(mesh(new THREE.BoxGeometry(0.42, 0.85, 0.03), paint("#3b3026"), (m) => m.position.set(doorX, 0.425, front + 0.015)));
-  parts.push(mesh(new THREE.BoxGeometry(0.36, 0.26, 0.032), glass, (m) => m.position.set(doorX, 0.64, front + 0.017)));
+  [0.62, 0.24].forEach((y) => parts.push(mesh(new THREE.BoxGeometry(0.32, 0.3, 0.034), paint("#4a3d30"), (m) => m.position.set(doorX, y, front + 0.017))));
+  parts.push(mesh(new THREE.BoxGeometry(0.02, 0.08, 0.04), paint("#b8b0a0"), (m) => m.position.set(doorX + 0.15, 0.45, front + 0.03)));
   if (random(seed * 17) > 0.35) parts.push(mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.42, 16), iron, (m) => m.position.set(width / 2 - 0.4, height + 0.37, -0.1)));
   if (random(seed * 19) > 0.4) {
     [-1, 1].forEach((side) => [-0.45, 0.45].forEach((z) => parts.push(mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.5, 5), iron, (m) => m.position.set(side * (width / 2 - 0.08), height + 0.4, z)))));
@@ -1069,7 +1149,7 @@ export function homeScene() {
   const walker = crowd([{ at: [-5, -0.4], facing: Math.PI / 2, walk: [6.2, 0], act: "Carry", kind: "vecina", carry: tote }], { looks: 1, seed: 9, era: 2026 });
   scene.add(walker);
   // Two neighbours talking at a door, face to face.
-  const neighbours = crowd([{ at: [3.35, -1.2], facing: Math.PI / 2, act: "Talk", kind: "vecino" }, { at: [3.95, -1.2], facing: -Math.PI / 2, act: "Talk", kind: "vecina" }], { looks: 2, seed: 13, era: 2026 });
+  const neighbours = crowd([{ at: [3.35, -1.2], y: 0.14, facing: Math.PI / 2, act: "Talk", kind: "vecino" }, { at: [3.95, -1.2], y: 0.14, facing: -Math.PI / 2, act: "Talk", kind: "vecina" }], { looks: 2, seed: 13, era: 2026 });
   scene.add(neighbours);
   scene.userData.play = (k, now) => {
     walker.userData.play(k, now);
@@ -1078,7 +1158,7 @@ export function homeScene() {
   return scene;
 }
 
-const SEAT = { height: 0.42, back: 0.06 };
+const SEAT = { height: 0.42, back: 0.06, depth: 0.32 };
 // Where the family sits: two across the table, facing the camera, and one at each end.
 const PLACES = [
   { at: [-0.55, -0.95], facing: 0 },
@@ -1423,25 +1503,19 @@ export function stocked() {
   const fridge = fridgeBody();
   fridge.userData.door.rotation.y = -1.95;
   const { SHELVES } = FRIDGE;
+  // The fridge of the landing, stocked as a Pasto kitchen is: the chicken breast the labels point at on the middle shelf.
   [
-    ["Milk", -0.2, SHELVES[0], -0.08],
-    ["Cheese", 0.12, SHELVES[0], -0.02],
-    ["Egg", -0.1, SHELVES[1], 0],
-    ["Potato", 0.18, SHELVES[1], 0.05],
+    ["Milk", -0.22, SHELVES[0], -0.1],
+    ["Double cream cheese", 0.02, SHELVES[0], -0.04],
+    ["Tree tomato", 0.2, SHELVES[0], 0.04],
+    ["Chicken breast", -0.1, SHELVES[1], 0.02],
+    ["Egg", 0.18, SHELVES[1], -0.02],
     ["Carrot", -0.12, SHELVES[2], 0.04],
-    ["Avocado", 0.16, SHELVES[2], 0.02],
+    ["Blackberries", 0.17, SHELVES[2], 0.02],
   ].forEach(([name, x, y, z]) => {
-    const food = foodModel(name, undefined, name === "Egg" ? 360 : name === "Potato" ? 540 : 300);
+    const food = foodModel(name, undefined, { Egg: 360, "Chicken breast": 842, "Tree tomato": 270 }[name] ?? 300);
     food.position.set(x, y + 0.012, z);
     fridge.add(food);
-  });
-  [
-    [0.02, SHELVES[0], 0.05],
-    [0.08, SHELVES[0], 0.08],
-  ].forEach(([x, y, z]) => {
-    const tomato = outline(group(treeTomato()));
-    tomato.position.set(x, y + 0.012, z);
-    fridge.add(tomato);
   });
   return fridge;
 }

@@ -11,7 +11,7 @@ const WEEKS_PER_MONTH = 4.3;
 const STAGES = ["weigh", "know", "warn", "cook"];
 const WORDMARK = "HayPaComer";
 
-const STAGE_SCENES = { weigh: "scale", know: "fridge", warn: "door", cook: "plate" };
+const STAGE_SCENES = { weigh: "scale", know: "fridge", warn: "use", cook: "rice" };
 
 function kitPart(key, vignette) {
   return `<li class="kit-part kit-${key}" style="--i:${["door", "probe", "brain", "scale"].indexOf(key)}">
@@ -20,11 +20,17 @@ function kitPart(key, vignette) {
   </li>`;
 }
 
+// Each stage shows a piece of the app as it looks today: the fridge list row for the chicken (glyph, name, grams, expiry), and the dish
+// the Now screen proposes.
+function foodRow(grams, when, attention = false) {
+  return `<div class="food-row-head land-row"><i class="food f-pollo" aria-hidden="true"></i><span class="item-name">${t("landing.ui.chicken")}</span><span class="value">${grams}</span><span class="row-expiry${attention ? " attention" : ""}">${when}</span></div>`;
+}
+
 function stageFragment(stage) {
   const fragments = {
-    weigh: `<span class="ui-label">${t("landing.ui.scale")}</span><b class="ui-figure">842 g</b><span class="status">${t("landing.ui.stable")}</span>`,
-    know: `<span class="ui-label">${t("landing.ui.chicken")}</span><b class="ui-figure">842 g</b><span class="status attention">${t("landing.ui.expires")}</span>`,
-    warn: `<span class="ui-label">${t("now.today")}</span><b class="ui-figure">80 g</b><span>${t("landing.ui.chicken")}</span>`,
+    weigh: `<span class="ui-label">${t("landing.ui.scale")}</span>${foodRow("842 g", `<span class="status">${t("landing.ui.stable")}</span>`)}`,
+    know: `<span class="ui-label">${t("nav.fridge")}</span>${foodRow("842 g", `≈ ${t("landing.ui.expires")}`, true)}`,
+    warn: `<span class="ui-label">${t("now.today")}</span>${foodRow("80 g", `<span class="status attention">${t("landing.ui.expires")}</span>`, true)}`,
     cook: `<span class="ui-label">${t("landing.ui.dish")}</span><b class="ui-figure">${t("now.dish.minutes", { n: 35 })}</b><span class="status">${t("verdict.ENOUGH")}</span>`,
   };
   return fragments[stage];

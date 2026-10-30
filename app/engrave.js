@@ -685,6 +685,7 @@ const DETAILED = {
     return bunch;
   },
   Apple: (grams) => cluster(() => FOODS.Apple(), count(grams, 180, 5), 0.08),
+  "Tree tomato": (grams) => cluster(() => treeTomato(), count(grams, 90, 5), 0.07),
   Ulluco: (grams) => cluster((index) => ulluco(index), count(grams, 25, 9), 0.042),
   Pepper: (grams) => cluster(() => FOODS.Pepper(), count(grams, 150, 3), 0.085),
   Granadilla: (grams) => cluster(() => FOODS.Granadilla(), count(grams, 90, 5), 0.075),

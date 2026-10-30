@@ -1426,6 +1426,9 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 /* On a short screen the scene is small, so the data card shrinks with it instead of covering it. */
 .landing .how-right .how-fragment { font-size: clamp(13px, 5.5cqi, 17px); padding: clamp(12px, 6cqi, 24px); }
 .landing .how-right .ui-figure { font-size: clamp(28px, 15cqi, 56px); }
+.landing .how-fragment .land-row { width: auto; min-width: min(300px, 62cqi); min-height: 0; padding: 0; color: inherit; cursor: default; }
+.landing .how-fragment .land-row .value { font-size: clamp(22px, 9cqi, 36px); letter-spacing: -0.02em; }
+.landing .how-fragment .land-row .item-name { font-size: clamp(15px, 6cqi, 20px); }
 .land-how h2 { font-size: clamp(40px, min(6.5vw, 11svh), 120px); }
 .how-clause { font-size: clamp(22px, min(3.6vw, 6svh), 60px); }
 .landing .how-right .how-scene { border: 3px solid var(--ink-color); }
@@ -1438,7 +1441,10 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
   .landing .kit { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-l) var(--space-s); }
   .landing .kit-text b { font-size: 20px; }
   .landing .kit-text span { font-size: 15px; }
-  .landing .how-fragment { left: 12px; bottom: -16px; }
+  .landing .how-fragment { left: 12px; bottom: -16px; max-width: 72%; padding: var(--space-s); }
+  .landing .how-fragment .land-row { min-width: 0; column-gap: var(--space-xs); }
+  .landing .how-fragment .land-row .value { font-size: 22px; }
+  .landing .how-fragment .land-row .item-name { font-size: 15px; }
 }
 
 /* Inside the app: the engraving language of the landing. Cream paper, cards edged in ink with a hard offset shadow, controls outlined in ink, chapter bands with a ragged ink bottom */

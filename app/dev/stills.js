@@ -1,7 +1,7 @@
 // Dev only: render the engraved stills used by the landing and dish cards, at double size, as webp data URLs.
 // Run from the mock with ?dev=stills; the review tool saves them into app/stills/.
 import * as THREE from "../vendor/three.module.min.js";
-import { inkBias, setHatchScale } from "../engrave.js";
+import { filmTone, inkBias, setHatchScale } from "../engrave.js";
 import { board, doorSensor, PAPER, plateScene, probe, scaleScene, stocked } from "../story/scenes.js";
 
 const STILLS = {
@@ -9,8 +9,13 @@ const STILLS = {
   door: { build: doorSensor, position: [0.95, 1.18, 0.95], target: [0.33, 0.98, 0.3], fov: 30 },
   probe: { build: probe, position: [0.22, 0.26, 0.34], target: [0, 0.01, 0], fov: 32 },
   board: { build: board, position: [0.07, 0.1, 0.11], target: [0.002, 0, 0], fov: 34 },
-  scale: { build: scaleScene, position: [0.5, 1.28, 0.62], target: [0.03, 0.99, 0.05], fov: 34 },
-  plate: { build: plateScene, position: [0.48, 1.22, 0.66], target: [0.02, 0.8, 0.02], fov: 34 },
+  // The landing weighs the chicken its text speaks of.
+  scale: { build: () => scaleScene("Chicken breast"), position: [0.5, 1.28, 0.62], target: [0.03, 0.99, 0.05], fov: 34 },
+  // The chicken in the fridge up close, on its shelf: what the landing warns about.
+  use: { build: stocked, position: [0.05, 0.95, 0.75], target: [-0.08, 0.66, 0], fov: 30 },
+  // The arroz con pollo the landing cooks with it.
+  rice: { build: () => plateScene("rice"), position: [0.48, 1.22, 0.66], target: [0.02, 0.8, 0.02], fov: 34 },
+  plate: { build: () => plateScene(), position: [0.48, 1.22, 0.66], target: [0.02, 0.8, 0.02], fov: 34 },
 };
 
 export async function renderStills(scale = 2) {
@@ -22,6 +27,9 @@ export async function renderStills(scale = 2) {
   renderer.setClearColor(PAPER);
   renderer.toneMapping = THREE.NoToneMapping;
   inkBias.value = 0.06;
+  // The landing's story may have left the old-film tone on; the stills are always drawn in today's colours.
+  const tone = filmTone.value;
+  filmTone.value = 0;
   const pictures = {};
   for (const [kind, view] of Object.entries(STILLS)) {
     const [width, height] = view.size ?? [720, 720];
@@ -41,6 +49,7 @@ export async function renderStills(scale = 2) {
     pictures[kind] = canvas.toDataURL("image/webp", 0.85);
   }
   inkBias.value = 0;
+  filmTone.value = tone;
   renderer.dispose();
   renderer.forceContextLoss();
   return pictures;
