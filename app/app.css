@@ -908,6 +908,9 @@ html:has(.loader:not(.done)) { overflow: hidden; }
 .f-mora { width: 24px; height: 22px; border-radius: 45%; background: radial-gradient(circle at 32% 30%, #4a1838 3px, transparent 4px), radial-gradient(circle at 68% 62%, #4a1838 3px, transparent 4px), #1d0d1a; }
 .f-mango { width: 30px; height: 22px; border-radius: 60% 40% 50% 50%; background: linear-gradient(170deg, #c8502e 45%, #c9b03c 45%); }
 .f-arveja { width: 40px; height: 12px; border-radius: 50%; background: radial-gradient(circle, #9ccc5a 3px, transparent 4px) 4px 0 / 8px 12px repeat-x, #6aa04a; }
+.f-tomate-arbol { width: 20px; height: 28px; border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; background: #c8432a; }
+.f-oca { width: 30px; height: 14px; border-radius: 50%; background: repeating-linear-gradient(90deg, #c9677d 0 5px, #b2586c 5px 6px); }
+.f-lulo { width: 24px; height: 24px; border-radius: 50%; background: radial-gradient(circle at 50% 8%, #6a7a3a 4px, transparent 5px), #e8a13a; }
 .f-mazorca { width: 42px; height: 16px; border-radius: 4px 50% 50% 4px; background: repeating-linear-gradient(90deg, #f0c84a 0 4px, #d9ac2e 4px 5px); }
 .f-otro { width: 22px; height: 22px; border-radius: 6px; background: var(--color-meson-strong); }
 

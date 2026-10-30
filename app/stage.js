@@ -27,8 +27,10 @@ const SHAPES = {
   "Ground beef": "carne",
   Lentils: "frasco",
   Lime: "limon",
+  Lulo: "lulo",
   Mango: "mango",
   Milk: "leche",
+  Oca: "oca",
   Onion: "cebolla",
   "Orange juice": "jugo",
   Orange: "naranja",
@@ -39,6 +41,7 @@ const SHAPES = {
   Soup: "olla",
   "Soy sauce": "botella oscura",
   Tomato: "tomate",
+  "Tree tomato": "tomate-arbol",
   Tuna: "lata",
   Yogurt: "yogur",
 };
