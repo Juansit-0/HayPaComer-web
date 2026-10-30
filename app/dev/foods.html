@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foods</title>
+<script type="importmap">{ "imports": { "three": "/app/vendor/three.module.min.js" } }</script>
+<link rel="stylesheet" href="/assets/tokens.css">
+<style>
+  html, body { margin: 0; background: #f3ecdf; font: 13px/1.2 "Hanken Grotesk", system-ui, sans-serif; color: #1c1712; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+</style>
+</head>
+<body>
+<canvas></canvas>
+<script type="module">
+// Dev only: every food model in a grid, as the fridge draws it, to review them together (?only=Lime,Corn&grams=300).
+import * as THREE from "../vendor/three.module.min.js";
+import { FOOD_NAMES, foodModel, sized } from "../engrave.js";
+
+const query = new URLSearchParams(location.search);
+const names = query.get("only")?.split(",") ?? FOOD_NAMES;
+const grams = Number(query.get("grams") ?? 300);
+const columns = Math.min(names.length, Number(query.get("columns") ?? 6));
+const rows = Math.ceil(names.length / columns);
+const canvas = document.querySelector("canvas");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight, false);
+renderer.setClearColor("#f3ecdf");
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight("#ffffff", "#b9b19c", 1.1));
+const sun = new THREE.DirectionalLight("#ffffff", 1.5);
+sun.position.set(2, 5, 4);
+scene.add(sun);
+const cell = 0.32;
+const spots = names.map((name, index) => {
+  const model = sized(foodModel(name, "VEGETABLE", grams));
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.set((index % columns - (columns - 1) / 2) * cell - center.x, 0, (Math.floor(index / columns) - (rows - 1) / 2) * cell * 1.4 - center.z);
+  scene.add(model);
+  return { name, at: new THREE.Vector3(model.position.x + center.x, 0, model.position.z + center.z + cell * 0.45) };
+});
+const aspect = innerWidth / innerHeight;
+const half = Math.max(columns / aspect, rows * 1.15) * cell * 0.55;
+const camera = new THREE.OrthographicCamera(-half * aspect, half * aspect, half, -half, 0.05, 50);
+camera.position.set(0, 0.6, 0.8);
+camera.lookAt(0, 0, 0);
+renderer.render(scene, camera);
+spots.forEach(({ name, at }) => {
+  const point = at.project(camera);
+  const label = document.createElement("span");
+  label.textContent = name;
+  label.style.left = `${(point.x + 1) * 50}%`;
+  label.style.top = `${(1 - point.y) * 50}%`;
+  document.body.append(label);
+});
+document.body.dataset.ready = "1";
+</script>
+</body>
+</html>

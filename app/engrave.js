@@ -294,6 +294,132 @@ export function naranjilla() {
   return group(fruit, calyx);
 }
 
+// A leaf or stem rising from its base and leaning away: the piece is moved up half its length inside a pivot, so it turns about its foot.
+function leaning(piece, length, lean, turn = 0) {
+  piece.position.y = length / 2;
+  const pivot = group(piece);
+  pivot.rotation.set(lean, turn, 0);
+  return pivot;
+}
+
+// A stalk of cebolla larga: a long white stem swelling a little at the root, going pale green, then three hollow green leaves.
+function greenOnion(seed) {
+  const stem = group(
+    mesh(lathe([[0, 0], [0.0075, 0.002], [0.011, 0.014], [0.0095, 0.032], [0.008, 0.07], [0.0078, 0.09], [0, 0.09]], 14), paint("#f1ece0")),
+    mesh(new THREE.CylinderGeometry(0.0072, 0.0078, 0.03, 14), paint("#b9cf8a"), (m) => (m.position.y = 0.1)),
+    mesh(new THREE.ConeGeometry(0.009, 0.008, 8), paint("#cbbf9a"), (m) => {
+      m.rotation.x = Math.PI;
+      m.position.y = -0.003;
+    }),
+  );
+  [-0.1, 0.02, 0.13].forEach((lean, index) => {
+    const length = 0.12 - index * 0.012 + hash(seed, index, 2) * 0.02;
+    const leaf = leaning(mesh(new THREE.CylinderGeometry(0.0016, 0.0045, length, 7), paint("#4f8a3a")), length, lean);
+    leaf.position.y = 0.112;
+    stem.add(leaf);
+  });
+  return stem;
+}
+
+// A sprig of cilantro: a thin stem with three lobed leaflets at its tip.
+function cilantroSprig(seed, length) {
+  const stem = mesh(new THREE.CylinderGeometry(0.0011, 0.0016, length, 5), paint("#6a9a45"));
+  const leaves = [0, 1, 2, 3, 4].map((leaf) =>
+    mesh(lumpy(new THREE.SphereGeometry(0.014, 12, 8), 0.22), paint(leaf % 2 ? "#4f8f3e" : "#3f7f3a"), (m) => {
+      const angle = leaf * 2.4 + seed;
+      const along = leaf > 2 ? -0.025 * (leaf - 2) : 0;
+      m.scale.set(1, 0.22, 0.8);
+      m.position.set(Math.cos(angle) * 0.011, length / 2 + 0.004 + along, Math.sin(angle) * 0.011);
+      m.rotation.set(hash(seed, leaf, 1) * 0.8 - 0.4, angle, hash(seed, leaf, 2) * 0.6 - 0.3);
+    }),
+  );
+  return { stem, leaves };
+}
+
+// A lime, whole, with a nub at each end; or cut in half to show its pale segments.
+function lime(cut) {
+  const skin = paint("#5f9a2e");
+  if (!cut) {
+    return group(
+      mesh(grown([0.026, 0.023, 0.023], 4.1, 0.03), skin, (m) => (m.position.y = 0.023)),
+      mesh(new THREE.SphereGeometry(0.004, 8, 6), skin, (m) => m.position.set(0.027, 0.023, 0)),
+    );
+  }
+  const half = mesh(new THREE.SphereGeometry(0.025, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), skin, (m) => {
+    m.rotation.x = Math.PI;
+    m.position.y = 0.025;
+  });
+  const flesh = mesh(new THREE.CircleGeometry(0.023, 24), paint("#d8e6a0"), (m) => {
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = 0.0252;
+  });
+  const segments = group(...Array.from({ length: 8 }, (_, index) => mesh(new THREE.BoxGeometry(0.021, 0.0008, 0.0012), paint("#a9c26a"), (m) => {
+    m.rotation.y = (index * Math.PI) / 8;
+    m.position.y = 0.0256;
+  })));
+  segments.traverse((child) => (child.userData.noOutline = true));
+  return group(half, flesh, segments);
+}
+
+// A drumstick with its thigh (pernil): plump skin-on meat narrowing to the knob of the bone.
+function drumstick(seed) {
+  const meat = lumpy(lathe([[0, 0], [0.014, 0.004], [0.027, 0.028], [0.029, 0.05], [0.021, 0.076], [0.009, 0.095], [0.006, 0.106], [0, 0.106]], 18), 0.05);
+  return group(
+    mesh(meat, paint("#e3b98a"), (m) => {
+      m.scale.set(1, 1, 0.7);
+      m.rotation.set(0, seed, Math.PI / 2);
+      m.position.set(0.053, 0.021, 0);
+    }),
+    mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.014, 8), paint("#efe6d6"), (m) => {
+      m.rotation.z = Math.PI / 2;
+      m.position.set(-0.05, 0.021, 0);
+    }),
+    mesh(new THREE.SphereGeometry(0.0078, 10, 8), paint("#efe6d6"), (m) => m.position.set(-0.059, 0.021, 0)),
+  );
+}
+
+// A pea pod: a green shell drawn to a point at both ends; open, it lies on its back with the peas in a row.
+function peaPod(open, seed) {
+  const geometry = new THREE.CapsuleGeometry(0.014, 0.09, 4, 14);
+  const position = geometry.attributes.position;
+  for (let index = 0; position.count > index; index++) {
+    const along = Math.min(1, Math.abs(position.getY(index)) / 0.059);
+    const taper = 1 - 0.55 * along ** 3;
+    const z = position.getZ(index);
+    position.setX(index, position.getX(index) * taper);
+    position.setZ(index, (open && z > 0 ? z * 0.12 : z) * taper * 0.8);
+  }
+  geometry.computeVertexNormals();
+  const pod = group(mesh(geometry, paint("#6aa04a")));
+  if (open) {
+    for (let pea = 0; 5 > pea; pea++) pod.add(mesh(new THREE.SphereGeometry(0.0092, 12, 8), paint("#9ccc5a"), (m) => m.position.set(0, (pea - 2) * 0.018, 0.005)));
+  }
+  pod.rotation.set(-Math.PI / 2, seed, 0);
+  pod.position.y = 0.011;
+  return pod;
+}
+
+// A corn kernel grid pressed into the ear: rows round it and kernels along it, each a small dome.
+function cornEar() {
+  // Many rings along the ear, so the kernels have vertices to rise on: the radius swells from the stalk end and closes to the tip.
+  const profile = Array.from({ length: 64 }, (_, index) => {
+    const along = index / 63;
+    return [0.023 * Math.sin((Math.PI / 2) * Math.min(1, along * 4)) ** 0.5 * (1 - 0.8 * along ** 5), along * 0.16];
+  });
+  const geometry = lathe([...profile, [0, 0.161]], 56);
+  const position = geometry.attributes.position;
+  for (let index = 0; position.count > index; index++) {
+    const x = position.getX(index);
+    const z = position.getZ(index);
+    const y = position.getY(index);
+    const bump = 1 + 0.12 * Math.abs(Math.sin(Math.atan2(z, x) * 7)) ** 0.5 * Math.abs(Math.sin(y * 400)) ** 0.5;
+    position.setX(index, x * bump);
+    position.setZ(index, z * bump);
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function carton(color, band) {
   const box = mesh(new RoundedBoxGeometry(0.07, 0.18, 0.07, 2, 0.006), paint(color, { roughness: 0.7 }), (m) => (m.position.y = 0.09));
   const roof = new THREE.Shape([new THREE.Vector2(-0.035, 0), new THREE.Vector2(0.035, 0), new THREE.Vector2(0, 0.03)]);
@@ -400,6 +526,21 @@ const DETAILED = {
     }));
     return bunch;
   },
+  "Creole potato": (grams) => cluster(() => potato(2), count(grams, 45, 8), 0.05),
+  Lime: (grams) => cluster((index) => lime(index === 1), count(grams, 60, 6), 0.055),
+  Orange: (grams) => cluster(() => FOODS.Orange(), count(grams, 200, 5), 0.08),
+  "Chicken thighs": (grams) => {
+    const pieces = count(grams, 150, 3);
+    const tray = group(mesh(new RoundedBoxGeometry(0.17, 0.014, 0.12, 2, 0.004), paint("#ffffff"), (m) => (m.position.y = 0.007)));
+    for (let index = 0; pieces > index; index++) {
+      const piece = drumstick(index * 0.4);
+      piece.position.set((index % 2 ? 0.014 : -0.014), 0.012, (index - (pieces - 1) / 2) * 0.052);
+      piece.rotation.y = (index % 2 ? Math.PI : 0) + (index - 1) * 0.08;
+      tray.add(piece);
+    }
+    return tray;
+  },
+  Mango: (grams) => cluster(() => FOODS.Mango(), count(grams, 300, 3), 0.09),
   "Chicken breast": (grams) => {
     const tray = group(
       mesh(new RoundedBoxGeometry(0.17, 0.018, 0.11, 2, 0.005), paint("#ffffff"), (m) => (m.position.y = 0.009)),
@@ -580,6 +721,153 @@ const FOODS = {
         m.userData.noOutline = true;
       })),
     ),
+  "Creole potato": () => potato(2),
+  // Cebolla larga: three stalks tied in a bunch, lying down, the white stems together and the leaves fanning out.
+  "Green onion": () => {
+    const bunch = group(...[-1, 0, 1].map((place) => {
+      const stalk = greenOnion(place + 2);
+      stalk.rotation.set(place * 0.08, 0, -Math.PI / 2);
+      stalk.position.set(-0.1, 0.011, place * 0.017);
+      return stalk;
+    }));
+    bunch.add(mesh(new RoundedBoxGeometry(0.008, 0.026, 0.056, 2, 0.003), paint(css("--color-tomate")), (m) => m.position.set(-0.04, 0.012, 0)));
+    return bunch;
+  },
+  // A bunch of cilantro: thin stems tied at the root, opening into lacy leaves.
+  Cilantro: () => {
+    const stems = [];
+    const leaves = [];
+    for (let sprig = 0; 9 > sprig; sprig++) {
+      const length = 0.075 + hash(sprig, 3, 1) * 0.035;
+      const { stem, leaves: tips } = cilantroSprig(sprig * 1.7, length);
+      const pivot = group(stem, ...tips);
+      stem.position.y = length / 2;
+      tips.forEach((tip) => (tip.position.y += length / 2));
+      pivot.rotation.set((sprig - 4) * 0.16, 0, hash(sprig, 5, 2) * 0.3 - 0.15);
+      (sprig % 2 ? leaves : stems).push(pivot);
+    }
+    const bunch = merged(group(...stems, ...leaves));
+    bunch.add(merged(group(...[-0.5, 0, 0.5].map((lean) => leaning(mesh(new THREE.CylinderGeometry(0.0007, 0.0012, 0.014, 4), paint("#d8c9a0")), 0.014, Math.PI + lean)))));
+    bunch.add(mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.006, 12), paint(css("--color-tomate")), (m) => (m.position.y = 0.014)));
+    bunch.rotation.z = -Math.PI / 2;
+    bunch.position.set(-0.07, 0.012, 0);
+    return group(bunch);
+  },
+  Lime: () => lime(false),
+  // An orange: round under a dimpled peel, the nub of its stalk and a small leaf.
+  Orange: () =>
+    group(
+      mesh(lumpy(new THREE.SphereGeometry(0.038, 28, 20), 0.025), paint("#ee9a2e"), (m) => (m.position.y = 0.037)),
+      mesh(new THREE.CylinderGeometry(0.0025, 0.003, 0.006, 6), paint("#5a6a2a"), (m) => (m.position.y = 0.076)),
+      mesh(new THREE.SphereGeometry(0.012, 10, 6), paint("#3d7a3a"), (m) => {
+        m.scale.set(1.5, 0.15, 0.6);
+        m.position.set(0.012, 0.077, 0.002);
+        m.rotation.set(0, 0.4, 0.25);
+      }),
+    ),
+  // Queso doble crema: a yellower block than queso campesino, in clear plastic crimped at the ends, with a blue printed band.
+  "Double cream cheese": () =>
+    group(
+      mesh(new RoundedBoxGeometry(0.11, 0.045, 0.07, 3, 0.008), paint("#f2dc8c"), (m) => (m.position.y = 0.0225)),
+      mesh(new THREE.BoxGeometry(0.05, 0.002, 0.072), paint("#3f6f8f"), (m) => (m.position.y = 0.046)),
+      mesh(new RoundedBoxGeometry(0.116, 0.049, 0.074, 2, 0.01), paint("#ffffff", { transparent: true, opacity: 0.25 }), (m) => (m.position.y = 0.0235)),
+      ...[-1, 1].map((end) => mesh(new THREE.BoxGeometry(0.012, 0.03, 0.05), paint("#ffffff", { transparent: true, opacity: 0.35 }), (m) => m.position.set(end * 0.064, 0.022, 0))),
+    ),
+  // A beef steak: a flat red cut, marbled, with its edge of white fat, on a tray.
+  "Beef steak": () => {
+    const cut = new THREE.Shape();
+    cut.moveTo(-0.06, -0.01);
+    cut.bezierCurveTo(-0.06, 0.04, 0.01, 0.045, 0.05, 0.03);
+    cut.bezierCurveTo(0.07, 0.02, 0.065, -0.03, 0.035, -0.038);
+    cut.bezierCurveTo(0.0, -0.045, -0.06, -0.04, -0.06, -0.01);
+    const fat = new THREE.Shape();
+    fat.moveTo(-0.062, -0.01);
+    fat.bezierCurveTo(-0.062, -0.043, 0.0, -0.05, 0.037, -0.042);
+    fat.bezierCurveTo(0.0, -0.036, -0.054, -0.034, -0.062, -0.01);
+    const slab = (shape, color, depth, y) => mesh(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelSize: 0.003, bevelThickness: 0.003, bevelSegments: 2, curveSegments: 20 }), paint(color), (m) => {
+      m.rotation.x = -Math.PI / 2;
+      m.position.y = y;
+    });
+    const marbling = group(...[[-0.02, 0.004, 0.4], [0.015, -0.012, -0.3], [0.01, 0.016, 0.9]].map(([x, z, turn]) => mesh(new THREE.BoxGeometry(0.03, 0.0008, 0.0025), paint("#e8c8bc"), (m) => {
+      m.position.set(x, 0.0282, z);
+      m.rotation.y = turn;
+    })));
+    marbling.traverse((child) => (child.userData.noOutline = true));
+    return group(
+      mesh(new RoundedBoxGeometry(0.16, 0.014, 0.11, 2, 0.004), paint("#ffffff"), (m) => (m.position.y = 0.007)),
+      slab(cut, "#a8332c", 0.011, 0.014),
+      slab(fat, "#efe2c8", 0.012, 0.014),
+      marbling,
+    );
+  },
+  "Chicken thighs": () => drumstick(0),
+  // Mora de Castilla: dark berries heaped in a clear tub with a printed sticker.
+  Blackberries: () => {
+    const berries = [];
+    for (let index = 0; 14 > index; index++) {
+      const row = Math.floor(index / 5);
+      // Each berry is a knot of small drupelets round a core, as a mora is.
+      const drupelets = new THREE.IcosahedronGeometry(1, 1).attributes.position;
+      const berry = group(mesh(new THREE.SphereGeometry(0.0075, 10, 8), paint("#1d0d1a")));
+      for (let seed = 0; drupelets.count > seed; seed += 3) {
+        berry.add(mesh(new THREE.SphereGeometry(0.0042, 7, 5), paint(index % 4 ? "#1d0d1a" : "#4a1838"), (m) => m.position.set(drupelets.getX(seed) * 0.0072, drupelets.getY(seed) * 0.0086, drupelets.getZ(seed) * 0.0072)));
+      }
+      berry.position.set(((index % 5) - 2) * 0.019 + (row % 2) * 0.009, 0.012 + row * 0.011, (hash(index, 1, 3) - 0.5) * 0.04);
+      berry.rotation.set(hash(index, 2, 3) * 3, hash(index, 3, 3) * 3, 0);
+      berries.push(berry);
+    }
+    return group(
+      merged(group(...berries)),
+      mesh(new RoundedBoxGeometry(0.11, 0.05, 0.07, 2, 0.006), paint("#ffffff", { transparent: true, opacity: 0.22 }), (m) => (m.position.y = 0.025)),
+      mesh(new THREE.BoxGeometry(0.03, 0.012, 0.002), paint(css("--color-mora")), (m) => m.position.set(0.03, 0.01, 0.036)),
+    );
+  },
+  // A mango lying on its side: a kidney shape, sun-red on top going to yellow-green below.
+  Mango: () => {
+    const shape = (thetaStart, thetaLength, color) => {
+      const geometry = new THREE.SphereGeometry(1, 28, 18, 0, Math.PI * 2, thetaStart, thetaLength);
+      const position = geometry.attributes.position;
+      for (let index = 0; position.count > index; index++) {
+        const x = position.getX(index);
+        const taper = 1 - 0.18 * x;
+        position.setXYZ(index, x * 0.055, position.getY(index) * 0.036 * taper, position.getZ(index) * 0.04 * taper + 0.012 * (1 - x * x));
+      }
+      geometry.computeVertexNormals();
+      return mesh(geometry, paint(color), (m) => (m.position.y = 0.036));
+    };
+    return group(
+      shape(0, 1.15, "#c8502e"),
+      shape(1.15, Math.PI - 1.15, "#c9b03c"),
+      mesh(new THREE.CylinderGeometry(0.002, 0.003, 0.008, 6), paint("#5a4a2a"), (m) => {
+        m.rotation.z = Math.PI / 2;
+        m.position.set(-0.058, 0.04, 0.0);
+      }),
+    );
+  },
+  // Arveja: two pods split open to show the peas, and one still closed.
+  "Green peas": () => group(...[[true, 0, -0.03, 0.1], [true, 0.014, 0.012, -0.2], [false, -0.01, 0.052, 0.3]].map(([open, x, z, turn], index) => {
+    const pod = group(peaPod(open, 0));
+    pod.position.set(x, 0, z);
+    pod.rotation.y = Math.PI / 2 + turn + index * 0.1;
+    return pod;
+  })),
+  // A mazorca: an ear of yellow corn with its kernels in rows, the husk peeled back from the stalk end and a tuft of silk at the tip.
+  Corn: () => {
+    const ear = mesh(cornEar(), paint("#f0c84a"));
+    const husk = [-0.9, 0, 0.9].map((turn) => {
+      const leaf = mesh(new THREE.SphereGeometry(1, 12, 8, 0, Math.PI, 0, Math.PI), paint("#b9b56a", { side: THREE.DoubleSide }), (m) => m.scale.set(0.014, 0.05, 0.006));
+      const pivot = group(leaf);
+      leaf.position.y = -0.045;
+      pivot.position.y = 0.012;
+      pivot.rotation.set(0.5, turn, 0);
+      return pivot;
+    });
+    const silk = mesh(new THREE.ConeGeometry(0.006, 0.018, 8), paint("#8a5a3a"), (m) => (m.position.y = 0.168));
+    const result = group(ear, ...husk, silk);
+    result.rotation.z = -Math.PI / 2;
+    result.position.set(-0.07, 0.024, 0);
+    return group(result);
+  },
   "Tree tomato": () => treeTomato(),
   Oca: () => oca("#c9677d"),
   Lulo: () => naranjilla(),
@@ -599,6 +887,8 @@ const BY_CATEGORY = {
   CONDIMENT: () => bottle("#7a3b22"),
   PREPARED: () => FOODS.Soup(),
 };
+
+export const FOOD_NAMES = Object.keys(FOODS);
 
 export function sized(model) {
   const box = new THREE.Box3().setFromObject(model);

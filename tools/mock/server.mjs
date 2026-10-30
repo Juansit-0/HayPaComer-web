@@ -30,6 +30,11 @@ const inventory = [
   item("i10", "Potato", 1000, TRAYS.drawer, 30),
   item("i11", "Orange juice", 1000, TRAYS.door, 9),
   item("i12", "Butter", 250, TRAYS.door, 40),
+  item("i13", "Double cream cheese", 400, TRAYS.bottom, 18),
+  item("i14", "Blackberries", 250, TRAYS.bottom, 3, ["AT_RISK"]),
+  item("i15", "Beef steak", 500, TRAYS.bottom, 2),
+  item("i16", "Green onion", 200, TRAYS.drawer, 8),
+  item("i17", "Lime", 300, TRAYS.door, 18),
 ];
 const sum = (trayId) => inventory.filter((entry) => entry.trayId === trayId).reduce((total, entry) => total + entry.grams, 0);
 const tray = (id, name) => ({ id, type: "TRAY", kind: null, name, grams: sum(id), items: inventory.filter((entry) => entry.trayId === id).length, children: [] });
