@@ -888,7 +888,7 @@ html:has(.loader:not(.done)) { overflow: hidden; }
 .f-aguacate { width: 22px; height: 30px; border-radius: 50% 50% 46% 46% / 40% 40% 60% 60%; background: #3f6b2a; }
 .f-banano, .f-platano { width: 44px; height: 14px; border-radius: 0 0 40px 40px; background: var(--color-papa); }
 .f-platano { background: #b9b13a; }
-.f-zanahoria { width: 40px; height: 12px; border-radius: 2px 20px 20px 2px; background: #e8892b; }
+.f-zanahoria { width: 42px; height: 16px; clip-path: polygon(0 0, 24% 22%, 30% 12%, 100% 50%, 30% 88%, 24% 78%, 0 100%); background: linear-gradient(90deg, #3d8a4f 24%, #e8892b 24%); }
 .f-cebolla { width: 24px; height: 24px; border-radius: 50% 50% 46% 46%; background: #e7cfc0; }
 .f-pan { width: 40px; height: 22px; border-radius: 12px 12px 4px 4px; background: #c98b4a; }
 .f-caja { width: 22px; height: 34px; border-radius: 2px; background: var(--color-cobre); }
@@ -923,6 +923,19 @@ html:has(.loader:not(.done)) { overflow: hidden; }
 .f-chorizo { width: 44px; height: 12px; border-radius: 6px; background: repeating-linear-gradient(90deg, #9a3a2a 0 13px, #d8c9a0 13px 15px); }
 .f-trucha { width: 44px; height: 16px; border-radius: 50% 30% 30% 50%; clip-path: polygon(0 50%, 15% 0, 80% 15%, 100% 0, 100% 100%, 80% 85%, 15% 100%); background: linear-gradient(180deg, #7f8c6a 45%, #d98a8a 45% 60%, #7f8c6a 60%); }
 .f-panela { width: 30px; height: 22px; border-radius: 6px / 4px; background: linear-gradient(90deg, #9a5a26 50%, #b9a46a 50%); }
+.f-frasco.f-frijol { background: #7a2e24; }
+.f-mote { width: 24px; height: 28px; border-radius: 40% 40% 6px 6px; background: linear-gradient(180deg, #f3eddc 70%, #e0b84a 70%); box-shadow: inset 0 0 0 1px #d9cfb4; }
+.f-avena { width: 22px; height: 30px; border-radius: 4px; background: linear-gradient(180deg, var(--color-papa) 5px, #ece0c4 5px 11px, var(--color-cobre) 11px 21px, #ece0c4 21px); }
+.f-aceite { width: 16px; height: 36px; border-radius: 6px 6px 4px 4px; background: linear-gradient(180deg, #2f7a4a 5px, #e9c24a 5px 15px, var(--color-cilantro) 15px 24px, #e9c24a 24px); }
+.f-cafe { width: 22px; height: 30px; border-radius: 4px; background: radial-gradient(circle at 50% 20%, #1c1712 2px, transparent 3px), linear-gradient(180deg, #3a2618 12px, #d8b47a 12px 22px, #3a2618 22px); }
+.f-aji { width: 18px; height: 22px; border-radius: 4px; background: linear-gradient(180deg, #2b2a22 5px, #b8432a 5px 10px, #4f8a3a 10px 15px, #b8432a 15px); }
+.f-repollo { width: 28px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #c9dc9a 7px, #8fb56a 8px); }
+.f-lechuga { width: 32px; height: 22px; border-radius: 50% 50% 40% 40%; background: radial-gradient(circle at 50% 70%, #a6d26a 6px, #6aa04a 7px); }
+.f-manzana { width: 26px; height: 24px; border-radius: 45% 45% 50% 50%; background: #b8302a; }
+.f-pina { width: 22px; height: 34px; border-radius: 3px 3px 50% 50% / 3px 3px 40% 40%; background: linear-gradient(180deg, #4f7a3a 11px, #c9902e 11px); }
+.f-chuleta { width: 40px; height: 24px; border-radius: 50% 60% 50% 40%; background: radial-gradient(ellipse 30% 50% at 30% 50%, #efe6d6 70%, transparent 75%), #e8a8a0; box-shadow: inset 0 0 0 3px #f4ead8; }
+.f-cuy { width: 42px; height: 18px; border-radius: 50%; background: radial-gradient(ellipse 35% 45% at 45% 50%, #a8572a 90%, transparent 95%), #f6f2e8; }
+.f-sobras { width: 36px; height: 22px; border-radius: 4px; background: linear-gradient(180deg, #3f6f8f 6px, transparent 6px), linear-gradient(90deg, #f3efe4 50%, #8a4a2a 50%); }
 .f-mazorca { width: 42px; height: 16px; border-radius: 4px 50% 50% 4px; background: repeating-linear-gradient(90deg, #f0c84a 0 4px, #d9ac2e 4px 5px); }
 .f-otro { width: 22px; height: 22px; border-radius: 6px; background: var(--color-meson-strong); }
 
