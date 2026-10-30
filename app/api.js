@@ -3,6 +3,12 @@ import { t } from "./i18n.js";
 const KEYS = { access: "hpc.access", refresh: "hpc.refresh", household: "hpc.household" };
 const LOCK = "hpc.refresh";
 const EARLY_SECONDS = 30;
+// Every request has an end: one attempt waits at most ATTEMPT_MS (above the 60 s the AI provider may take), and while the server wakes up
+// (Render sleeps an idle service and answers 502 or 503 for about a minute) the request is tried again until PATIENCE_MS have passed, then
+// fails with a clear error.
+const ATTEMPT_MS = 75000;
+const PATIENCE_MS = 150000;
+const WAKING = new Set([502, 503, 504]);
 
 export class ApiError extends Error {
   constructor(problem, status) {
@@ -56,9 +62,57 @@ function signedOut() {
   window.dispatchEvent(new Event("hpc:signed-out"));
 }
 
+// How many requests are waiting and since when, told to the shell (hpc:network) so it can say the server is loading.
+const waiting = new Set();
+function tell() {
+  const since = waiting.size ? Math.min(...waiting) : 0;
+  window.dispatchEvent(new CustomEvent("hpc:network", { detail: { waiting: waiting.size, since } }));
+}
+
+async function attempt(url, init) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ATTEMPT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// A read is tried again after a timeout or a dropped connection; a write only when it never reached the server (no connection) or the
+// proxy answered for a sleeping server, so nothing is saved twice.
+export async function patiently(url, init = {}) {
+  const read = !init.method || init.method === "GET";
+  const started = Date.now();
+  waiting.add(started);
+  tell();
+  try {
+    for (let pause = 1000; ; pause = Math.min(pause * 2, 8000)) {
+      let response = null;
+      let failure = null;
+      try {
+        response = await attempt(url, init);
+      } catch (error) {
+        failure = error;
+      }
+      const retry = failure ? read || failure.name !== "AbortError" : WAKING.has(response.status) && !response.headers.get("Content-Type")?.includes("problem");
+      const late = Date.now() - started + pause > PATIENCE_MS;
+      if (response && (!retry || late)) return response;
+      if (!retry || late) {
+        window.dispatchEvent(new Event("hpc:network-failed"));
+        throw new ApiError({ title: t("net.failed") }, 0);
+      }
+      await new Promise((resolve) => setTimeout(resolve, pause));
+    }
+  } finally {
+    waiting.delete(started);
+    tell();
+  }
+}
+
 async function exchange(used) {
   if (session.refresh !== used) return Boolean(session.access);
-  const response = await fetch("/api/v1/auth/refresh", {
+  const response = await patiently("/api/v1/auth/refresh", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ refreshToken: used }),
@@ -100,7 +154,7 @@ async function send(path, { method = "GET", body, auth = true } = {}) {
     const access = await freshAccess();
     if (access) headers.Authorization = `Bearer ${access}`;
   }
-  return fetch(`/api/v1${path}`, {
+  return patiently(`/api/v1${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),

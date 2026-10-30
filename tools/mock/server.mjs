@@ -40,8 +40,8 @@ const sum = (trayId) => inventory.filter((entry) => entry.trayId === trayId).red
 const tray = (id, name) => ({ id, type: "TRAY", kind: null, name, grams: sum(id), items: inventory.filter((entry) => entry.trayId === id).length, children: [] });
 const fridges = () => [{ id: F, type: "FRIDGE", kind: null, name: "Kitchen", grams: inventory.reduce((total, entry) => total + entry.grams, 0), items: inventory.length, children: [
   { id: "z1", type: "ZONE", kind: "SHELF", name: "Shelves", grams: 0, items: 0, children: [tray(TRAYS.top, "Top"), tray(TRAYS.middle, "Middle"), tray(TRAYS.bottom, "Bottom")] },
-  { id: "z2", type: "ZONE", kind: "DRAWER", name: "Vegetable drawer", grams: 0, items: 0, children: [tray(TRAYS.drawer, "Drawer")] },
-  { id: "z3", type: "ZONE", kind: "DOOR", name: "Door", grams: 0, items: 0, children: [tray(TRAYS.door, "Door shelf")] },
+  { id: "z2", type: "ZONE", kind: "DRAWER", name: "Drawer", grams: 0, items: 0, children: [tray(TRAYS.drawer, "Vegetables")] },
+  { id: "z3", type: "ZONE", kind: "DOOR", name: "Door", grams: 0, items: 0, children: [tray(TRAYS.door, "Rack")] },
 ] }];
 const requirement = (food, grams) => ({ food, grams, verdict: "ENOUGH", availableGrams: grams, shortfallGrams: 0, substitute: null });
 const recipe = (name, minutes, foods) => ({ id: name, name, servings: 2, minutes, requirements: foods.map(([food, grams]) => ({ food, grams, optional: false })), steps: [{ instruction: "Cook", timerSeconds: null, weighFood: null, weighGrams: null }] });

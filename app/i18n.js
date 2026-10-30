@@ -1,3 +1,4 @@
+import { patiently } from "./api.js";
 const STORE = "hpc.locale";
 const CACHE = "hpc.texts.";
 const FALLBACK = "es-CO";
@@ -75,7 +76,7 @@ export function formatTime(iso) {
 async function fetchTexts(code) {
   const cached = read(CACHE + code);
   const known = cached ? JSON.parse(cached) : null;
-  const response = await fetch(`/api/v1/i18n/${encodeURIComponent(code)}`, {
+  const response = await patiently(`/api/v1/i18n/${encodeURIComponent(code)}`, {
     headers: known?.etag ? { "If-None-Match": known.etag } : {},
     cache: "no-cache",
   }).catch(() => null);
@@ -99,7 +100,7 @@ export function translatePage(root = document) {
 
 export async function loadLocale(code) {
   if (!available.length) {
-    const info = await fetch("/api/v1/i18n", { cache: "no-cache" })
+    const info = await patiently("/api/v1/i18n", { cache: "no-cache" })
       .then((response) => (response.ok ? response.json() : null))
       .catch(() => null);
     available = info?.available ?? [{ code: FALLBACK, name: "Español", isDefault: true }];

@@ -1,4 +1,4 @@
-import { api, freshAccess } from "./api.js";
+import { api, freshAccess, patiently } from "./api.js";
 import { foodName, formatDay, formatMoney, formatNumber, t } from "./i18n.js";
 import { esc, foodOptions, formData, grams, moneyField, moneyValue, showError, ticker, toast, wireFoodSearch, wireSteppers } from "./ui.js";
 import { easing, reduced, token } from "./motion.js";
@@ -112,7 +112,7 @@ function ring({ key, grams: amount, rate }) {
 }
 
 async function download(base, format, from, to) {
-  const response = await fetch(`/api/v1${base}/analytics/report?format=${format}&from=${from}&to=${to}`, {
+  const response = await patiently(`/api/v1${base}/analytics/report?format=${format}&from=${from}&to=${to}`, {
     headers: { Authorization: `Bearer ${await freshAccess()}` },
   });
   if (!response.ok) {

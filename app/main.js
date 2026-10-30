@@ -25,6 +25,36 @@ const bar = document.querySelector(".bar");
 const accountButton = document.querySelector("[data-account]");
 const accountMenu = document.querySelector("[data-account-menu]");
 const tabsBlot = tabs.querySelector(".tabs-blot");
+// Says when the server is slow to answer: a thin running line after a moment, words after a few seconds, and when api.js gives up (it
+// never waits more than its patience), why and a way to try again.
+const net = document.querySelector("[data-net]");
+const netNote = net.querySelector("[data-net-note]");
+let netTimers = [];
+function netState(state, key) {
+  net.dataset.state = state;
+  netNote.textContent = key ? t(key) : "";
+}
+window.addEventListener("hpc:network", ({ detail }) => {
+  netTimers.forEach(clearTimeout);
+  netTimers = [];
+  if (!detail.waiting) {
+    if (net.dataset.state !== "failed") netState("idle");
+    return;
+  }
+  if (net.dataset.state === "failed") netState("idle");
+  const waited = Date.now() - detail.since;
+  [[700, "busy"], [4000, "slow", "net.slow"], [12000, "waking", "net.waking"]].forEach(([at, state, key]) => {
+    netTimers.push(setTimeout(() => netState(state, key), Math.max(0, at - waited)));
+  });
+});
+window.addEventListener("hpc:network-failed", () => {
+  netTimers.forEach(clearTimeout);
+  netState("failed", "net.failed");
+});
+net.querySelector("[data-net-retry]").addEventListener("click", () => {
+  netState("idle");
+  render({ refresh: true });
+});
 const syncSound = () => document.querySelectorAll("[data-sound]").forEach((button) => button.setAttribute("aria-pressed", String(soundOn())));
 syncSound();
 document.addEventListener("click", (event) => {

@@ -1,5 +1,5 @@
 import { art } from "./art/drawings.js";
-import { api, freshAccess } from "./api.js";
+import { api, freshAccess, patiently } from "./api.js";
 import { reduced } from "./motion.js";
 import { foodName, formatDay, formatMoney, formatNumber, placeName, plural, t } from "./i18n.js";
 import { focusFood, shapeClass, takeFocusRequest, undoable } from "./stage.js";
@@ -198,7 +198,7 @@ async function readLabel(base, values, file, tray) {
   body.append("zone", tray.zone);
   body.append("opened", String(Boolean(values.opened)));
   const access = await freshAccess();
-  const response = await fetch(`/api/v1${base}/items/expiry-from-photo`, {
+  const response = await patiently(`/api/v1${base}/items/expiry-from-photo`, {
     method: "POST",
     headers: { Authorization: `Bearer ${access}` },
     body,
