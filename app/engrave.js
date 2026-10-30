@@ -420,6 +420,130 @@ function cornEar() {
   return geometry;
 }
 
+// An arracacha root: thick, pale yellow and knobbly, narrowing to a blunt point, with flecks of its brown skin.
+function arracacha(seed) {
+  const root = lumpy(lathe([[0, 0], [0.006, 0.006], [0.013, 0.03], [0.019, 0.07], [0.02, 0.1], [0.015, 0.118], [0, 0.122]], 18), 0.07);
+  return mesh(root, paint("#e6d28a"), (m) => {
+    m.rotation.set(seed * 0.4, 0, -Math.PI / 2);
+    m.position.set(-0.06, 0.019, 0);
+  });
+}
+
+// An ulluco: a small glossy tuber, yellow or pink, a little longer than round.
+function ulluco(index) {
+  const size = [0.02, 0.014, 0.015];
+  return mesh(grown(size, index * 2.3 + 0.7, 0.05), paint(index % 3 === 1 ? "#e07a8a" : "#e8c74a"), (m) => (m.position.y = size[1]));
+}
+
+// A wedge cut from a ridged squash (ahuyama): green rind round the back, orange flesh on the two cut faces, seeds near the middle.
+function squashWedge() {
+  const profile = [[0.012, 0], [0.045, 0.004], [0.068, 0.025], [0.072, 0.045], [0.06, 0.068], [0.03, 0.08], [0.012, 0.082]];
+  const open = 1.1;
+  const wedge = new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), 16, 0, open);
+  const position = wedge.attributes.position;
+  for (let index = 0; position.count > index; index++) {
+    const rib = 1 + 0.04 * Math.cos(Math.atan2(position.getX(index), position.getZ(index)) * 9);
+    position.setX(index, position.getX(index) * rib);
+    position.setZ(index, position.getZ(index) * rib);
+  }
+  wedge.computeVertexNormals();
+  const face = () => {
+    const shape = new THREE.Shape([new THREE.Vector2(0, 0), ...profile.map(([x, y]) => new THREE.Vector2(x * 0.97, y)), new THREE.Vector2(0, 0.082)]);
+    return new THREE.ShapeGeometry(shape);
+  };
+  const flesh = paint("#e88a2a", { side: THREE.DoubleSide });
+  const seeds = paint("#f0d79a");
+  const piece = group(
+    mesh(wedge, paint("#3f5a2e")),
+    ...[0, open].map((phi) => {
+      const cut = group(
+        mesh(face(), flesh),
+        mesh(new THREE.CircleGeometry(0.012, 12), seeds, (m) => {
+          m.scale.set(1, 2, 1);
+          m.position.set(0.02, 0.04, 0.0005 * (phi ? -1 : 1));
+          m.userData.noOutline = true;
+        }),
+      );
+      cut.rotation.y = phi - Math.PI / 2;
+      return cut;
+    }),
+  );
+  piece.rotation.y = Math.PI - 0.3;
+  piece.scale.setScalar(1.35);
+  return group(piece);
+}
+
+// A papaya cut lengthwise and lying on its back: orange flesh round a hollow full of black seeds.
+function papayaHalf() {
+  const skin = mesh(new THREE.SphereGeometry(1, 28, 14, 0, Math.PI), paint("#c9a23a"), (m) => {
+    m.rotation.x = Math.PI / 2;
+    m.scale.set(0.09, 0.045, 0.04);
+    m.position.y = 0.04;
+  });
+  const flesh = mesh(new THREE.CircleGeometry(1, 32), paint("#ef7a3a"), (m) => {
+    m.rotation.x = -Math.PI / 2;
+    m.scale.set(0.088, 0.044, 1);
+    m.position.y = 0.0402;
+  });
+  const hollow = mesh(new THREE.CircleGeometry(1, 24), paint("#c95a2a"), (m) => {
+    m.rotation.x = -Math.PI / 2;
+    m.scale.set(0.05, 0.017, 1);
+    m.position.set(0.006, 0.0405, 0);
+    m.userData.noOutline = true;
+  });
+  const seeds = [];
+  for (let seed = 0; 22 > seed; seed++) {
+    seeds.push(mesh(new THREE.SphereGeometry(0.0036, 6, 5), paint("#1c1712"), (m) => m.position.set(0.006 + (hash(seed, 1, 7) - 0.5) * 0.085, 0.042, (hash(seed, 2, 7) - 0.5) * 0.026)));
+  }
+  return group(skin, flesh, hollow, merged(group(...seeds)));
+}
+
+// A link of chorizo: a plump sausage tied at both ends.
+function chorizoLink() {
+  return group(
+    mesh(new THREE.CapsuleGeometry(0.014, 0.045, 6, 14), paint("#9a3a2a"), (m) => (m.rotation.z = Math.PI / 2)),
+    ...[-1, 1].map((end) => mesh(new THREE.SphereGeometry(0.004, 8, 6), paint("#d8c9a0"), (m) => (m.position.x = end * 0.037))),
+  );
+}
+
+// A trout lying on its side: a long body tapering to the tail fin, olive back, a pink stripe and dark spots.
+function trout() {
+  const body = new THREE.SphereGeometry(1, 32, 16);
+  const position = body.attributes.position;
+  for (let index = 0; position.count > index; index++) {
+    const x = position.getX(index);
+    const narrow = x > 0 ? 1 - 0.75 * x * x : 1 - 0.25 * x * x;
+    position.setXYZ(index, x * 0.085, position.getY(index) * 0.016 * narrow, position.getZ(index) * 0.03 * narrow);
+  }
+  body.computeVertexNormals();
+  const tail = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.04, 0.028), new THREE.Vector2(0.032, 0), new THREE.Vector2(0.04, -0.028)]);
+  // The height of the flank at (x, z), so the marks lie on the body rather than cutting through it.
+  const flank = (x, z) => {
+    const u = x / 0.085;
+    const narrow = u > 0 ? 1 - 0.75 * u * u : 1 - 0.25 * u * u;
+    return 0.018 + 0.016 * narrow * Math.sqrt(Math.max(0, 1 - u * u - (z / (0.03 * narrow)) ** 2)) + 0.0004;
+  };
+  const dot = (x, z, radius, color, stretch = 1) => mesh(new THREE.CircleGeometry(radius, 8), paint(color), (m) => {
+    m.rotation.x = -Math.PI / 2;
+    m.scale.x = stretch;
+    m.position.set(x, flank(x, z), z);
+  });
+  const marks = group(
+    ...Array.from({ length: 9 }, (_, step) => dot(-0.05 + step * 0.012, 0.002, 0.0042, "#d98a8a", 1.8)),
+    ...Array.from({ length: 16 }, (_, spot) => dot((hash(spot, 1, 9) - 0.55) * 0.12, (hash(spot, 2, 9) - 0.5) * 0.03, 0.0022, "#2b2a22")),
+    dot(-0.066, -0.004, 0.0045, "#1c1712"),
+  );
+  marks.traverse((child) => (child.userData.noOutline = true));
+  return group(
+    mesh(body, paint("#7f8c6a"), (m) => (m.position.y = 0.018)),
+    mesh(new THREE.ShapeGeometry(tail), paint("#6a7458", { side: THREE.DoubleSide }), (m) => {
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(0.078, 0.018, 0);
+    }),
+    marks,
+  );
+}
+
 function carton(color, band) {
   const box = mesh(new RoundedBoxGeometry(0.07, 0.18, 0.07, 2, 0.006), paint(color, { roughness: 0.7 }), (m) => (m.position.y = 0.09));
   const roof = new THREE.Shape([new THREE.Vector2(-0.035, 0), new THREE.Vector2(0.035, 0), new THREE.Vector2(0, 0.03)]);
@@ -525,6 +649,21 @@ const DETAILED = {
       m.position.set(-0.09, 0.03, 0);
     }));
     return bunch;
+  },
+  Ulluco: (grams) => cluster((index) => ulluco(index), count(grams, 25, 9), 0.042),
+  Pepper: (grams) => cluster(() => FOODS.Pepper(), count(grams, 150, 3), 0.085),
+  Granadilla: (grams) => cluster(() => FOODS.Granadilla(), count(grams, 90, 5), 0.075),
+  Chorizo: (grams) => {
+    const links = count(grams, 80, 5);
+    const chain = new THREE.Group();
+    for (let index = 0; links > index; index++) {
+      const link = chorizoLink();
+      const angle = (index - (links - 1) / 2) * 0.55;
+      link.position.set(Math.sin(angle) * 0.14, 0.014, 0.14 - Math.cos(angle) * 0.14);
+      link.rotation.y = -angle;
+      chain.add(link);
+    }
+    return chain;
   },
   "Creole potato": (grams) => cluster(() => potato(2), count(grams, 45, 8), 0.05),
   Lime: (grams) => cluster((index) => lime(index === 1), count(grams, 60, 6), 0.055),
@@ -867,6 +1006,127 @@ const FOODS = {
     result.rotation.z = -Math.PI / 2;
     result.position.set(-0.07, 0.024, 0);
     return group(result);
+  },
+  // Arracacha: two pale roots and the knob of the crown they grew from.
+  Arracacha: () =>
+    group(
+      arracacha(0),
+      group(arracacha(1)).rotateY(-0.35).translateZ(0.036),
+      mesh(lumpy(new THREE.SphereGeometry(0.014, 12, 8), 0.12), paint("#8a6a7a"), (m) => m.position.set(-0.066, 0.018, 0.008)),
+    ),
+  Ulluco: () => ulluco(0),
+  // A yuca root: long, its bark brown and rough, the cut end showing the white flesh and the line of its core.
+  Yuca: () =>
+    group(
+      group(
+      mesh(lumpy(lathe([[0, 0], [0.008, 0.004], [0.017, 0.04], [0.024, 0.11], [0.025, 0.17], [0, 0.17]], 18), 0.05), paint("#7a4e2c"), (m) => {
+        m.rotation.z = Math.PI / 2;
+        m.position.set(0.085, 0.025, 0);
+      }),
+      mesh(new THREE.CircleGeometry(0.026, 20), paint("#f4efe2"), (m) => {
+        m.rotation.y = -Math.PI / 2;
+        m.position.set(-0.0885, 0.025, 0);
+      }),
+      mesh(new THREE.RingGeometry(0.004, 0.006, 16), paint("#d9cfb4"), (m) => {
+        m.rotation.y = -Math.PI / 2;
+        m.position.set(-0.089, 0.025, 0);
+        m.userData.noOutline = true;
+      }),
+    ).rotateY(0.7),
+    ),
+  // A head of garlic: a white bulb pinched into cloves, drawn to a dry stalk, and one clove broken off.
+  Garlic: () => {
+    const bulb = lathe([[0, 0], [0.012, 0.002], [0.026, 0.014], [0.027, 0.028], [0.016, 0.044], [0.004, 0.054], [0.003, 0.064], [0, 0.064]], 32);
+    const position = bulb.attributes.position;
+    for (let index = 0; position.count > index; index++) {
+      const lobe = 1 + 0.08 * Math.cos(Math.atan2(position.getZ(index), position.getX(index)) * 8);
+      position.setX(index, position.getX(index) * lobe);
+      position.setZ(index, position.getZ(index) * lobe);
+    }
+    bulb.computeVertexNormals();
+    return group(
+      mesh(bulb, paint("#f1ebe0"), (m) => m.scale.setScalar(1.25)),
+      mesh(lathe([[0, 0], [0.007, 0.004], [0.008, 0.014], [0.003, 0.026], [0, 0.028]], 12), paint("#ece2cf"), (m) => {
+        m.rotation.set(0, 0, 1.3);
+        m.position.set(0.045, 0.008, 0.01);
+      }),
+    );
+  },
+  // A red pepper (pimentón): glossy, taller than wide, four lobes at its foot and a bent green stalk.
+  Pepper: () => {
+    const body = lathe([[0, 0.006], [0.016, 0.001], [0.03, 0.008], [0.036, 0.03], [0.037, 0.058], [0.031, 0.074], [0.014, 0.08], [0.007, 0.075], [0, 0.074]], 32);
+    const position = body.attributes.position;
+    for (let index = 0; position.count > index; index++) {
+      const x = position.getX(index);
+      const z = position.getZ(index);
+      const y = position.getY(index);
+      const lobe = Math.cos(Math.atan2(z, x) * 4);
+      position.setXYZ(index, x * (1 + 0.1 * lobe), y + 0.006 * lobe * Math.max(0, 1 - y / 0.03), z * (1 + 0.1 * lobe));
+    }
+    body.computeVertexNormals();
+    return group(
+      mesh(body, paint("#c8322a")),
+      mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.006, 10), paint("#3d7a3a"), (m) => (m.position.y = 0.077)),
+      mesh(new THREE.CylinderGeometry(0.0028, 0.0034, 0.022, 6), paint("#3d7a3a"), (m) => {
+        m.rotation.z = 0.5;
+        m.position.set(-0.004, 0.088, 0);
+      }),
+    );
+  },
+  Squash: () => squashWedge(),
+  Papaya: () => papayaHalf(),
+  // A granadilla: a smooth orange shell freckled pale, with its curled stalk and two dry bracts.
+  Granadilla: () => {
+    const freckles = group(...Array.from({ length: 10 }, (_, spot) => {
+      const point = new THREE.Vector3(hash(spot, 1, 4) - 0.5, hash(spot, 2, 4) * 0.8, hash(spot, 3, 4) - 0.5).normalize();
+      return mesh(new THREE.CircleGeometry(0.0022, 6), paint("#f6d9a0"), (m) => {
+        m.position.copy(point).multiplyScalar(0.0372);
+        m.lookAt(m.position.clone().multiplyScalar(2));
+        m.position.y += 0.036;
+      });
+    }));
+    freckles.traverse((child) => (child.userData.noOutline = true));
+    return group(
+      mesh(new THREE.SphereGeometry(0.037, 24, 16), paint("#e8a33a"), (m) => {
+        m.scale.set(1, 1.08, 1);
+        m.position.y = 0.036;
+      }),
+      freckles,
+      mesh(new THREE.TorusGeometry(0.012, 0.0022, 6, 16, Math.PI * 1.3), paint("#7a6a3a"), (m) => {
+        m.rotation.set(0, 0.4, 0.3);
+        m.position.set(0.006, 0.086, 0);
+      }),
+      mesh(new THREE.SphereGeometry(0.012, 8, 6), paint("#c9b98a"), (m) => {
+        m.scale.set(1, 0.15, 0.5);
+        m.position.set(-0.008, 0.078, 0.004);
+        m.rotation.z = 0.6;
+      }),
+    );
+  },
+  // Kumis: a white bottle with a red cap and a band of its label.
+  Kumis: () =>
+    group(
+      mesh(lathe([[0, 0], [0.03, 0], [0.032, 0.01], [0.032, 0.11], [0.022, 0.135], [0.016, 0.15], [0, 0.15]], 28), paint("#f6f3ea")),
+      mesh(new THREE.CylinderGeometry(0.0325, 0.0325, 0.05, 28, 1, true), paint(css("--color-cilantro")), (m) => (m.position.y = 0.06)),
+      mesh(new THREE.CylinderGeometry(0.017, 0.017, 0.018, 20), paint(css("--color-tomate")), (m) => (m.position.y = 0.158)),
+    ),
+  Chorizo: () => chorizoLink(),
+  Trout: () => trout(),
+  // Panela: two round cakes of brown cane sugar, half wrapped in dry plantain leaf and tied with a string, as Nariño sells them.
+  Panela: () => {
+    const cake = (y) =>
+      group(
+        mesh(new THREE.CylinderGeometry(0.045, 0.047, 0.032, 28), paint("#9a5a26"), (m) => (m.position.y = y + 0.016)),
+        mesh(new THREE.CylinderGeometry(0.0485, 0.0485, 0.034, 28, 1, true, 0, Math.PI * 1.1), paint("#b9a46a", { side: THREE.DoubleSide }), (m) => (m.position.y = y + 0.016)),
+      );
+    return group(
+      cake(0),
+      cake(0.034),
+      mesh(new THREE.TorusGeometry(0.049, 0.0016, 6, 32), paint("#d8c9a0"), (m) => {
+        m.rotation.x = Math.PI / 2;
+        m.position.y = 0.034;
+      }),
+    );
   },
   "Tree tomato": () => treeTomato(),
   Oca: () => oca("#c9677d"),

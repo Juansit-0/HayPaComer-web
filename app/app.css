@@ -911,6 +911,18 @@ html:has(.loader:not(.done)) { overflow: hidden; }
 .f-tomate-arbol { width: 20px; height: 28px; border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; background: #c8432a; }
 .f-oca { width: 30px; height: 14px; border-radius: 50%; background: repeating-linear-gradient(90deg, #c9677d 0 5px, #b2586c 5px 6px); }
 .f-lulo { width: 24px; height: 24px; border-radius: 50%; background: radial-gradient(circle at 50% 8%, #6a7a3a 4px, transparent 5px), #e8a13a; }
+.f-arracacha { width: 36px; height: 14px; border-radius: 40% 60% 60% 40% / 50%; background: #e6d28a; }
+.f-ulluco { width: 24px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 70% 60%, #e07a8a 6px, transparent 7px), #e8c74a; }
+.f-yuca { width: 44px; height: 14px; border-radius: 3px 50% 50% 3px; background: linear-gradient(90deg, #f4efe2 4px, #7a4e2c 4px); }
+.f-ajo { width: 22px; height: 24px; border-radius: 50% 50% 46% 46% / 40% 40% 60% 60%; background: #f1ebe0; box-shadow: inset 0 0 0 1px #d9cfb4; }
+.f-pimenton { width: 26px; height: 28px; border-radius: 40% 40% 45% 45%; background: #c8322a; }
+.f-ahuyama { width: 28px; height: 24px; clip-path: polygon(0 0, 100% 0, 50% 100%); background: linear-gradient(180deg, #3f5a2e 5px, #e88a2a 5px); }
+.f-papaya { width: 40px; height: 20px; border-radius: 50%; background: radial-gradient(ellipse 30% 25%, #1c1712 60%, transparent 70%), #ef7a3a; }
+.f-granadilla { width: 24px; height: 26px; border-radius: 50%; background: #e8a33a; }
+.f-kumis { width: 16px; height: 34px; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, var(--color-tomate) 6px, #f6f3ea 6px 18px, var(--color-cilantro) 18px 26px, #f6f3ea 26px); }
+.f-chorizo { width: 44px; height: 12px; border-radius: 6px; background: repeating-linear-gradient(90deg, #9a3a2a 0 13px, #d8c9a0 13px 15px); }
+.f-trucha { width: 44px; height: 16px; border-radius: 50% 30% 30% 50%; clip-path: polygon(0 50%, 15% 0, 80% 15%, 100% 0, 100% 100%, 80% 85%, 15% 100%); background: linear-gradient(180deg, #7f8c6a 45%, #d98a8a 45% 60%, #7f8c6a 60%); }
+.f-panela { width: 30px; height: 22px; border-radius: 6px / 4px; background: linear-gradient(90deg, #9a5a26 50%, #b9a46a 50%); }
 .f-mazorca { width: 42px; height: 16px; border-radius: 4px 50% 50% 4px; background: repeating-linear-gradient(90deg, #f0c84a 0 4px, #d9ac2e 4px 5px); }
 .f-otro { width: 22px; height: 22px; border-radius: 6px; background: var(--color-meson-strong); }
 
