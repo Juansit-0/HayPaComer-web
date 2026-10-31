@@ -38,11 +38,22 @@ const inventory = [
 ];
 const sum = (trayId) => inventory.filter((entry) => entry.trayId === trayId).reduce((total, entry) => total + entry.grams, 0);
 const tray = (id, name) => ({ id, type: "TRAY", kind: null, name, grams: sum(id), items: inventory.filter((entry) => entry.trayId === id).length, children: [] });
+// The fridge's trays come from its shape, as the backend fits them; the first trays keep the ids the inventory above uses.
+const SHAPE_EXAMPLES = [
+  ["challenger-cr050", { type: "MINIBAR", shelves: 2, doorRacks: 3, drawers: 0, freezerShelves: 1, hinge: "LEFT", widthCm: 43, heightCm: 58, depthCm: 49 }],
+  ["top-freezer", { type: "TOP_FREEZER", shelves: 3, doorRacks: 3, drawers: 1, freezerShelves: 1, hinge: "LEFT", widthCm: 60, heightCm: 165, depthCm: 65 }],
+  ["bottom-freezer", { type: "BOTTOM_FREEZER", shelves: 3, doorRacks: 3, drawers: 1, freezerShelves: 2, hinge: "LEFT", widthCm: 60, heightCm: 185, depthCm: 65 }],
+  ["side-by-side", { type: "SIDE_BY_SIDE", shelves: 4, doorRacks: 4, drawers: 2, freezerShelves: 4, hinge: "LEFT", widthCm: 90, heightCm: 178, depthCm: 70 }],
+  ["single-door", { type: "SINGLE_DOOR", shelves: 3, doorRacks: 3, drawers: 1, freezerShelves: 1, hinge: "LEFT", widthCm: 55, heightCm: 145, depthCm: 60 }],
+];
+let shape = { type: "TOP_FREEZER", shelves: 3, doorRacks: 1, drawers: 1, freezerShelves: 1, hinge: "LEFT", widthCm: 72, heightCm: 170, depthCm: 66 };
+const named = (count, first, names, more) => Array.from({ length: count }, (_, index) => [index < first.length ? first[index] : `${more}-${index + 1}`, names[index] ?? `${names.at(-1)} ${index + 1}`]);
 const fridges = () => [{ id: F, type: "FRIDGE", kind: null, name: "Kitchen", grams: inventory.reduce((total, entry) => total + entry.grams, 0), items: inventory.length, children: [
-  { id: "z1", type: "ZONE", kind: "SHELF", name: "Shelves", grams: 0, items: 0, children: [tray(TRAYS.top, "Top"), tray(TRAYS.middle, "Middle"), tray(TRAYS.bottom, "Bottom")] },
-  { id: "z2", type: "ZONE", kind: "DRAWER", name: "Drawer", grams: 0, items: 0, children: [tray(TRAYS.drawer, "Vegetables")] },
-  { id: "z3", type: "ZONE", kind: "DOOR", name: "Door", grams: 0, items: 0, children: [tray(TRAYS.door, "Rack")] },
-] }];
+  { id: "z1", type: "ZONE", kind: "SHELF", name: "Shelves", grams: 0, items: 0, children: named(shape.shelves, [TRAYS.top, TRAYS.middle, TRAYS.bottom], ["Top", "Middle", "Bottom"], "t-shelf").map(([id, name], index) => tray(id, index > 2 ? `Shelf ${index + 1}` : name)) },
+  { id: "z2", type: "ZONE", kind: "DRAWER", name: "Drawer", grams: 0, items: 0, children: named(shape.drawers, [TRAYS.drawer], ["Vegetables"], "t-drawer").map(([id], index) => tray(id, index ? `Drawer ${index + 1}` : "Vegetables")) },
+  { id: "z3", type: "ZONE", kind: "DOOR", name: "Door", grams: 0, items: 0, children: named(shape.doorRacks, [TRAYS.door], ["Rack"], "t-rack").map(([id], index) => tray(id, index ? `Rack ${index + 1}` : "Rack")) },
+  { id: "z4", type: "ZONE", kind: "FREEZER", name: "Freezer", grams: 0, items: 0, children: named(shape.freezerShelves, [], ["Top"], "t-freezer").map(([id], index) => tray(id, ["Top", "Middle", "Bottom"][index] ?? `Shelf ${index + 1}`)) },
+].filter((zone) => zone.children.length) }];
 const requirement = (food, grams) => ({ food, grams, verdict: "ENOUGH", availableGrams: grams, shortfallGrams: 0, substitute: null });
 const recipe = (name, minutes, foods) => ({ id: name, name, servings: 2, minutes, requirements: foods.map(([food, grams]) => ({ food, grams, optional: false })), steps: [{ instruction: "Cook", timerSeconds: null, weighFood: null, weighGrams: null }] });
 const recipes = [recipe("Scrambled eggs with tomato", 10, [["Egg", 120], ["Tomato", 100]]), recipe("Pasta con tomate", 25, [["Tomato", 200], ["Cheese", 50]]), recipe("Arroz con pollo", 35, [["Chicken breast", 300], ["Carrot", 100]])];
@@ -63,9 +74,11 @@ const routes = [
   [/^\/i18n$/, () => ({ available: [{ code: "es-CO", name: "Español", isDefault: true }, { code: "en", name: "English", isDefault: false }], current: "es-CO" })],
   [/^\/i18n\/(.+)$/, (m) => texts[decodeURIComponent(m[1])] ?? {}],
   [/^\/me$/, () => ({ id: "u1", email: "juan@example.test", displayName: "Juan", locale: "es-CO" })],
-  [/^\/households$/, () => [{ id: H, name: "Casa", currency: "COP", timezone: "America/Bogota", role: "OWNER" }]],
-  [/^\/households\/[^/]+$/, () => ({ id: H, name: "Casa", currency: "COP", timezone: "America/Bogota", members: [{ userId: "u1", name: "Juan", role: "OWNER" }] })],
+  [/^\/households$/, () => [{ id: H, name: "Casa", currency: "COP", timezone: "America/Bogota", role: "OWNER", myRole: "OWNER" }]],
+  [/^\/households\/[^/]+$/, () => ({ id: H, name: "Casa", currency: "COP", timezone: "America/Bogota", myRole: "OWNER", members: [{ userId: "u1", name: "Juan", role: "OWNER" }] })],
   [/^\/households\/[^/]+\/fridges$/, fridges],
+  [/^\/households\/[^/]+\/fridges\/[^/]+\/shape$/, () => shape],
+  [/^\/fridge-examples$/, () => SHAPE_EXAMPLES.map(([key, example]) => ({ key, shape: example }))],
   [/^\/households\/[^/]+\/fridges\/[^/]+\/twin$/, () => ({ fridgeId: F, doorOpen: false, celsius: 4.2 })],
   [/^\/households\/[^/]+\/inventory/, () => inventory],
   [/^\/households\/[^/]+\/kitchen$/, () => ({ totalGrams: inventory.reduce((t, e) => t + e.grams, 0), items: inventory.length, atRisk: 3, expired: 0 })],
@@ -116,6 +129,25 @@ createServer((request, response) => {
     const marketItem = request.method !== "GET" && path.match(/\/market-list\/items\/([^/]+)(\/check)?$/);
     const failing = path.match(/\/items\/[^/]+\/(move|consume|discard)$/)?.[1] ?? (marketItem ? (marketItem[2] ? "check" : "remove") : null);
     if (failing && (request.headers.referer ?? "").includes(`fail=${failing}`)) { response.writeHead(500, { "content-type": "application/problem+json" }); response.end('{"title":"Mock failure"}'); return; }
+    if (request.method === "PUT" && /\/fridges\/[^/]+\/shape$/.test(path)) {
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk));
+      request.on("end", () => {
+        const wanted = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+        const held = (id) => inventory.some((entry) => entry.trayId === id);
+        const shelves = [TRAYS.top, TRAYS.middle, TRAYS.bottom].slice(wanted.shelves);
+        const blocked = [...shelves, ...(wanted.drawers ? [] : [TRAYS.drawer]), ...(wanted.doorRacks ? [] : [TRAYS.door])].find(held);
+        if (blocked) {
+          response.writeHead(409, { "content-type": "application/problem+json" });
+          response.end(JSON.stringify({ title: "Tray holds food", detail: "Tray still holds food", trayId: blocked }));
+          return;
+        }
+        shape = wanted;
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify(shape));
+      });
+      return;
+    }
     if (marketItem) {
       const entry = market.find((candidate) => candidate.id === marketItem[1]);
       if (entry && marketItem[2]) entry.checked = request.method === "POST";

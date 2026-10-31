@@ -3,6 +3,7 @@ import { soundOn } from "./sound.js";
 import { currentLocale, formatNumber, loadLocale, locales, t } from "./i18n.js";
 import { esc, formData, numberField, showError, toast, wireSteppers } from "./ui.js";
 import { reduced } from "./motion.js";
+import { openFridgeShape, shapeDrawing } from "./fridge-shape.js";
 
 const DIETS = ["OMNIVORE", "PESCATARIAN", "VEGETARIAN", "VEGAN"];
 const ALLERGENS = [
@@ -135,8 +136,19 @@ function saved(form, text = t("settings.saved")) {
   setTimeout(() => stamp.remove(), 4000);
 }
 
+function fridgeTile(shape, canChange) {
+  return `<section class="tile w-12" aria-labelledby="fridge-shape-title">
+    <h2 id="fridge-shape-title">${t("fridge-shape.title")}</h2>
+    <p class="hint">${t("fridge-shape.lead")}</p>
+    ${shape ? `<div class="shape-summary">${shapeDrawing(shape)}<p><b>${t(`fridge-type.${shape.type}`)}</b></p></div>` : ""}
+    ${canChange ? `<button type="button" class="primary" data-fridge-shape>${t("fridge-shape.open")}</button>` : ""}
+  </section>`;
+}
+
 export async function renderSettings(main, household, rerender) {
   const base = `/households/${household.id}`;
+  const fridges = await api(`${base}/fridges`).catch(() => []);
+  const shape = fridges[0] ? await api(`${base}/fridges/${fridges[0].id}/shape`).catch(() => null) : null;
   const [me, detail, profiles, preferences, settings] = await Promise.all([
     api("/me"),
     api(base),
@@ -158,6 +170,7 @@ export async function renderSettings(main, household, rerender) {
       ["language-title", "settings.language"],
       ["alerts-title", "settings.alerts"],
       ["household-settings-title", "settings.household"],
+      ...(fridges[0] ? [["fridge-shape-title", "fridge-shape.title"]] : []),
     ]
       .map(([target, key]) => `<button type="button" class="chip-button" data-goto="${target}">${t(key)}</button>`)
       .join("")}</nav>
@@ -168,7 +181,9 @@ export async function renderSettings(main, household, rerender) {
         ${notificationsTile(preferences)}
       </div>
       ${householdTile(settings, owner)}
+      ${fridges[0] ? fridgeTile(shape, owner) : ""}
     </div>`;
+  main.querySelector("[data-fridge-shape]")?.addEventListener("click", () => openFridgeShape(household, fridges[0], rerender));
   wireSteppers(main);
 
   // The index scrolls to a group; the route stays on Ajustes, so these are buttons, not hash links.

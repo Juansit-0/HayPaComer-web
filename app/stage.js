@@ -87,6 +87,7 @@ let lastRoute = "now";
 let household = null;
 let pending = null;
 let currentFridge = null;
+let currentShape = null;
 let zones = null;
 let leader = null;
 let placedSignature = null;
@@ -104,26 +105,37 @@ function foods(items) {
   return items.slice(0, MAX_FOODS).map(food).join("");
 }
 
-function markup() {
-  return `<div class="fridge" data-fridge>
+// The drawn fridge (no WebGL, or reduced motion) follows the household's shape too: its shelves, drawers and door racks, and where the
+// freezer goes.
+const FLAT_SHAPE = { type: "TOP_FREEZER", shelves: 3, doorRacks: 3, drawers: 1 };
+const slots = (count, html) => Array.from({ length: count }, (_, index) => html(index)).join("");
+
+function markup(shape = FLAT_SHAPE) {
+  const freezer = !["MINIBAR", "SINGLE_DOOR"].includes(shape.type);
+  const rows = `repeat(${Math.max(1, shape.shelves)}, 1fr) ${shape.drawers ? "62px " : ""}44px`;
+  return `<div class="fridge" data-fridge data-type="${shape.type}">
     <span class="face back"></span><span class="face side"></span><span class="face side l"></span><span class="face lid"></span>
-    <a class="part freezer" href="#/fridge" data-part="fridge" aria-label="${t("nav.fridge")}"><span class="handle"></span></a>
-    <div class="cabin">
-      <a class="part shelf" href="#/fridge" data-part="fridge" data-zone="SHELF" data-index="0"></a>
-      <a class="part shelf" href="#/fridge" data-part="fridge" data-zone="SHELF" data-index="1"></a>
-      <a class="part shelf" href="#/fridge" data-part="fridge" data-zone="SHELF" data-index="2"></a>
-      <a class="part shelf drawer" href="#/fridge" data-part="fridge" data-zone="DRAWER" data-index="0"></a>
+    ${freezer ? `<a class="part freezer" href="#/fridge" data-part="fridge" aria-label="${t("nav.fridge")}"><span class="handle"></span></a>` : ""}
+    <div class="cabin" style="grid-template-rows: ${rows}">
+      ${slots(shape.shelves, (index) => `<a class="part shelf" href="#/fridge" data-part="fridge" data-zone="SHELF" data-index="${index}"></a>`)}
+      ${shape.drawers ? `<div class="drawers" style="grid-template-columns: repeat(${shape.drawers}, 1fr)">${slots(shape.drawers, (index) => `<a class="part shelf drawer" href="#/fridge" data-part="fridge" data-zone="DRAWER" data-index="${index}"></a>`)}</div>` : ""}
       <a class="part knob" href="#/fridge" data-part="fridge"><i></i><span data-celsius>--</span></a>
       <span class="light"></span>
     </div>
     <a class="part door" href="#/fridge" data-part="fridge" aria-label="${t("nav.fridge")}">
       <span class="door-outer"><span class="handle"></span></span>
-      <span class="door-inner"><span class="rack" data-zone="DOOR" data-index="0"></span><span class="rack" data-zone="DOOR" data-index="1"></span><span class="rack" data-zone="DOOR" data-index="2"></span></span>
+      <span class="door-inner" style="grid-template-rows: repeat(${Math.max(1, shape.doorRacks)}, 1fr)">${slots(shape.doorRacks, (index) => `<span class="rack" data-zone="DOOR" data-index="${index}"></span>`)}</span>
     </a>
   </div>`;
 }
 
-function fill(fridge, inventory, twin) {
+function fill(fridge, inventory, twin, shape) {
+  const drawn = root.querySelector("[data-fridge]");
+  const wanted = shape ?? FLAT_SHAPE;
+  if (drawn && JSON.stringify([wanted.type, wanted.shelves, wanted.drawers, wanted.doorRacks]) !== drawn.dataset.shape) {
+    drawn.outerHTML = markup(wanted);
+    root.querySelector("[data-fridge]").dataset.shape = JSON.stringify([wanted.type, wanted.shelves, wanted.drawers, wanted.doorRacks]);
+  }
   const zones = fridge?.children ?? [];
   root.querySelectorAll("[data-zone]").forEach((slot) => {
     const zone = zones.filter((candidate) => (candidate.kind ?? "SHELF") === slot.dataset.zone);
@@ -432,6 +444,11 @@ export function showRoute(route) {
   });
 }
 
+// The fridge sheet shows a shape on the 3D fridge while it is edited; null puts the saved one back.
+export function previewShape(shape) {
+  three?.setShape(shape ?? currentShape);
+}
+
 export async function refreshStage(chosen) {
   if (!root) return;
   household = chosen ?? household;
@@ -452,12 +469,16 @@ export async function refreshStage(chosen) {
   const inventory = listed.map((item) => ({ ...item, category: categories.get(item.name.toLowerCase()), days: daysLeft(item.expiresOn) }));
   const fridge = fridges[0];
   currentFridge = fridge;
-  const twin = fridge ? await api(`${base}/fridges/${fridge.id}/twin`).catch(() => null) : null;
-  fill(fridge, inventory, twin);
+  const [twin, shape] = fridge
+    ? await Promise.all([api(`${base}/fridges/${fridge.id}/twin`).catch(() => null), api(`${base}/fridges/${fridge.id}/shape`).catch(() => null)])
+    : [null, null];
+  currentShape = shape;
+  fill(fridge, inventory, twin, shape);
   const scene = await threeReady;
   if (scene) {
     const week = metrics?.total;
     const moved = Number(week?.consumedGrams ?? 0) + Number(week?.discardedGrams ?? 0);
+    scene.setShape(shape);
     const signature = JSON.stringify([fridge?.id, inventory.map((item) => [item.id, item.grams, item.trayId, item.days, item.usable])]);
     if (signature !== placedSignature) {
       placedSignature = signature;

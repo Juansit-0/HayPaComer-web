@@ -4,14 +4,56 @@ import { boil, css, engrave, foodModel, group, hash, lathe, mesh, outline, paint
 import { buildKitchen } from "./stage/kitchen.js";
 import { damp, loop, onReduced, reduced as prefersReduced, SPRINGS, springConstants, springStep } from "./motion.js";
 
-const W = 0.72;
-const H = 1.7;
-const D = 0.66;
 const T = 0.035;
-const FRIDGE_TOP = 1.13;
-const SHELVES = [0.89, 0.62, 0.35];
-const DRAWER = 0.06;
 const DOOR_OPEN = -1.92;
+// The fridge drawn before the household's shape arrives: the tall top-freezer the app always showed.
+const DEFAULT_SHAPE = { type: "TOP_FREEZER", shelves: 3, doorRacks: 3, drawers: 1, freezerShelves: 1, hinge: "LEFT", widthCm: 72, heightCm: 170, depthCm: 66 };
+// The fridge's right side stays next to the counter (kitchen.js starts it at 0.42); a wider or narrower fridge grows to the left.
+const RIGHT_EDGE = 0.36;
+
+// Where every part of a fridge goes, in metres, from the shape the household described: the fridge and freezer sections, the shelves
+// spread evenly above the drawers, the racks along the door, and an ice box inside a fridge with no freezer door.
+export function fridgeGeometry(shape = DEFAULT_SHAPE) {
+  const W = Math.min(1.1, Math.max(0.4, shape.widthCm / 100));
+  const H = Math.min(2.1, Math.max(0.5, shape.heightCm / 100));
+  const D = Math.min(0.85, Math.max(0.4, shape.depthCm / 100));
+  const base = 0.04;
+  let cold = { x0: -W / 2, x1: W / 2, y0: base, y1: H };
+  let freezer = null;
+  let icebox = 0;
+  if (shape.type === "TOP_FREEZER") {
+    const split = base + (H - base) * 0.66;
+    cold = { ...cold, y1: split };
+    freezer = { x0: -W / 2, x1: W / 2, y0: split + T, y1: H, divider: "y", at: split };
+  } else if (shape.type === "BOTTOM_FREEZER") {
+    const split = base + (H - base) * 0.34;
+    freezer = { x0: -W / 2, x1: W / 2, y0: base, y1: split, divider: "y", at: split };
+    cold = { ...cold, y0: split + T };
+  } else if (shape.type === "SIDE_BY_SIDE") {
+    const split = -W / 2 + W * 0.42;
+    freezer = { x0: -W / 2, x1: split, y0: base, y1: H, divider: "x", at: split };
+    cold = { ...cold, x0: split };
+  } else if (shape.freezerShelves > 0) {
+    icebox = Math.min(0.16, (H - base) * 0.2);
+  }
+  const inner = { x0: cold.x0 + T, x1: cold.x1 - T };
+  const innerWidth = inner.x1 - inner.x0;
+  const drawerHeight = shape.drawers ? Math.min(0.2, (cold.y1 - cold.y0) * 0.2) : 0;
+  const drawers = Array.from({ length: shape.drawers }, (_, index) => {
+    const width = innerWidth / shape.drawers;
+    return { x: inner.x0 + width * (index + 0.5), width: width - 0.012, y: cold.y0 + 0.02, height: drawerHeight };
+  });
+  const top = cold.y1 - (icebox ? icebox + 0.02 : 0);
+  const bottom = drawerHeight ? cold.y0 + 0.02 + drawerHeight + 0.09 : cold.y0 + 0.08;
+  const span = top - bottom;
+  const shelves = Array.from({ length: shape.shelves }, (_, index) => top - ((index + 1) * span) / shape.shelves);
+  // Side by side: the fridge door hangs on the outer right edge and the freezer's on the outer left.
+  const hinge = shape.type === "SIDE_BY_SIDE" ? "RIGHT" : shape.hinge;
+  const door = { x0: cold.x0, x1: cold.x1, y0: cold.y0, height: cold.y1 - cold.y0, side: hinge === "RIGHT" ? -1 : 1 };
+  const racks = Array.from({ length: shape.doorRacks }, (_, index) => door.height * (shape.doorRacks > 1 ? 0.2 + (0.6 * index) / (shape.doorRacks - 1) : 0.5));
+  const offset = RIGHT_EDGE - W / 2;
+  return { shape, W, H, D, base, cold, freezer, icebox, inner, drawers, shelves, top, door, racks, offset, freezerSide: shape.type === "SIDE_BY_SIDE" ? 1 : door.side };
+}
 
 // One camera stop per section along the kitchen wall, in tab order from the fridge on the left; Ajustes steps back to see the whole room.
 const VIEWS = {
@@ -113,6 +155,18 @@ function puffTexture() {
 
 const spring = (k) => 1 - Math.cos(k * Math.PI * 2.5) * Math.exp(-k * 6);
 
+const isIn = (object, root) => {
+  for (let node = object; node; node = node.parent) if (node === root) return true;
+  return false;
+};
+
+// The camera stop for Nevera follows the fridge: in front of its cold section, far enough to see it whole.
+function fridgeView(G) {
+  const x = G.offset + (G.cold.x0 + G.cold.x1) / 2;
+  const y = (G.cold.y0 + G.top) / 2;
+  return { position: [x + 0.2, y + 0.2, 0.6 + (G.top - G.cold.y0) * 0.66], target: [x, y, 0] };
+}
+
 export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zoneAt, onDragging, onAnchor }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -125,8 +179,6 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   sun.position.set(2.5, 4, 3);
   scene.add(sun);
   const inside = new THREE.PointLight("#fff1c8", 0, 1.6, 1.5);
-  inside.position.set(0, FRIDGE_TOP - 0.06, 0.05);
-  scene.add(inside);
 
   const floor = mesh(new THREE.CircleGeometry(0.95, 48), new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.05 }), (m) => {
     m.rotation.x = -Math.PI / 2;
@@ -141,6 +193,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   const glass = paint("#c4d3cc");
   const fridge = new THREE.Group();
   scene.add(fridge);
+  fridge.add(inside);
   const parts = new Map();
   const tag = (object, part) => {
     object.traverse((child) => {
@@ -156,63 +209,131 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   };
 
   const panel = (w, h, d, x, y, z, material = shell) => mesh(new RoundedBoxGeometry(w, h, d, 3, Math.min(0.012, d / 2 - 0.001)), material, (m) => m.position.set(x, y, z));
-  fridge.add(panel(W, H, T, 0, H / 2, -D / 2 + T / 2));
-  fridge.add(panel(T, H, D, -W / 2 + T / 2, H / 2, 0));
-  fridge.add(panel(T, H, D, W / 2 - T / 2, H / 2, 0));
-  fridge.add(panel(W, T, D, 0, H - T / 2, 0));
-  fridge.add(panel(W, T, D, 0, T / 2 + 0.02, 0));
-  fridge.add(panel(W, T, D, 0, FRIDGE_TOP + T / 2, 0));
-  fridge.add(panel(W - 2 * T, FRIDGE_TOP - 0.06, 0.004, 0, FRIDGE_TOP / 2 + 0.02, -D / 2 + T + 0.003, liner));
-  [-0.25, 0.25].forEach((x) => fridge.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 16), steel, (m) => m.position.set(x, 0.01, 0.2))));
+  let G = null;
+  let body = null;
+  let shelfSlots = [];
+  let racks = [];
+  let door = null;
+  let doorPivot = new THREE.Group();
+  let freezerPivot = new THREE.Group();
+  let doorItems = new THREE.Group();
+  let frost = null;
+  let knob = null;
 
-  const shelfSlots = SHELVES.map((y, index) => {
-    const slab = tag(mesh(new RoundedBoxGeometry(W - 2 * T - 0.01, 0.01, D - 0.12, 2, 0.004), glass, (m) => m.position.set(0, y, -0.03)), "fridge");
-    fridge.add(slab);
-    return { zone: "SHELF", index, y: y + 0.006, slab };
-  });
-  const drawer = tag(mesh(new RoundedBoxGeometry(W - 2 * T - 0.02, 0.2, D - 0.16, 2, 0.01), paint("#dfeee4", { transparent: true, opacity: 0.55, roughness: 0.1, clearcoat: 1 }), (m) => m.position.set(0, DRAWER + 0.1, -0.02)), "fridge");
-  fridge.add(drawer);
-  shelfSlots.push({ zone: "DRAWER", index: 0, y: DRAWER + 0.012, slab: drawer });
+  // Builds the fridge's body for a geometry: walls, shelves, drawers, doors with their racks and the settings knob. A new shape replaces the
+  // whole body; the food is placed again by placeItems.
+  function buildBody(geometry) {
+    frost = null;
+    if (body) {
+      parts.forEach((list, part) => parts.set(part, list.filter((object) => !isIn(object, body))));
+      fridge.remove(body);
+      body.traverse((child) => {
+        if (!child.isMesh && !child.isLineSegments) return;
+        child.geometry.dispose();
+        if (!child.userData.outline) child.material.dispose();
+      });
+    }
+    G = geometry;
+    const { W, H, D, base, cold, freezer, icebox, inner, drawers, shelves, top } = G;
+    fridge.position.x = G.offset;
+    vapor.position.x = G.offset;
+    body = new THREE.Group();
+    body.add(panel(W, H, T, 0, H / 2, -D / 2 + T / 2));
+    body.add(panel(T, H, D, -W / 2 + T / 2, H / 2, 0));
+    body.add(panel(T, H, D, W / 2 - T / 2, H / 2, 0));
+    body.add(panel(W, T, D, 0, H - T / 2, 0));
+    body.add(panel(W, T, D, 0, T / 2 + base - 0.02, 0));
+    if (freezer?.divider === "y") body.add(panel(W, T, D, 0, freezer.at + T / 2, 0));
+    if (freezer?.divider === "x") body.add(panel(T, H, D, freezer.at + T / 2, H / 2, 0));
+    body.add(panel(inner.x1 - inner.x0, cold.y1 - cold.y0 - 0.06, 0.004, (inner.x0 + inner.x1) / 2, (cold.y0 + cold.y1) / 2, -D / 2 + T + 0.003, liner));
+    [-1, 1].forEach((side) => body.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 16), steel, (m) => m.position.set(side * (W / 2 - 0.11), 0.01, 0.2))));
+    const shelfWidth = inner.x1 - inner.x0;
+    const middle = (inner.x0 + inner.x1) / 2;
+    shelfSlots = shelves.map((y, index) => {
+      const slab = tag(mesh(new RoundedBoxGeometry(shelfWidth - 0.01, 0.01, D - 0.12, 2, 0.004), glass, (m) => m.position.set(middle, y, -0.03)), "fridge");
+      body.add(slab);
+      const above = index === 0 ? top : shelves[index - 1];
+      return { zone: "SHELF", index, y: y + 0.006, slab, left: inner.x0 + 0.05, room: shelfWidth - 0.1, headroom: above - y - 0.04 };
+    });
+    drawers.forEach((drawer, index) => {
+      const slab = tag(mesh(new RoundedBoxGeometry(drawer.width, drawer.height, D - 0.16, 2, 0.01), paint("#dfeee4", { transparent: true, opacity: 0.55, roughness: 0.1, clearcoat: 1 }), (m) => m.position.set(drawer.x, drawer.y + drawer.height / 2, -0.02)), "fridge");
+      body.add(slab);
+      shelfSlots.push({ zone: "DRAWER", index, y: drawer.y + 0.012, slab, left: drawer.x - drawer.width / 2 + 0.03, room: drawer.width - 0.06, headroom: drawer.height - 0.03 });
+    });
+    if (icebox) {
+      const box = group(
+        mesh(new RoundedBoxGeometry(shelfWidth * 0.72, icebox, D - 0.22, 2, 0.008), liner, (m) => m.position.set(0, 0, -0.04)),
+        mesh(new RoundedBoxGeometry(shelfWidth * 0.72, icebox - 0.01, 0.012, 2, 0.004), glass, (m) => m.position.set(0, -0.002, D / 2 - 0.15)),
+      );
+      box.position.set(middle - shelfWidth * 0.12, cold.y1 - icebox / 2 - 0.01, 0);
+      body.add(box);
+      frost = mesh(new THREE.PlaneGeometry(shelfWidth * 0.68, icebox - 0.03), new THREE.MeshBasicMaterial({ map: frostTexture(), transparent: true, opacity: 0, depthWrite: false }), (m) => {
+        m.position.set(0, -0.002, D / 2 - 0.143);
+        m.userData.noOutline = true;
+      });
+      box.add(frost);
+    }
 
-  const knob = tag(group(
-    mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.03, 32), paint("#121212", { roughness: 0.35, clearcoat: 0.8 }), (m) => (m.rotation.x = Math.PI / 2)),
-    mesh(new THREE.BoxGeometry(0.008, 0.03, 0.006), paint(css("--color-arroz")), (m) => m.position.set(0, 0.022, 0.018)),
-  ), "settings");
-  knob.position.set(0.18, FRIDGE_TOP - 0.07, -D / 2 + T + 0.02);
-  fridge.add(knob);
+    knob = tag(group(
+      mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.03, 32), paint("#121212", { roughness: 0.35, clearcoat: 0.8 }), (m) => (m.rotation.x = Math.PI / 2)),
+      mesh(new THREE.BoxGeometry(0.008, 0.03, 0.006), paint(css("--color-arroz")), (m) => m.position.set(0, 0.022, 0.018)),
+    ), "settings");
+    knob.scale.setScalar(Math.min(1, W / 0.72));
+    knob.position.set(inner.x1 - 0.11 * Math.min(1, W / 0.72), top - 0.07 * Math.min(1, W / 0.72), -D / 2 + T + 0.02);
+    body.add(knob);
 
-  const freezerPivot = new THREE.Group();
-  freezerPivot.position.set(-W / 2, FRIDGE_TOP + T, D / 2);
-  const freezerHeight = H - FRIDGE_TOP - T;
-  const freezerDoor = tag(group(
-    mesh(new RoundedBoxGeometry(W, freezerHeight, 0.05, 4, 0.02), shell, (m) => m.position.set(W / 2, freezerHeight / 2, 0.025)),
-    mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 16), steel, (m) => m.position.set(W - 0.06, 0.12, 0.08)),
-  ), "fridge");
-  freezerPivot.add(freezerDoor);
-  fridge.add(freezerPivot);
-
-  const doorPivot = new THREE.Group();
-  doorPivot.position.set(-W / 2, 0.04, D / 2);
-  const doorHeight = FRIDGE_TOP - 0.04;
-  const door = tag(group(
-    mesh(new RoundedBoxGeometry(W, doorHeight, 0.06, 4, 0.02), shell, (m) => m.position.set(W / 2, doorHeight / 2, 0.03)),
-    mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.24, 16), steel, (m) => m.position.set(W - 0.06, doorHeight - 0.2, 0.09)),
-  ), "fridge");
-  const racks = [0.22, 0.52, 0.82].map((y) => {
-    const rack = mesh(new RoundedBoxGeometry(W - 0.12, 0.03, 0.09, 2, 0.006), glass, (m) => m.position.set(W / 2, y - 0.02, -0.05));
-    door.add(rack);
-    return { zone: "DOOR", y, rack };
-  });
-  const doorItems = new THREE.Group();
-  door.add(doorItems);
-  doorPivot.add(door);
-  fridge.add(doorPivot);
-
-  const frost = mesh(new THREE.PlaneGeometry(W - 0.04, freezerHeight - 0.04), new THREE.MeshBasicMaterial({ map: frostTexture(), transparent: true, opacity: 0, depthWrite: false }), (m) => {
-    m.position.set(W / 2, freezerHeight / 2, 0.051);
-    m.userData.noOutline = true;
-  });
-  freezerPivot.add(frost);
+    // A door hangs from its hinge: its panel, handle and racks reach from the pivot toward the other side.
+    const hung = (section, side, depth) => {
+      const width = section.x1 - section.x0;
+      const height = section.height ?? section.y1 - section.y0;
+      const pivot = new THREE.Group();
+      pivot.position.set(side === 1 ? section.x0 : section.x1, section.y0, D / 2);
+      const leaf = tag(group(
+        mesh(new RoundedBoxGeometry(width, height, depth, 4, 0.02), shell, (m) => m.position.set((side * width) / 2, height / 2, depth / 2)),
+        mesh(new THREE.CylinderGeometry(0.012, 0.012, Math.min(0.24, height * 0.3), 16), steel, (m) => m.position.set(side * (width - 0.06), height - Math.min(0.2, height * 0.3), depth + 0.03)),
+      ), "fridge");
+      pivot.add(leaf);
+      body.add(pivot);
+      return { pivot, leaf, width, height };
+    };
+    const main = hung({ ...G.door, x1: G.door.x1, y1: G.door.y0 + G.door.height }, G.door.side, 0.06);
+    door = main.leaf;
+    doorPivot = main.pivot;
+    const doorWidth = main.width;
+    racks = G.racks.map((y) => {
+      const rack = mesh(new RoundedBoxGeometry(doorWidth - 0.12, 0.03, 0.09, 2, 0.006), glass, (m) => m.position.set((G.door.side * doorWidth) / 2, y - 0.02, -0.05));
+      door.add(rack);
+      const left = G.door.side === 1 ? 0.08 : -doorWidth + 0.08;
+      return { zone: "DOOR", y, rack, left, room: doorWidth - 0.16, headroom: 0.26 };
+    });
+    doorItems = new THREE.Group();
+    door.add(doorItems);
+    if (freezer) {
+      const frozen = hung(freezer, G.freezerSide, 0.05);
+      freezerPivot = frozen.pivot;
+      frost = mesh(new THREE.PlaneGeometry(frozen.width - 0.04, frozen.height - 0.04), new THREE.MeshBasicMaterial({ map: frostTexture(), transparent: true, opacity: 0, depthWrite: false }), (m) => {
+        m.position.set((G.freezerSide * frozen.width) / 2, frozen.height / 2, 0.051);
+        m.userData.noOutline = true;
+      });
+      freezerPivot.add(frost);
+    } else {
+      freezerPivot = new THREE.Group();
+    }
+    // No freezer and no ice box: the frost has nothing to cover, so it stays an invisible speck.
+    frost ??= mesh(new THREE.PlaneGeometry(0.001, 0.001), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }), (m) => (m.userData.noOutline = true));
+    if (!frost.parent) body.add(frost);
+    inside.position.set(middle, top - 0.06, 0.05);
+    fridge.add(body);
+    outline(body);
+    body.traverse((child) => {
+      if (child.isMesh && child.material.transparent && !child.userData.outline && child.material.map === null) {
+        const edges = new THREE.LineSegments(new THREE.EdgesGeometry(child.geometry, 30), new THREE.LineBasicMaterial({ color: "#121212" }));
+        edges.raycast = () => {};
+        child.add(edges);
+      }
+    });
+    VIEWS.fridge = { ...VIEWS.fridge, ...fridgeView(G) };
+  }
 
   const vapor = new THREE.Points(
     new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(VAPOR * 3), 3)),
@@ -245,14 +366,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   ), "discard");
   bin.position.copy(kitchen.binSpot);
   scene.add(pot, bin);
-  [fridge, pot, bin, kitchen.counter, kitchen.stove, kitchen.pantry, kitchen.board].forEach(outline);
-  fridge.traverse((child) => {
-    if (child.isMesh && child.material.transparent && !child.userData.outline) {
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(child.geometry, 30), new THREE.LineBasicMaterial({ color: "#121212" }));
-      edges.raycast = () => {};
-      child.add(edges);
-    }
-  });
+  [pot, bin, kitchen.counter, kitchen.stove, kitchen.pantry, kitchen.board].forEach(outline);
 
   const extras = {
     now: (() => {
@@ -295,6 +409,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
 
   const items = new THREE.Group();
   fridge.add(items);
+  buildBody(fridgeGeometry());
   const state = {
     route: "now",
     door: DOOR_OPEN,
@@ -345,7 +460,22 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   }
 
   let deferred = null;
+  let placed = null;
+  // A new shape rebuilds the body, then puts the food back on its shelves.
+  function setShape(shape) {
+    shape ??= DEFAULT_SHAPE;
+    if (JSON.stringify(shape) === JSON.stringify(G.shape)) return;
+    buildBody(fridgeGeometry(shape));
+    if (state.route === "fridge") {
+      arrived = false;
+      goTo("fridge");
+    }
+    if (placed) placeItems(...placed);
+    film?.wake();
+  }
+
   function placeItems(fridgeTree, inventory) {
+    placed = [fridgeTree, inventory];
     if (drag.model) {
       deferred = [fridgeTree, inventory];
       return;
@@ -372,7 +502,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       slot.slab.traverse((child) => (child.userData.trayId = slot.tray?.id ?? null));
       if (!slot.tray) return;
       const door = slot.zone === "DOOR";
-      const room = door ? W - 0.16 : W - 2 * T - 0.1;
+      const room = slot.room;
       const rows = door ? [-0.05] : slot.zone === "DRAWER" ? [0.05, -0.1] : [0.08, -0.14];
       const models = inventory
         .filter((item) => item.trayId === slot.tray.id)
@@ -396,9 +526,9 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
           }
           return model;
         });
-      const left = door ? 0.08 : -W / 2 + T + 0.05;
+      const left = slot.left;
       slotByTray.set(slot.tray.id, { group: door ? doorItems : items, left, room, y: door ? slot.y - 0.03 : slot.y, z: rows[0] });
-      const headroom = door ? 0.26 : slot.zone === "DRAWER" ? 0.17 : (slot.index === 0 ? FRIDGE_TOP : SHELVES[slot.index - 1]) - SHELVES[slot.index] - 0.04;
+      const headroom = slot.headroom;
       const scaleOf = (model, fit) => Math.min(fit, headroom / Math.max(model.userData.height, 0.001));
       const pack = (fit) => {
         const placed = [];
@@ -685,7 +815,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   new ResizeObserver(resize).observe(canvas);
   resize();
 
-  const anchors = () => ({ now: extras.now, fridge: shelfSlots[1].slab, market: kitchen.basket, numbers: extras.numbers, chef: kitchen.pot });
+  const anchors = () => ({ now: extras.now, fridge: (shelfSlots[1] ?? shelfSlots[0])?.slab ?? door, market: kitchen.basket, numbers: extras.numbers, chef: kitchen.pot });
   const lastAnchor = { x: -1, y: -1, inside: null };
   function anchor() {
     if (!onAnchor) return;
@@ -769,8 +899,9 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       state.target.z + (state.position.z - state.target.z) * reach,
     );
     camera.lookAt(state.target);
-    doorPivot.rotation.y = state.door;
-    freezerPivot.rotation.y = state.freezer;
+    // The springs swing like a left-hinged door; a door hung on the right turns the other way.
+    doorPivot.rotation.y = state.door * G.door.side;
+    freezerPivot.rotation.y = state.freezer * G.freezerSide;
     extras.numbers.userData.arcs.forEach((arc, index) => {
       const wanted = Math.max(0.02, state.ringShares[index] ?? 0);
       if (settled(arc.userData.share, wanted)) return;
@@ -819,10 +950,10 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       puff.age += delta * 0.35;
       if (puff.age > 1) {
         puff.age -= 1;
-        puff.x = (hash(index, now, 1) - 0.5) * (W - 0.1);
-        puff.z = D / 2 + hash(index, now, 2) * 0.06;
+        puff.x = (G.inner.x0 + G.inner.x1) / 2 + (hash(index, now, 1) - 0.5) * (G.inner.x1 - G.inner.x0 - 0.06);
+        puff.z = G.D / 2 + hash(index, now, 2) * 0.06;
       }
-      positions.setXYZ(index, puff.x, 0.12 + puff.age * 0.5, puff.z);
+      positions.setXYZ(index, puff.x, G.cold.y0 + 0.08 + puff.age * Math.min(0.5, G.top - G.cold.y0), puff.z);
     });
     positions.needsUpdate = true;
     vapor.material.opacity = reduced ? 0 : open * 0.12;
@@ -884,10 +1015,11 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     return moving;
   }
   film = loop(canvas, tick, { gpu: true });
-  if (location.search.includes("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { fridge: { renderer, flights, items, doorItems, camera, canvas, pick, state, shelves: () => [...shelfSlots.map((slot) => slot.slab)] } });
+  if (location.search.includes("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { fridge: { renderer, flights, items, doorItems, camera, canvas, pick, state, setShape: (shape) => setShape(shape), shelves: () => [...shelfSlots.map((slot) => slot.slab)] } });
 
   return {
     goTo,
+    setShape,
     placeItems,
     setRings,
     setStatus,

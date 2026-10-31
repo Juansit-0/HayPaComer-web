@@ -3,6 +3,7 @@ import { api, freshAccess, patiently } from "./api.js";
 import { reduced } from "./motion.js";
 import { foodName, formatDay, formatMoney, formatNumber, placeName, plural, t } from "./i18n.js";
 import { focusFood, shapeClass, takeFocusRequest, undoable } from "./stage.js";
+import { openFridgeShape } from "./fridge-shape.js";
 import {
   busy,
   daysLeft,
@@ -411,11 +412,13 @@ export async function renderFridge(main, household) {
     main.querySelector("[data-setup]").addEventListener("submit", async (event) => {
       event.preventDefault();
       try {
-        await api(`${base}/fridges`, {
+        const fridge = await api(`${base}/fridges`, {
           method: "POST",
           body: { name: formData(event.target).name, layout: "STANDARD" },
         });
-        renderFridge(main, household);
+        await renderFridge(main, household);
+        // A new fridge is described right away, so the app draws the one in the kitchen and not a standard one.
+        openFridgeShape(household, fridge, () => renderFridge(main, household));
       } catch (error) {
         showError(event.target, error);
       }
@@ -438,12 +441,14 @@ export async function renderFridge(main, household) {
       <p class="hero-figure"><span class="data" data-total></span></p>
       <p class="lead">${t("fridge.lead", { grams: grams(total) })}</p>
       ${twins.map(twinLine).join("")}
+      ${(household.myRole ?? household.role) === "OWNER" ? `<button type="button" class="ghost" data-fridge-shape>${t("fridge-shape.open")}</button>` : ""}
     </header>
     ${shelfChips(fridges)}
     <div class="bento fridge-bento">
       ${tray ? shelfTile(tray, inventory.filter((item) => item.trayId === tray.id)) : ""}
     </div>`;
 
+  main.querySelector("[data-fridge-shape]")?.addEventListener("click", () => openFridgeShape(household, fridges[0], () => renderFridge(main, household)));
   // The total rolls its digits from the last figure shown, like the money on Mercado and Números.
   ticker(main.querySelector("[data-total]"), grams(total));
   const shown = main.querySelector(".fridge-bento");

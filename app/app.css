@@ -1792,3 +1792,33 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 
 /* The first layout of a visit, and the switch to the 3D fridge once it is ready, take their columns at once. */
 .shell[data-settling] { transition: none !important; }
+
+/* The fridge sheet: a front view drawn in ink that follows every change, then the parts as steppers. */
+.shape-drawing { display: block; width: 100%; max-width: 260px; height: auto; margin-inline: auto; }
+.shape-drawing .body, .shape-drawing .door { fill: var(--color-surface); stroke: var(--color-text); stroke-width: 2; }
+.shape-drawing .freezer { fill: color-mix(in oklab, var(--color-text) 14%, var(--color-surface)); stroke: var(--color-text); stroke-width: 1.5; }
+.shape-drawing .drawer { fill: none; stroke: var(--color-text); stroke-width: 1.5; }
+.shape-drawing .shelf { stroke: var(--color-text); stroke-width: 2; stroke-linecap: round; }
+.shape-form { display: grid; gap: var(--space-m); }
+.shape-counts, .shape-size { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-s); }
+.shape-size { border: 0; padding: 0; margin: 0; }
+.shape-size legend { font-weight: 600; margin-bottom: var(--space-xs); padding: 0; }
+.shape-summary { display: flex; align-items: center; gap: var(--space-m); }
+.shape-summary .shape-drawing { width: 120px; margin: 0; }
+
+/* The drawn fridge in other shapes: no freezer door on a minibar or a single door, the freezer at the bottom, or beside it. */
+.fridge .drawers { display: grid; gap: 4px; }
+.fridge:is([data-type="MINIBAR"], [data-type="SINGLE_DOOR"]) .cabin { top: 0; height: 480px; border-radius: 20px; }
+.fridge:is([data-type="MINIBAR"], [data-type="SINGLE_DOOR"]) .door { top: 0; height: 480px; }
+.fridge[data-type="BOTTOM_FREEZER"] .cabin { top: 0; border-radius: 20px 20px 4px 4px; }
+.fridge[data-type="BOTTOM_FREEZER"] .freezer { top: 348px; border-radius: 4px 4px 20px 20px; }
+.fridge[data-type="BOTTOM_FREEZER"] .door { top: 0; }
+.fridge[data-type="SIDE_BY_SIDE"] .freezer { width: 100px; height: 480px; border-radius: 20px 4px 4px 20px; }
+.fridge[data-type="SIDE_BY_SIDE"] .cabin { left: 104px; width: 146px; top: 0; height: 480px; border-radius: 4px 20px 20px 4px; }
+.fridge[data-type="SIDE_BY_SIDE"] .door { top: 0; height: 480px; }
+@media (min-width: 1024px) {
+  .fridge:is([data-type="MINIBAR"], [data-type="SINGLE_DOOR"], [data-type="BOTTOM_FREEZER"], [data-type="SIDE_BY_SIDE"]) .door { top: 0; }
+  .fridge:is([data-type="MINIBAR"], [data-type="SINGLE_DOOR"], [data-type="SIDE_BY_SIDE"]) .door { height: 480px; }
+  .fridge[data-type="SIDE_BY_SIDE"] .cabin { width: 146px; }
+}
+.fridge-hero [data-fridge-shape] { grid-column: 1; justify-self: start; color: inherit; box-shadow: inset 0 0 0 2px currentColor; }
