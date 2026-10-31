@@ -420,7 +420,12 @@ export function showRoute(route) {
   root.dataset.route = route;
   root.closest(".stage").dataset.route = route;
   // The fridge is the interface on Ahora and Nevera; elsewhere it steps aside and the panel takes the room.
-  root.closest(".shell").dataset.layout = ["now", "fridge"].includes(route) ? "wide" : "aside";
+  // The first layout lands without the track animation: sliding the columns on load would shift the whole page.
+  const shell = root.closest(".shell");
+  const first = !shell.dataset.layout;
+  if (first) shell.dataset.settling = "";
+  shell.dataset.layout = ["now", "fridge"].includes(route) ? "wide" : "aside";
+  if (first) setTimeout(() => delete shell.dataset.settling, 1000);
   root.querySelectorAll("[data-part]").forEach((part) => {
     if (part.dataset.part === route) part.setAttribute("aria-current", "page");
     else part.removeAttribute("aria-current");

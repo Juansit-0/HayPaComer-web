@@ -17,5 +17,6 @@ export function dishPicture(name, foods = []) {
       <figcaption>${esc(t("photo.credit", { credit: photo[1] }))}</figcaption>
     </figure>`;
   }
-  return `<figure class="dish-photo dish-engraved" aria-hidden="true"><img src="/app/stills/plate.webp" alt="" width="960" height="960" loading="lazy"></figure>`;
+  const still = String(name).trim().toLowerCase() === "arroz con pollo" ? "rice" : "plate";
+  return `<figure class="dish-photo dish-engraved" aria-hidden="true"><img src="/app/stills/${still}.webp" alt="" width="960" height="960" loading="lazy"></figure>`;
 }

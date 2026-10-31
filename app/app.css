@@ -1329,7 +1329,8 @@ a.button:active { transform: scale(0.97); }
   .dish-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-s); }
   .dish-row .dish-card { grid-template-columns: 112px minmax(0, 1fr); align-items: center; }
   .dish-row .dish-photo img { aspect-ratio: 1; }
-  .dish-row .dish-photo figcaption { display: none; }
+  /* A CC BY-SA photo keeps its credit in the row too, small under the picture. */
+  .dish-row .dish-photo figcaption { font-size: 11px; line-height: 1.25; }
   .dish-row .dish-card h2 { font-size: var(--size-h3); }
   .summary-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .today-list { grid-template-columns: minmax(0, 1fr); }
@@ -1788,3 +1789,6 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 @media (prefers-reduced-motion: reduce) {
   .net:not([data-state="idle"]):not([data-state="failed"]) .net-line { animation: none; background-size: 100% 100%; opacity: 0.6; }
 }
+
+/* The first layout of a visit, and the switch to the 3D fridge once it is ready, take their columns at once. */
+.shell[data-settling] { transition: none !important; }
