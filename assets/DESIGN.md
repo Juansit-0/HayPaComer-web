@@ -143,6 +143,30 @@ The 3D integrator uses the same stiffness and damping as the DOM springs, so the
 
 Rules: only `transform`, `opacity`, `clip-path`, masks and filters animate; one WebGL context per area; rendering pauses off screen and while idle; sound is off until the visitor turns it on.
 
+## Motion v3
+
+What changed since v2, after the app shell redesign (plan v5) and the landing story's later stages. The tokens, springs and rules of v2 still hold.
+
+### App shell
+
+| Where | Trigger | What moves | Motion | Reduced motion |
+|---|---|---|---|---|
+| Header tabs | Route change | An ink blot slides under the current tab | `snappy`, also its colour by section | Jumps |
+| Shell | Route change | The 3D fridge steps aside (Mercado, Números, Chef, Ajustes) or takes the room (Ahora, Nevera) | `grid-template-columns` with `--ease-spring`; the first layout of a visit lands without it, so nothing shifts on load | Instant |
+| Phone | Sideways swipe on the page | The page follows the finger (0.6 of it, 0.15 past the first or last section) and changes section past 25 % of the width or a flick of 0.5 px/ms | Springs back with `--duration-slow` | The swipe still changes section, without following the finger |
+| Everywhere | A request waits | A running line across the top after 0.7 s; "Waiting for the server" after 4 s; "The server is waking up" after 12 s | Line loops at 1.2 s while waiting, never longer than the request's patience (150 s) | A still line |
+| Everywhere | A request gives up | The note says why and offers "Try again" | None | None |
+
+### Landing story
+
+| Parameter | v2 | v3 |
+|---|---|---|
+| Kitchen door | Hold a button 3 s | Drag the door itself; it opens on its own once the arm is fully stretched (26 % of the swing), no release needed; springs back three times faster if let go early; arrows and Enter on the hint do the same |
+| Pointer while dragging the door | Ink trail | Quiet (`data-quiet-pointer`) |
+| 1876 chapters | Engraving in colour | Old film: sepia tone, vignette, scanlines and grain at 8 Hz; a tuning band rolls through the cut to 2026 |
+| Table chapter | One table | 1876 and today side by side, split by a torn paper edge that crosses from left to right with the scroll until today has the whole table |
+| Figures | Hand-drawn walk | Motion-capture clips per figure; walkers settle into breathing in 0.15 s when the scroll stops; the idle loop renders at 24 Hz and freezes after 5 s |
+
 ## Accessibility
 
 AA contrast on every pair above; visible 2 px focus outline in tinta; skeletons are `aria-hidden` and `main` announces `aria-busy`; the loader is decorative (`aria-hidden`); status is never told by colour alone.
