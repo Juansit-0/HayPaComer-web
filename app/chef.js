@@ -1,6 +1,6 @@
 import { art } from "./art/drawings.js";
 import { api } from "./api.js";
-import { currentLocale, foodName, locales, plural, recipeName, t } from "./i18n.js";
+import { currentLocale, foodName, foodWord, locales, plural, recipeName, t, theFood } from "./i18n.js";
 import { candidate, dishCard, kitchenRecipes } from "./now.js";
 import { highlightFoods, shapeClass } from "./stage.js";
 import { daysLeft, esc, grams, toast, whenText } from "./ui.js";
@@ -75,7 +75,7 @@ function sees(inventory) {
 
 function prompts(inventory) {
   const first = inventory.find((item) => item.usable && item.days !== null && SOON_DAYS >= item.days);
-  return [first ? t("chef.prompt.use", { food: foodName(first.name).toLowerCase() }) : t("chef.prompt.first"), t("chef.prompt.dinner"), t("chef.prompt.buy")];
+  return [first ? t("chef.prompt.use", { food: theFood(first.name) }) : t("chef.prompt.first"), t("chef.prompt.dinner"), t("chef.prompt.buy")];
 }
 
 function stepCard(session) {
@@ -94,13 +94,21 @@ function stepCard(session) {
   </article>`;
 }
 
+// What the Chef asks to do, said in the person's language from the tool and its arguments; the server's English summary only as a fallback.
+export function confirmationText(pending) {
+  const args = pending.arguments ?? {};
+  if (pending.tool === "add_to_market" && args.food) return t("chef.confirm.add_to_market", { grams: grams(Number(args.grams) || 0), food: foodWord(args.food) });
+  if (pending.tool === "remember" && args.subject) return t("chef.confirm.remember", { subject: args.subject, value: args.value ?? "" });
+  return pending.summary;
+}
+
 function confirmations(list) {
   if (!list.length) return "";
   return `<section class="tile" aria-labelledby="confirm-title">
     <h2 id="confirm-title">${t("chef.waiting")}</h2>
     <ul class="list">${list
       .map(
-        (pending) => `<li data-pending><span class="item-name">${esc(pending.summary)}</span>
+        (pending) => `<li data-pending><span class="item-name">${esc(confirmationText(pending))}</span>
           <span class="item-actions"><button class="primary" type="button" data-approve="${esc(pending.id)}" data-hold aria-describedby="hold-hint">${t("chef.approve")}</button><button type="button" data-reject="${esc(pending.id)}">${t("chef.reject")}</button></span></li>`,
       )
       .join("")}</ul>
@@ -207,8 +215,10 @@ export async function renderChef(main, household) {
       const foods = mentioned(reply.answer, inventory);
       const cooking = reply.runs?.some((run) => run.specialist === "chef");
       const dishes = cooking && foods.length ? await dishesWith(foods) : [];
-      state.messages.push({ role: "assistant", text: reply.answer, runs: reply.runs, evidence: reply.evidence, foods, dishes });
-      if (state.handsFree || mic.getAttribute("aria-pressed") === "true") speak(spoken(reply.answer), voiceLanguage());
+      // A run that only proposes a change answers with its English summary; say it in the person's language instead.
+      const text = reply.confirmation && /^Waiting for your confirmation/.test(reply.answer) ? t("chef.waiting-for", { what: confirmationText(reply.confirmation) }) : reply.answer;
+      state.messages.push({ role: "assistant", text, runs: reply.runs, evidence: reply.evidence, foods, dishes });
+      if (state.handsFree || mic.getAttribute("aria-pressed") === "true") speak(spoken(text), voiceLanguage());
     } catch (error) {
       state.messages.push({ role: "assistant", text: error.message, runs: [] });
     }

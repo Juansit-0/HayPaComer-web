@@ -2,7 +2,7 @@ import { art } from "./art/drawings.js";
 import { api } from "./api.js";
 import { dishPicture } from "./dishes.js";
 import { liveFeed } from "./live.js";
-import { foodName, formatTime, plural, recipeName, t } from "./i18n.js";
+import { foodName, foodWord, formatTime, plural, recipeName, t } from "./i18n.js";
 import { busy, esc, expiryText, grams, kpi, numberField, portions, showError, statusPill, wireSteppers } from "./ui.js";
 import { undoable } from "./stage.js";
 
@@ -176,7 +176,7 @@ export async function renderNow(main, household) {
       const amount = Number(new FormData(form).get("grams"));
       try {
         await busy(event.submitter ?? form.querySelector("button"), () =>
-          undoable(() => api(`${base}/items/${item.id}/consume`, { method: "POST", body: { grams: amount } }), t("now.toast-used", { grams: grams(amount), food: foodName(item.name) })),
+          undoable(() => api(`${base}/items/${item.id}/consume`, { method: "POST", body: { grams: amount } }), t("now.toast-used", { grams: grams(amount), food: foodWord(item.name) })),
         );
       } catch (error) {
         showError(form, error);

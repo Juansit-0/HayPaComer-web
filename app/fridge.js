@@ -1,7 +1,7 @@
 import { art } from "./art/drawings.js";
 import { api, freshAccess, patiently } from "./api.js";
 import { reduced } from "./motion.js";
-import { foodName, formatDay, formatMoney, formatNumber, placeName, plural, t } from "./i18n.js";
+import { foodName, foodWord, formatDay, formatMoney, formatNumber, placeName, plural, t, theFood } from "./i18n.js";
 import { focusFood, shapeClass, takeFocusRequest, undoable } from "./stage.js";
 import { openFridgeShape } from "./fridge-shape.js";
 import {
@@ -376,7 +376,7 @@ function wireAddFood(dialog, base, trays, onDone) {
     try {
       await api(`${base}/items`, { method: "POST", body });
       dialog.close();
-      toast(t("fridge.toast-added", { grams: grams(body.grams), food: foodName(body.food) }));
+      toast(t("fridge.toast-added", { grams: grams(body.grams), food: foodWord(body.food) }));
       onDone(tray.id);
     } catch (error) {
       showError(form, error);
@@ -514,19 +514,20 @@ export async function renderFridge(main, household) {
       event.preventDefault();
       const action = event.submitter?.value ?? "consume";
       const item = inventory.find((entry) => entry.id === form.dataset.item);
-      const food = foodName(item.name);
+      const food = foodWord(item.name);
+      const the = theFood(item.name);
       const done = busy(event.submitter ?? form.querySelector("button"), async () => {
         if (action === "discard") {
           // Say what the waste cost when the household has a price for that food.
           const perKg = Number(prices[item.name] ?? prices[item.name.toLowerCase()] ?? 0);
-          const lost = perKg ? t("fridge.toast-discarded-value", { food, money: formatMoney((perKg * item.grams) / 1000, household.currency) }) : t("fridge.toast-discarded", { food });
+          const lost = perKg ? t("fridge.toast-discarded-value", { food: the, money: formatMoney((perKg * item.grams) / 1000, household.currency) }) : t("fridge.toast-discarded", { food: the });
           await undoable(() => api(`${base}/items/${item.id}/discard`, { method: "POST" }), lost);
           return;
         } else if (action === "open") {
           const opened = await api(`${base}/items/${item.id}/open`, { method: "POST" });
           toast(
             t("fridge.toast-opened", {
-              food: foodName(item.name),
+              food: the,
               date: formatDay(opened.expiresOn, { day: "numeric", month: "long" }),
             }),
           );

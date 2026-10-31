@@ -39,6 +39,22 @@ export function foodName(name) {
   return texts[`food.${String(name).trim().toLowerCase()}`] ?? name;
 }
 
+// A food inside a sentence: lowercase, as Spanish and English both write it there ("Agregaste 500 g de tomate").
+export function foodWord(name) {
+  const text = foodName(name);
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+// A food with its article, which in Spanish follows its gender and number (el tomate, la pechuga de pollo, los fríjoles negros, las lentejas).
+export function theFood(name) {
+  const gender = texts[`food-gender.${String(name ?? "").trim().toLowerCase()}`] ?? "m";
+  return t(`article.the-${["m", "f", "mp", "fp"].includes(gender) ? gender : "m"}`, { food: foodWord(name) });
+}
+
+export function sentence(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function recipeName(name) {
   return texts[`recipe.${String(name ?? "").trim().toLowerCase()}`] ?? name;
 }

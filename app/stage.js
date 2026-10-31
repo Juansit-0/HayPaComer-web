@@ -1,7 +1,7 @@
 import { webgl2 } from "./quality.js";
 import { reduced } from "./motion.js";
 import { api } from "./api.js";
-import { foodName, formatNumber, t } from "./i18n.js";
+import { foodName, foodWord, formatNumber, placeName, sentence, t, theFood } from "./i18n.js";
 import { daysLeft, esc, grams, openSheet, toast, whenText } from "./ui.js";
 
 const SHAPES = {
@@ -193,24 +193,34 @@ export async function undoable(task, message) {
   return ok;
 }
 
+// Where a tray is, as people say it: "Repisas, arriba" or "Puerta, bandeja 2".
+function placeOf(trayId) {
+  for (const zone of currentFridge?.children ?? []) {
+    const tray = zone.children.find((candidate) => candidate.id === trayId);
+    if (tray) return `${placeName(zone.name)}, ${placeName(tray.name).toLowerCase()}`;
+  }
+  return "";
+}
+
 async function quickAdd(food, trayId) {
   const fridge = currentFridge;
   if (!fridge || !trayId) return;
   const amount = PACK_GRAMS[food] ?? 250;
   await undoable(
     () => api(`/households/${household.id}/items`, { method: "POST", body: { fridgeId: fridge.id, trayId, food, grams: amount, opened: false, expiresOn: null, expirySource: null } }),
-    t("fridge.toast-added", { grams: grams(amount), food: foodName(food) }),
+    t("stage.stored", { food: theFood(food), place: placeOf(trayId) }),
   );
 }
 
 async function act(drop) {
   const base = `/households/${household.id}`;
-  const food = foodName(drop.item.name);
+  const food = foodWord(drop.item.name);
+  const the = theFood(drop.item.name);
   if (drop.kind === "move") {
-    return undoable(() => api(`${base}/items/${drop.item.id}/move`, { method: "POST", body: { trayId: drop.trayId } }), t("stage.moved", { food }));
+    return undoable(() => api(`${base}/items/${drop.item.id}/move`, { method: "POST", body: { trayId: drop.trayId } }), t("stage.moved", { food: the, place: placeOf(drop.trayId) }));
   }
   if (drop.kind === "discard") {
-    return undoable(() => api(`${base}/items/${drop.item.id}/discard`, { method: "POST" }), t("fridge.toast-discarded", { food }));
+    return undoable(() => api(`${base}/items/${drop.item.id}/discard`, { method: "POST" }), t("fridge.toast-discarded", { food: the }));
   }
   const total = Number(drop.item.grams);
   const dialog = openSheet(

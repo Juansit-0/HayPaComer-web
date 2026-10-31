@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { foodName, formatMoney, plural, t } from "./i18n.js";
+import { foodName, formatMoney, plural, t, theFood } from "./i18n.js";
 import { easing, page, reduced, token } from "./motion.js";
 import {
   esc,
@@ -41,7 +41,7 @@ function row(item, bought, line, currency) {
         ? `<span class="status quiet">${item.source === "PLAN" ? t("market.from-plan") : t("market.from-recipe")}</span>`
         : ""
     }</span>
-    <span class="item-actions"><button class="icon-button" type="button" data-remove="${esc(item.id)}" aria-label="${esc(t("market.remove-food", { food: foodName(item.food) }))}"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>
+    <span class="item-actions"><button class="icon-button" type="button" data-remove="${esc(item.id)}" aria-label="${esc(t("market.remove-food", { food: theFood(item.food) }))}"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>
   </li>`;
 }
 
@@ -222,7 +222,7 @@ export async function renderMarket(main, household) {
     const values = formData(add);
     try {
       await api(`${base}/items`, { method: "POST", body: { food: values.food, grams: Number(values.grams) } });
-      toast(t("market.toast-added", { food: foodName(values.food) }));
+      toast(t("market.toast-added", { food: theFood(values.food) }));
       refresh();
     } catch (error) {
       showError(add, error);

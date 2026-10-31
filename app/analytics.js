@@ -1,5 +1,5 @@
 import { api, freshAccess, patiently } from "./api.js";
-import { foodName, formatDay, formatMoney, formatNumber, t } from "./i18n.js";
+import { foodName, foodWord, formatDay, formatMoney, formatNumber, t } from "./i18n.js";
 import { esc, foodOptions, formData, grams, moneyField, moneyValue, showError, ticker, toast, wireFoodSearch, wireSteppers } from "./ui.js";
 import { easing, reduced, token } from "./motion.js";
 
@@ -254,7 +254,7 @@ export async function renderAnalytics(main, household) {
     const values = formData(price);
     try {
       await api(`${base}/prices`, { method: "PUT", body: { food: values.food, pricePerKg: moneyValue(values.price) } });
-      toast(t("numbers.toast-price", { food: foodName(values.food) }));
+      toast(t("numbers.toast-price", { food: foodWord(values.food) }));
       renderAnalytics(main, household);
     } catch (error) {
       showError(price, error);
