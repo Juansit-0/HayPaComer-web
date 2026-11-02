@@ -142,7 +142,7 @@ function trayOptions(fridges) {
         fridgeId: fridge.id,
         zone: zone.kind ?? "SHELF",
         label: `${placeName(zone.name)}: ${placeName(tray.name)}`,
-        place: `${placeName(zone.name)}, ${placeName(tray.name).toLowerCase()}`,
+        place: `${placeName(zone.name).toLowerCase()}, ${placeName(tray.name).toLowerCase()}`,
       })),
     ),
   );

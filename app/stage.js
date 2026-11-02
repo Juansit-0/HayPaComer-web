@@ -214,7 +214,7 @@ export function fullMessage(error) {
 function placeOf(trayId) {
   for (const zone of currentFridge?.children ?? []) {
     const tray = zone.children.find((candidate) => candidate.id === trayId);
-    if (tray) return `${placeName(zone.name)}, ${placeName(tray.name).toLowerCase()}`;
+    if (tray) return `${placeName(zone.name).toLowerCase()}, ${placeName(tray.name).toLowerCase()}`;
   }
   return "";
 }
