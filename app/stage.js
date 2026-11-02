@@ -158,7 +158,9 @@ function fill(fridge, inventory, twin, shape) {
       : `${foods(items)}${tray && slot.classList.contains("shelf") ? `<span class="shelf-grams">${grams(held)}</span>` : ""}`;
     slot.dataset.tray = tray?.id ?? "";
     if (tray && slot.tagName === "A") slot.setAttribute("href", `#/fridge/${tray.id}`);
-    slot.setAttribute("aria-label", `${slot.dataset.zone === "FREEZER" ? t("stage.freezer") : t("nav.fridge")}${tray ? `: ${grams(held)}` : ""}`);
+    const part = slot.dataset.zone === "FREEZER" ? t("stage.freezer") : t("nav.fridge");
+    const place = tray && !closed ? `${placeName(zone.find((candidate) => candidate.children.includes(tray)).name)}: ${placeName(tray.name)}, ` : tray ? `${part}: ` : part;
+    slot.setAttribute("aria-label", `${place}${tray ? grams(held) : ""}`);
   });
   root.querySelector("[data-celsius]").textContent =
     twin?.celsius === null || twin?.celsius === undefined ? "--" : `${formatNumber(twin.celsius, 1)} °C`;

@@ -48,6 +48,8 @@ const SHAPE_EXAMPLES = [
 ];
 let shape = { type: "TOP_FREEZER", shelves: 3, doorRacks: 1, drawers: 1, freezerShelves: 1, hinge: "LEFT", widthCm: 72, heightCm: 170, depthCm: 66 };
 const named = (count, first, names, more) => Array.from({ length: count }, (_, index) => [index < first.length ? first[index] : `${more}-${index + 1}`, names[index] ?? `${names.at(-1)} ${index + 1}`]);
+// Shelves are named by how many there are, as the backend names them.
+const level = (index, count) => (index === 0 ? "Top" : index === count - 1 ? "Bottom" : count === 3 ? "Middle" : `Shelf ${index + 1}`);
 // Litres per part, roughly the server's; the door rack is kept full so the "full" message can be seen.
 const LITRES = { SHELF: 14, DRAWER: 9, DOOR: 2, FREEZER: 10 };
 const rooms = () => fridges()[0].children.flatMap((zone) => zone.children.map((entry) => {
@@ -55,10 +57,10 @@ const rooms = () => fridges()[0].children.flatMap((zone) => zone.children.map((e
   return { trayId: entry.id, capacityLiters: zone.kind === "DOOR" ? Math.max(usedLiters, 0.2) : LITRES[zone.kind], usedLiters };
 }));
 const fridges = () => [{ id: F, type: "FRIDGE", kind: null, name: "Kitchen", grams: inventory.reduce((total, entry) => total + entry.grams, 0), items: inventory.length, children: [
-  { id: "z1", type: "ZONE", kind: "SHELF", name: "Shelves", grams: 0, items: 0, children: named(shape.shelves, [TRAYS.top, TRAYS.middle, TRAYS.bottom], ["Top", "Middle", "Bottom"], "t-shelf").map(([id, name], index) => tray(id, index > 2 ? `Shelf ${index + 1}` : name)) },
+  { id: "z1", type: "ZONE", kind: "SHELF", name: "Shelves", grams: 0, items: 0, children: named(shape.shelves, [TRAYS.top, TRAYS.middle, TRAYS.bottom], ["Top", "Middle", "Bottom"], "t-shelf").map(([id], index) => tray(id, level(index, shape.shelves))) },
   { id: "z2", type: "ZONE", kind: "DRAWER", name: "Drawer", grams: 0, items: 0, children: named(shape.drawers, [TRAYS.drawer], ["Vegetables"], "t-drawer").map(([id], index) => tray(id, index ? `Drawer ${index + 1}` : "Vegetables")) },
   { id: "z3", type: "ZONE", kind: "DOOR", name: "Door", grams: 0, items: 0, children: named(shape.doorRacks, [TRAYS.door], ["Rack"], "t-rack").map(([id], index) => tray(id, index ? `Rack ${index + 1}` : "Rack")) },
-  { id: "z4", type: "ZONE", kind: "FREEZER", name: "Freezer", grams: 0, items: 0, children: named(shape.freezerShelves, [], ["Top"], "t-freezer").map(([id], index) => tray(id, ["Top", "Middle", "Bottom"][index] ?? `Shelf ${index + 1}`)) },
+  { id: "z4", type: "ZONE", kind: "FREEZER", name: "Freezer", grams: 0, items: 0, children: named(shape.freezerShelves, [], ["Top"], "t-freezer").map(([id], index) => tray(id, level(index, shape.freezerShelves))) },
 ].filter((zone) => zone.children.length) }];
 const requirement = (food, grams) => ({ food, grams, verdict: "ENOUGH", availableGrams: grams, shortfallGrams: 0, substitute: null });
 const recipe = (name, minutes, foods) => ({ id: name, name, servings: 2, minutes, requirements: foods.map(([food, grams]) => ({ food, grams, optional: false })), steps: [{ instruction: "Cook", timerSeconds: null, weighFood: null, weighGrams: null }] });

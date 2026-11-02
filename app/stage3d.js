@@ -160,11 +160,14 @@ const isIn = (object, root) => {
   return false;
 };
 
-// The camera stop for Nevera follows the fridge: in front of its cold section, far enough to see it whole.
+// The camera stop for Nevera follows the fridge: in front of its cold section, far enough to see it whole. With many shelves the top one
+// sits near the ceiling, so the camera steps back until the food standing on it (about 16 cm) stays inside the 32 degree view.
 function fridgeView(G) {
   const x = G.offset + (G.cold.x0 + G.cold.x1) / 2;
   const y = (G.cold.y0 + G.top) / 2;
-  return { position: [x + 0.2, y + 0.2, 0.6 + (G.top - G.cold.y0) * 0.66], target: [x, y, 0] };
+  const reach = Math.min(G.top, (G.shelves[0] ?? G.top) + 0.16) - (y + 0.2);
+  const z = Math.max(0.6 + (G.top - G.cold.y0) * 0.66, G.D / 2 + reach / Math.tan((15 * Math.PI) / 180));
+  return { position: [x + 0.2, y + 0.2, z], target: [x, y, 0] };
 }
 
 // With the freezer open the camera frames the freezer section instead, its door swung wide. It stands back far enough for the tall
