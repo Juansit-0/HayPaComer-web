@@ -125,7 +125,7 @@ function markup(shape = FLAT_SHAPE) {
     <div class="cabin" style="grid-template-rows: ${rows}">
       ${icebox ? `<a class="part shelf icebox" href="#/fridge" data-part="fridge" data-zone="FREEZER" data-index="0"></a>` : ""}
       ${slots(shape.shelves, (index) => `<a class="part shelf" href="#/fridge" data-part="fridge" data-zone="SHELF" data-index="${index}"></a>`)}
-      ${shape.drawers ? `<div class="drawers" style="grid-template-columns: repeat(${shape.drawers}, 1fr)">${slots(shape.drawers, (index) => `<a class="part shelf drawer" href="#/fridge" data-part="fridge" data-zone="DRAWER" data-index="${index}"></a>`)}</div>` : ""}
+      ${shape.drawers ? `<div class="drawers" style="grid-template-columns: repeat(${shape.drawers}, minmax(0, 1fr))">${slots(shape.drawers, (index) => `<a class="part shelf drawer" href="#/fridge" data-part="fridge" data-zone="DRAWER" data-index="${index}"></a>`)}</div>` : ""}
       <a class="part knob" href="#/fridge" data-part="fridge"><i></i><span data-celsius>--</span></a>
       <span class="light"></span>
     </div>

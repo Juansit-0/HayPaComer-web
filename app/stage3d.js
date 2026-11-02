@@ -167,12 +167,13 @@ function fridgeView(G) {
   return { position: [x + 0.2, y + 0.2, 0.6 + (G.top - G.cold.y0) * 0.66], target: [x, y, 0] };
 }
 
-// With the freezer open the camera frames the freezer section instead, its door swung wide.
+// With the freezer open the camera frames the freezer section instead, its door swung wide. It stands back far enough for the tall
+// freezer of a side by side to fit with every shelf in sight.
 function freezerView(G) {
   const { x0, x1, y0, y1 } = G.freezer;
   const x = G.offset + (x0 + x1) / 2;
   const y = (y0 + y1) / 2;
-  return { position: [x + 0.15, y + 0.15, 0.55 + Math.max(y1 - y0, (x1 - x0) * 1.2) * 0.8], target: [x, y, 0], door: DOOR_OPEN, freezer: DOOR_OPEN };
+  return { position: [x + 0.15, y + 0.15, 0.25 + Math.max(y1 - y0, (x1 - x0) * 1.2) * 1.35], target: [x, y, 0], door: DOOR_OPEN, freezer: DOOR_OPEN };
 }
 
 export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zoneAt, onDragging, onAnchor, isFull }) {
