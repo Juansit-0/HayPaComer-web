@@ -117,10 +117,13 @@ function spaceLine(room) {
 }
 
 function shelfTile(tray, items, trays, room) {
+  // A freezer shelf shares its name with a fridge shelf ("Arriba"), so its title says which one it is.
+  const option = trays.find((candidate) => candidate.id === tray.id);
+  const title = option?.zone === "FREEZER" ? option.label : placeName(tray.name);
   return `<section class="tile w-12 shelf-tile" aria-labelledby="tray-title">
     <header>
       <div>
-        <h2 id="tray-title">${esc(placeName(tray.name))}</h2>
+        <h2 id="tray-title">${esc(title)}</h2>
         <p class="hint">${t("fridge.on-shelf", { grams: grams(tray.grams) })}</p>
         ${spaceLine(room)}
       </div>

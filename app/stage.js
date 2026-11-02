@@ -111,16 +111,19 @@ function foods(items) {
 
 // The drawn fridge (no WebGL, or reduced motion) follows the household's shape too: its shelves, drawers and door racks, and where the
 // freezer goes.
-const FLAT_SHAPE = { type: "TOP_FREEZER", shelves: 3, doorRacks: 3, drawers: 1 };
+const FLAT_SHAPE = { type: "TOP_FREEZER", shelves: 3, doorRacks: 3, drawers: 1, freezerShelves: 1 };
 const slots = (count, html) => Array.from({ length: count }, (_, index) => html(index)).join("");
 
 function markup(shape = FLAT_SHAPE) {
   const freezer = !["MINIBAR", "SINGLE_DOOR"].includes(shape.type);
-  const rows = `repeat(${Math.max(1, shape.shelves)}, 1fr) ${shape.drawers ? "62px " : ""}44px`;
+  // A fridge with no freezer door keeps its ice box as the first row inside the cabin.
+  const icebox = !freezer && shape.freezerShelves > 0;
+  const rows = `${icebox ? "56px " : ""}repeat(${Math.max(1, shape.shelves)}, 1fr) ${shape.drawers ? "62px " : ""}44px`;
   return `<div class="fridge" data-fridge data-type="${shape.type}">
     <span class="face back"></span><span class="face side"></span><span class="face side l"></span><span class="face lid"></span>
-    ${freezer ? `<a class="part freezer" href="#/fridge" data-part="fridge" aria-label="${t("nav.fridge")}"><span class="handle"></span></a>` : ""}
+    ${freezer ? `<a class="part freezer" href="#/fridge" data-part="fridge" data-zone="FREEZER" data-index="0" data-closed aria-label="${t("stage.freezer")}"><span class="handle"></span></a>` : ""}
     <div class="cabin" style="grid-template-rows: ${rows}">
+      ${icebox ? `<a class="part shelf icebox" href="#/fridge" data-part="fridge" data-zone="FREEZER" data-index="0"></a>` : ""}
       ${slots(shape.shelves, (index) => `<a class="part shelf" href="#/fridge" data-part="fridge" data-zone="SHELF" data-index="${index}"></a>`)}
       ${shape.drawers ? `<div class="drawers" style="grid-template-columns: repeat(${shape.drawers}, 1fr)">${slots(shape.drawers, (index) => `<a class="part shelf drawer" href="#/fridge" data-part="fridge" data-zone="DRAWER" data-index="${index}"></a>`)}</div>` : ""}
       <a class="part knob" href="#/fridge" data-part="fridge"><i></i><span data-celsius>--</span></a>
@@ -136,9 +139,10 @@ function markup(shape = FLAT_SHAPE) {
 function fill(fridge, inventory, twin, shape) {
   const drawn = root.querySelector("[data-fridge]");
   const wanted = shape ?? FLAT_SHAPE;
-  if (drawn && JSON.stringify([wanted.type, wanted.shelves, wanted.drawers, wanted.doorRacks]) !== drawn.dataset.shape) {
+  const signature = JSON.stringify([wanted.type, wanted.shelves, wanted.drawers, wanted.doorRacks, wanted.freezerShelves]);
+  if (drawn && signature !== drawn.dataset.shape) {
     drawn.outerHTML = markup(wanted);
-    root.querySelector("[data-fridge]").dataset.shape = JSON.stringify([wanted.type, wanted.shelves, wanted.drawers, wanted.doorRacks]);
+    root.querySelector("[data-fridge]").dataset.shape = signature;
   }
   const zones = fridge?.children ?? [];
   root.querySelectorAll("[data-zone]").forEach((slot) => {
@@ -146,10 +150,15 @@ function fill(fridge, inventory, twin, shape) {
     const trays = zone.flatMap((candidate) => candidate.children);
     const tray = trays[Number(slot.dataset.index)];
     const items = tray ? inventory.filter((item) => item.trayId === tray.id) : [];
-    slot.innerHTML = `${foods(items)}${tray && slot.classList.contains("shelf") ? `<span class="shelf-grams">${grams(tray.grams)}</span>` : ""}`;
+    // The freezer door stays shut: it shows what all its shelves hold and opens the first one.
+    const closed = slot.hasAttribute("data-closed");
+    const held = closed ? trays.reduce((total, candidate) => total + Number(candidate.grams), 0) : tray?.grams;
+    slot.innerHTML = closed
+      ? `<span class="handle"></span>${tray ? `<span class="shelf-grams">${grams(held)}</span>` : ""}`
+      : `${foods(items)}${tray && slot.classList.contains("shelf") ? `<span class="shelf-grams">${grams(held)}</span>` : ""}`;
     slot.dataset.tray = tray?.id ?? "";
     if (tray && slot.tagName === "A") slot.setAttribute("href", `#/fridge/${tray.id}`);
-    slot.setAttribute("aria-label", `${t("nav.fridge")}${tray ? `: ${grams(tray.grams)}` : ""}`);
+    slot.setAttribute("aria-label", `${slot.dataset.zone === "FREEZER" ? t("stage.freezer") : t("nav.fridge")}${tray ? `: ${grams(held)}` : ""}`);
   });
   root.querySelector("[data-celsius]").textContent =
     twin?.celsius === null || twin?.celsius === undefined ? "--" : `${formatNumber(twin.celsius, 1)} °C`;

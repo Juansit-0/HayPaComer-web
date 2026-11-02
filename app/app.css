@@ -807,6 +807,8 @@ html:has(.loader:not(.done)) { overflow: hidden; }
 }
 .fridge .freezer .handle, .fridge .door-outer .handle { position: absolute; width: 6px; border-radius: 3px; background: var(--color-tinta); }
 .fridge .freezer .handle { right: 14px; bottom: 14px; height: 40px; }
+.fridge .freezer .shelf-grams { position: absolute; left: 16px; bottom: 14px; }
+.fridge .shelf.icebox { border: 3px solid var(--color-tinta); border-radius: 8px; background: var(--color-white); }
 @keyframes ring-draw { from { stroke-dashoffset: var(--len); } }
 
 .fridge .cabin {
