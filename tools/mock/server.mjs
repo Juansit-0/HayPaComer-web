@@ -155,6 +155,18 @@ createServer((request, response) => {
       });
       return;
     }
+    if (request.method === "POST" && /^\/households\/[^/]+\/items$/.test(path)) {
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk));
+      request.on("end", () => {
+        const { food, grams, trayId } = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+        const added = item(`i${inventory.length + 100}`, food, grams, trayId, 7);
+        inventory.push(added);
+        response.writeHead(201, { "content-type": "application/json" });
+        response.end(JSON.stringify(added));
+      });
+      return;
+    }
     const moving = request.method === "POST" && path.match(/\/items\/([^/]+)\/move$/);
     if (moving) {
       const chunks = [];

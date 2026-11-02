@@ -469,8 +469,12 @@ function setFreezer(on) {
   three?.showFreezer(on);
 }
 
-// Choosing a freezer tray on Nevera opens the freezer, any other tray closes it.
+// Choosing a freezer tray on Nevera opens the freezer, any other tray closes it. Redrawing the same tray after a change leaves the door
+// as the person left it, so food just put in the freezer stays in sight.
+let shownTray = null;
 export function showTray(trayId) {
+  if (trayId === shownTray) return;
+  shownTray = trayId;
   const zone = currentFridge?.children.find((candidate) => candidate.children.some((tray) => tray.id === trayId));
   setFreezer(zone?.kind === "FREEZER" && hasFreezerDoor(currentShape));
 }
@@ -478,7 +482,10 @@ export function showTray(trayId) {
 export function showRoute(route) {
   if (!root) return;
   lastRoute = route;
-  if (route !== "fridge") setFreezer(false);
+  if (route !== "fridge") {
+    setFreezer(false);
+    shownTray = null;
+  }
   three?.goTo(route);
   if (route !== "chef") three?.highlight([]);
   if (route !== "fridge") three?.focus(null);
