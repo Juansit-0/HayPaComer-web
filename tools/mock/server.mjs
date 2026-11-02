@@ -48,6 +48,12 @@ const SHAPE_EXAMPLES = [
 ];
 let shape = { type: "TOP_FREEZER", shelves: 3, doorRacks: 1, drawers: 1, freezerShelves: 1, hinge: "LEFT", widthCm: 72, heightCm: 170, depthCm: 66 };
 const named = (count, first, names, more) => Array.from({ length: count }, (_, index) => [index < first.length ? first[index] : `${more}-${index + 1}`, names[index] ?? `${names.at(-1)} ${index + 1}`]);
+// Litres per part, roughly the server's; the door rack is kept full so the "full" message can be seen.
+const LITRES = { SHELF: 14, DRAWER: 9, DOOR: 2, FREEZER: 10 };
+const rooms = () => fridges()[0].children.flatMap((zone) => zone.children.map((entry) => {
+  const usedLiters = Math.round((sum(entry.id) / 600) * 10) / 10;
+  return { trayId: entry.id, capacityLiters: zone.kind === "DOOR" ? Math.max(usedLiters, 0.2) : LITRES[zone.kind], usedLiters };
+}));
 const fridges = () => [{ id: F, type: "FRIDGE", kind: null, name: "Kitchen", grams: inventory.reduce((total, entry) => total + entry.grams, 0), items: inventory.length, children: [
   { id: "z1", type: "ZONE", kind: "SHELF", name: "Shelves", grams: 0, items: 0, children: named(shape.shelves, [TRAYS.top, TRAYS.middle, TRAYS.bottom], ["Top", "Middle", "Bottom"], "t-shelf").map(([id, name], index) => tray(id, index > 2 ? `Shelf ${index + 1}` : name)) },
   { id: "z2", type: "ZONE", kind: "DRAWER", name: "Drawer", grams: 0, items: 0, children: named(shape.drawers, [TRAYS.drawer], ["Vegetables"], "t-drawer").map(([id], index) => tray(id, index ? `Drawer ${index + 1}` : "Vegetables")) },
@@ -78,6 +84,7 @@ const routes = [
   [/^\/households\/[^/]+$/, () => ({ id: H, name: "Casa", currency: "COP", timezone: "America/Bogota", myRole: "OWNER", members: [{ userId: "u1", name: "Juan", role: "OWNER" }] })],
   [/^\/households\/[^/]+\/fridges$/, fridges],
   [/^\/households\/[^/]+\/fridges\/[^/]+\/shape$/, () => shape],
+  [/^\/households\/[^/]+\/fridges\/[^/]+\/space$/, () => rooms()],
   [/^\/fridge-examples$/, () => SHAPE_EXAMPLES.map(([key, example]) => ({ key, shape: example }))],
   [/^\/households\/[^/]+\/fridges\/[^/]+\/twin$/, () => ({ fridgeId: F, doorOpen: false, celsius: 4.2 })],
   [/^\/households\/[^/]+\/inventory/, () => inventory],
@@ -145,6 +152,25 @@ createServer((request, response) => {
         shape = wanted;
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify(shape));
+      });
+      return;
+    }
+    const moving = request.method === "POST" && path.match(/\/items\/([^/]+)\/move$/);
+    if (moving) {
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk));
+      request.on("end", () => {
+        const { trayId } = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+        const room = rooms().find((candidate) => candidate.trayId === trayId);
+        const entry = inventory.find((candidate) => candidate.id === moving[1]);
+        if (room && 0.25 > room.capacityLiters - room.usedLiters) {
+          response.writeHead(409, { "content-type": "application/problem+json" });
+          response.end(JSON.stringify({ title: "Tray full", detail: "Tray full", trayId, freeLiters: 0 }));
+          return;
+        }
+        if (entry) entry.trayId = trayId;
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end("{}");
       });
       return;
     }

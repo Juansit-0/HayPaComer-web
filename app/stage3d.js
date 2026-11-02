@@ -167,7 +167,15 @@ function fridgeView(G) {
   return { position: [x + 0.2, y + 0.2, 0.6 + (G.top - G.cold.y0) * 0.66], target: [x, y, 0] };
 }
 
-export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zoneAt, onDragging, onAnchor }) {
+// With the freezer open the camera frames the freezer section instead, its door swung wide.
+function freezerView(G) {
+  const { x0, x1, y0, y1 } = G.freezer;
+  const x = G.offset + (x0 + x1) / 2;
+  const y = (y0 + y1) / 2;
+  return { position: [x + 0.15, y + 0.15, 0.55 + Math.max(y1 - y0, (x1 - x0) * 1.2) * 0.8], target: [x, y, 0], door: DOOR_OPEN, freezer: DOOR_OPEN };
+}
+
+export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zoneAt, onDragging, onAnchor, isFull }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.toneMapping = THREE.NoToneMapping;
@@ -260,6 +268,20 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       body.add(slab);
       shelfSlots.push({ zone: "DRAWER", index, y: drawer.y + 0.012, slab, left: drawer.x - drawer.width / 2 + 0.03, room: drawer.width - 0.06, headroom: drawer.height - 0.03 });
     });
+    // The freezer's shelves, the first one at the top as the trays are named; behind its own door, they take food only while it is open.
+    const frozen = freezer ? G.shape.freezerShelves : 0;
+    if (frozen) {
+      const x0 = freezer.x0 + T;
+      const x1 = freezer.x1 - T;
+      const low = freezer.y0 + 0.012;
+      const step = (freezer.y1 - T - 0.01 - low) / frozen;
+      for (let index = 0; frozen > index; index++) {
+        const y = low + (frozen - 1 - index) * step;
+        const slab = tag(mesh(new RoundedBoxGeometry(x1 - x0 - 0.01, 0.01, D - 0.12, 2, 0.004), glass, (m) => m.position.set((x0 + x1) / 2, y, -0.03)), "fridge");
+        body.add(slab);
+        shelfSlots.push({ zone: "FREEZER", index, y: y + 0.006, slab, left: x0 + 0.04, room: x1 - x0 - 0.08, headroom: step - 0.03, behindDoor: true });
+      }
+    }
     if (icebox) {
       const box = group(
         mesh(new RoundedBoxGeometry(shelfWidth * 0.72, icebox, D - 0.22, 2, 0.008), liner, (m) => m.position.set(0, 0, -0.04)),
@@ -272,6 +294,11 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
         m.userData.noOutline = true;
       });
       box.add(frost);
+      const width = shelfWidth * 0.72;
+      const floor = cold.y1 - icebox - 0.004;
+      const slab = tag(mesh(new RoundedBoxGeometry(width - 0.02, 0.006, D - 0.26, 2, 0.002), glass, (m) => m.position.set(middle - shelfWidth * 0.12, floor, -0.04)), "fridge");
+      body.add(slab);
+      shelfSlots.push({ zone: "FREEZER", index: 0, y: floor + 0.004, slab, left: middle - shelfWidth * 0.12 - width / 2 + 0.03, room: width - 0.06, headroom: icebox - 0.03, icebox: true });
     }
 
     knob = tag(group(
@@ -451,12 +478,27 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     state.goals = [...view.position, ...view.target];
     state.doorGoal = view.door;
     state.freezerGoal = view.freezer;
+    if (route === "fridge" && freezerOpen && G.freezer) {
+      const inside = freezerView(G);
+      state.goals = [...inside.position, ...inside.target];
+      state.freezerGoal = inside.freezer;
+    }
     if (reduced) {
       state.axes.forEach((axis, index) => Object.assign(axis, { value: state.goals[index], velocity: 0 }));
       Object.assign(state.doorSpring, { value: view.door, velocity: 0 });
       Object.assign(state.freezerSpring, { value: view.freezer, velocity: 0 });
     }
     film?.wake();
+  }
+
+  let freezerOpen = false;
+  const freezerShown = () => -0.9 > state.freezer;
+  // Opens or closes the freezer door on Nevera; elsewhere it stays shut.
+  function showFreezer(on) {
+    if (freezerOpen === Boolean(on)) return;
+    freezerOpen = Boolean(on);
+    arrived = false;
+    goTo(state.route);
   }
 
   let deferred = null;
@@ -503,7 +545,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       if (!slot.tray) return;
       const door = slot.zone === "DOOR";
       const room = slot.room;
-      const rows = door ? [-0.05] : slot.zone === "DRAWER" ? [0.05, -0.1] : [0.08, -0.14];
+      const rows = door ? [-0.05] : slot.icebox ? [-0.02] : slot.zone === "DRAWER" ? [0.05, -0.1] : [0.08, -0.14];
       const models = inventory
         .filter((item) => item.trayId === slot.tray.id)
         .slice(0, 12)
@@ -514,6 +556,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
             child.userData.part = "fridge";
           });
           model.userData.key = item.id;
+          model.userData.behindDoor = Boolean(slot.behindDoor);
           model.userData.born = known.get(item.id) === item.trayId ? 0 : performance.now() + order++ * 70;
           sized(model);
           const text = describe?.(item);
@@ -638,7 +681,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     const box = canvas.getBoundingClientRect();
     state.pointer.set(((x - box.left) / box.width) * 2 - 1, -((y - box.top) / box.height) * 2 + 1);
     raycaster.setFromCamera(state.pointer, camera);
-    const candidates = [...shelfSlots.map((slot) => slot.slab), ...racks.map((rack) => rack.rack), pot, bin];
+    const candidates = [...shelfSlots.filter((slot) => !slot.behindDoor || freezerShown()).map((slot) => slot.slab), ...racks.map((rack) => rack.rack), pot, bin];
     const hit = raycaster.intersectObjects(candidates, true)[0];
     if (!hit) return null;
     const part = hit.object.userData.part;
@@ -648,10 +691,12 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     return object?.userData.trayId ? { kind: "tray", trayId: object.userData.trayId, object, point: hit.point } : null;
   };
 
+  // A part that takes the food glows yellow; one with no room left glows red.
   const glow = (target, on) => {
     if (target) target.object.userData.glowing = on;
+    const color = target?.kind === "tray" && isFull?.(target.trayId) ? css("--color-tomate") : css("--color-papa");
     target?.object.traverse((child) => {
-      if (child.isMesh && child.material.emissive) child.material.emissive.set(on ? css("--color-papa") : "#000000").multiplyScalar(on ? 0.35 : 1);
+      if (child.isMesh && child.material.emissive) child.material.emissive.set(on ? color : "#000000").multiplyScalar(on ? 0.35 : 1);
     });
   };
 
@@ -731,15 +776,35 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
       const into = target.kind !== "tray";
       const destination = into ? target.object.getWorldPosition(new THREE.Vector3()).add(lifted.set(0, 0.08, 0)) : model.getWorldPosition(new THREE.Vector3());
       fly(model, model.parent.worldToLocal(destination), into ? 0.15 : 1);
+      // A done move waits where it landed for the refresh to place it; only a model the refresh never replaced goes back.
       const settle = (ok) => {
         if (!ok) fly(model, home, 1);
-        else setTimeout(() => model.parent && fly(model, home, 1), 1500);
+        else setTimeout(() => model.parent && fly(model, home, 1), 8000);
       };
       Promise.resolve(onDrop(target.kind === "tray" ? { kind: "move", item, trayId: target.trayId } : { kind: target.kind, item })).then(settle, () => settle(false));
     } else {
       fly(model, home, 1);
     }
   });
+
+  // The browser took the pointer back mid drag: the food goes home and nothing changes.
+  const cancelDrag = () => {
+    if (!drag.model) return;
+    const { model, target, moved } = drag;
+    glow(target, false);
+    if (moved) onDragging?.(false);
+    land(null);
+    drag.model = null;
+    drag.target = null;
+    fly(model, drag.origin.clone(), 1);
+    if (deferred) {
+      const [tree, list] = deferred;
+      deferred = null;
+      placeItems(tree, list);
+    }
+  };
+  canvas.addEventListener("pointercancel", cancelDrag);
+  canvas.addEventListener("lostpointercapture", cancelDrag);
 
   canvas.addEventListener("pointerleave", () => {
     state.tilt.set(0, 0);
@@ -846,7 +911,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     ordered.forEach(({ model, tag, x, y }) => {
       const { element } = tag;
       const wanted = tag.soon || model === state.hoverModel || (state.focusId && model.userData.key === state.focusId);
-      if (!show || !wanted || !model.visible || model === drag.model) {
+      if (!show || !wanted || !model.visible || model === drag.model || (model.userData.behindDoor && !freezerShown())) {
         element.style.visibility = "hidden";
         return;
       }
@@ -1020,6 +1085,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
   return {
     goTo,
     setShape,
+    showFreezer,
     placeItems,
     setRings,
     setStatus,

@@ -605,6 +605,11 @@ dialog.sheet .sheet-head { display: flex; justify-content: space-between; align-
 
 .card-actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); align-items: center; }
 .card-actions input.grams { width: 6ch; }
+.move-to { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); flex-basis: 100%; color: var(--color-text-weak); }
+.move-to select { min-height: 44px; max-width: 100%; }
+.space-line { display: flex; align-items: center; gap: var(--space-xs); margin: 4px 0 0; color: var(--color-text-weak); font-size: 0.9em; }
+.space-line meter { inline-size: 120px; block-size: 8px; }
+.space-line.full { color: var(--color-attention-text); font-weight: 600; }
 
 .add-food { display: grid; gap: var(--space-m); }
 .add-food .step { border: 0; padding: 0; margin: 0; display: grid; gap: var(--space-s); }
@@ -1197,6 +1202,9 @@ a.button:active { transform: scale(0.97); }
   .stage.has-three { grid-template-rows: minmax(0, 1fr) auto auto; }
   .stage.has-three[data-route="fridge"] .stage-palette { display: grid; gap: var(--space-xs); }
 }
+.palette-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-xs); }
+.palette-head .hint { margin: 0; }
+.palette-freezer[aria-pressed="true"] { background: var(--color-tinta); color: var(--color-arroz); }
 .palette-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .palette-chip { flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: var(--radius-full); background: var(--color-surface); color: var(--color-text); font-weight: 600; cursor: grab; touch-action: none; }
 .palette-chip .food { scale: 0.8; }

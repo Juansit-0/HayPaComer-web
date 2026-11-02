@@ -88,6 +88,10 @@ let household = null;
 let pending = null;
 let currentFridge = null;
 let currentShape = null;
+let space = new Map();
+let freezerButton = null;
+// Only these types have a freezer behind its own door; a minibar's ice box sits in plain sight. No shape yet draws the top-freezer default.
+const hasFreezerDoor = (shape) => ["TOP_FREEZER", "BOTTOM_FREEZER", "SIDE_BY_SIDE"].includes(shape?.type ?? "TOP_FREEZER");
 let zones = null;
 let leader = null;
 let placedSignature = null;
@@ -187,10 +191,23 @@ export async function undoable(task, message) {
       },
     });
   } catch (error) {
-    toast(error.message);
+    toast(fullMessage(error) ?? error.message);
   }
   changed();
   return ok;
+}
+
+// A part of the fridge with no room left: under a cup, as the server measures it.
+export function isFull(trayId) {
+  const room = space.get(trayId);
+  return Boolean(room) && 0.25 > room.capacityLiters - room.usedLiters;
+}
+
+// The server refuses food that does not fit and names the tray; this says it the way the user reads it.
+export function fullMessage(error) {
+  const problem = error?.problem;
+  if (problem?.freeLiters === undefined || !problem.trayId) return null;
+  return t("stage.full", { place: placeOf(problem.trayId) || t("stage.this-part") });
 }
 
 // Where a tray is, as people say it: "Repisas, arriba" or "Puerta, bandeja 2".
@@ -204,7 +221,15 @@ function placeOf(trayId) {
 
 async function quickAdd(food, trayId) {
   const fridge = currentFridge;
-  if (!fridge || !trayId) return;
+  if (!fridge) return;
+  if (!trayId) {
+    toast(t("stage.drop-on-shelf"));
+    return;
+  }
+  if (isFull(trayId)) {
+    toast(t("stage.full", { place: placeOf(trayId) }));
+    return;
+  }
   const amount = PACK_GRAMS[food] ?? 250;
   await undoable(
     () => api(`/households/${household.id}/items`, { method: "POST", body: { fridgeId: fridge.id, trayId, food, grams: amount, opened: false, expiresOn: null, expirySource: null } }),
@@ -217,6 +242,10 @@ async function act(drop) {
   const food = foodWord(drop.item.name);
   const the = theFood(drop.item.name);
   if (drop.kind === "move") {
+    if (isFull(drop.trayId)) {
+      toast(t("stage.full", { place: placeOf(drop.trayId) }));
+      return false;
+    }
     return undoable(() => api(`${base}/items/${drop.item.id}/move`, { method: "POST", body: { trayId: drop.trayId } }), t("stage.moved", { food: the, place: placeOf(drop.trayId) }));
   }
   if (drop.kind === "discard") {
@@ -253,11 +282,13 @@ async function act(drop) {
 function palette(stageBox, canvas) {
   const tray = document.createElement("div");
   tray.className = "stage-palette";
-  tray.innerHTML = `<p class="hint">${t("stage.palette")}</p>
+  tray.innerHTML = `<div class="palette-head"><p class="hint">${t("stage.palette")}</p><button type="button" class="ghost palette-freezer" data-freezer aria-pressed="false"${hasFreezerDoor(currentShape) ? "" : " hidden"}>${t("stage.freezer")}</button></div>
     <div class="palette-chips">${PALETTE.map((name) => `<button type="button" class="palette-chip" data-food="${esc(name)}"><i class="${shapeClass(name)}" aria-hidden="true"></i>${esc(foodName(name))}</button>`).join("")}
       <form class="palette-other" data-other><label class="visually-hidden" for="palette-other">${t("stage.other")}</label><input id="palette-other" name="name" maxlength="60" autocomplete="off" placeholder="${esc(t("stage.other"))}"></form>
     </div>`;
   canvas.after(tray);
+  freezerButton = tray.querySelector("[data-freezer]");
+  freezerButton.addEventListener("click", () => setFreezer(freezerButton.getAttribute("aria-pressed") !== "true"));
   let ghost = null;
   tray.addEventListener("pointerdown", (event) => {
     const chip = event.target.closest("[data-food]");
@@ -277,19 +308,23 @@ function palette(stageBox, canvas) {
     };
     move(event);
     chip.addEventListener("pointermove", move);
-    chip.addEventListener(
-      "pointerup",
-      (up) => {
-        chip.removeEventListener("pointermove", move);
-        const trayId = three.showTarget(up.clientX, up.clientY, chip.dataset.food, PACK_GRAMS[chip.dataset.food]);
-        three.showTarget(null, null);
-        ghost.remove();
-        ghost = null;
-        if (dragged) quickAdd(chip.dataset.food, trayId);
-        else import("./fridge.js").then(({ openAddFood }) => openAddFood(household, { food: chip.dataset.food, onDone: changed }));
-      },
-      { once: true },
-    );
+    const finish = () => {
+      chip.removeEventListener("pointermove", move);
+      chip.removeEventListener("pointerup", drop);
+      chip.removeEventListener("pointercancel", finish);
+      three.showTarget(null, null);
+      ghost?.remove();
+      ghost = null;
+    };
+    const drop = (up) => {
+      const trayId = three.showTarget(up.clientX, up.clientY, chip.dataset.food, PACK_GRAMS[chip.dataset.food]);
+      finish();
+      if (dragged) quickAdd(chip.dataset.food, trayId);
+      else import("./fridge.js").then(({ openAddFood }) => openAddFood(household, { food: chip.dataset.food, onDone: changed }));
+    };
+    chip.addEventListener("pointerup", drop);
+    // A drag the browser takes back (a scroll, a call, the pointer lost) puts the chip back and adds nothing.
+    chip.addEventListener("pointercancel", finish);
   });
   tray.querySelector("[data-other]").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -329,6 +364,7 @@ function mountThree(element) {
         labels: { market: t("nav.market") },
         describe: (item) => (item.days !== null && 2 >= item.days ? `${grams(item.grams)}, ${whenText(item.expiresOn)}` : grams(item.grams)),
         onDrop: act,
+        isFull,
         onAnchor: (x, y, inside) => {
           const box = element.closest(".stage");
           box.style.setProperty("--anchor-x", `${x}px`);
@@ -428,9 +464,21 @@ export function highlightFoods(names) {
   three?.highlight(names);
 }
 
+function setFreezer(on) {
+  freezerButton?.setAttribute("aria-pressed", String(on));
+  three?.showFreezer(on);
+}
+
+// Choosing a freezer tray on Nevera opens the freezer, any other tray closes it.
+export function showTray(trayId) {
+  const zone = currentFridge?.children.find((candidate) => candidate.children.some((tray) => tray.id === trayId));
+  setFreezer(zone?.kind === "FREEZER" && hasFreezerDoor(currentShape));
+}
+
 export function showRoute(route) {
   if (!root) return;
   lastRoute = route;
+  if (route !== "fridge") setFreezer(false);
   three?.goTo(route);
   if (route !== "chef") three?.highlight([]);
   if (route !== "fridge") three?.focus(null);
@@ -479,10 +527,16 @@ export async function refreshStage(chosen) {
   const inventory = listed.map((item) => ({ ...item, category: categories.get(item.name.toLowerCase()), days: daysLeft(item.expiresOn) }));
   const fridge = fridges[0];
   currentFridge = fridge;
-  const [twin, shape] = fridge
-    ? await Promise.all([api(`${base}/fridges/${fridge.id}/twin`).catch(() => null), api(`${base}/fridges/${fridge.id}/shape`).catch(() => null)])
-    : [null, null];
+  const [twin, shape, room] = fridge
+    ? await Promise.all([
+        api(`${base}/fridges/${fridge.id}/twin`).catch(() => null),
+        api(`${base}/fridges/${fridge.id}/shape`).catch(() => null),
+        api(`${base}/fridges/${fridge.id}/space`).catch(() => []),
+      ])
+    : [null, null, []];
   currentShape = shape;
+  space = new Map(room.map((entry) => [entry.trayId, entry]));
+  freezerButton?.toggleAttribute("hidden", !hasFreezerDoor(shape));
   fill(fridge, inventory, twin, shape);
   const scene = await threeReady;
   if (scene) {

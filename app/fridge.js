@@ -2,7 +2,7 @@ import { art } from "./art/drawings.js";
 import { api, freshAccess, patiently } from "./api.js";
 import { reduced } from "./motion.js";
 import { foodName, foodWord, formatDay, formatMoney, formatNumber, placeName, plural, t, theFood } from "./i18n.js";
-import { focusFood, shapeClass, takeFocusRequest, undoable } from "./stage.js";
+import { focusFood, fullMessage, shapeClass, showTray, takeFocusRequest, undoable } from "./stage.js";
 import { openFridgeShape } from "./fridge-shape.js";
 import {
   busy,
@@ -69,11 +69,12 @@ function shelfChips(fridges) {
 }
 
 // A shelf lists its food as rows: what it is, how much, and one line about when it goes off. Choosing a row unfolds its actions.
-function foodRow(item) {
+function foodRow(item, trays) {
   const hidden = item.name === "Private food";
   const days = daysLeft(item.expiresOn);
   const notable = (item.statuses ?? []).filter((status) => status !== "AT_RISK");
   const actions = `actions-${esc(item.id)}`;
+  const elsewhere = trays.filter((tray) => tray.id !== item.trayId);
   return `<li class="food-row" data-food-id="${esc(item.id)}" data-key="${esc(item.id)}" tabindex="-1">
     <button class="food-row-head" type="button" ${item.usable ? `aria-expanded="false" aria-controls="${actions}"` : "disabled"}>
       <i class="${shapeClass(item.name)}" aria-hidden="true"></i>
@@ -91,24 +92,43 @@ function foodRow(item) {
             <button type="submit" name="action" value="consume">${t("fridge.use")}</button>
             ${item.openedOn ? "" : `<button class="ghost" type="submit" name="action" value="open" formnovalidate>${t("fridge.opened")}</button>`}
             <button class="ghost danger" type="submit" name="action" value="discard" formnovalidate data-hold aria-describedby="hold-hint">${t("fridge.discard")}</button>
+            ${
+              elsewhere.length
+                ? `<span class="move-to"><label for="move-${esc(item.id)}">${t("fridge.move-to")}</label>
+                    <select id="move-${esc(item.id)}" name="trayId">${elsewhere.map((tray) => `<option value="${esc(tray.id)}">${esc(tray.label)}</option>`).join("")}</select>
+                    <button class="ghost" type="submit" name="action" value="move" formnovalidate>${t("fridge.move")}</button></span>`
+                : ""
+            }
           </form></div></div>`
         : ""
     }
   </li>`;
 }
 
-function shelfTile(tray, items) {
+// How full the part is, by volume: a bar and the litres left, so a full shelf is no surprise when the server refuses more.
+function spaceLine(room) {
+  if (!room?.capacityLiters) return "";
+  const free = Math.max(0, room.capacityLiters - room.usedLiters);
+  const full = 0.25 > free;
+  return `<p class="space-line${full ? " full" : ""}">
+    <meter min="0" max="${room.capacityLiters}" low="${room.capacityLiters * 0.7}" high="${room.capacityLiters * 0.9}" optimum="0" value="${Math.min(room.usedLiters, room.capacityLiters)}" aria-hidden="true"></meter>
+    <span>${full ? t("fridge.space-full") : t("fridge.space", { free: formatNumber(free, 1), total: formatNumber(room.capacityLiters, 1) })}</span>
+  </p>`;
+}
+
+function shelfTile(tray, items, trays, room) {
   return `<section class="tile w-12 shelf-tile" aria-labelledby="tray-title">
     <header>
       <div>
         <h2 id="tray-title">${esc(placeName(tray.name))}</h2>
         <p class="hint">${t("fridge.on-shelf", { grams: grams(tray.grams) })}</p>
+        ${spaceLine(room)}
       </div>
       <button class="primary" type="button" data-add-food>${t("fridge.add")}</button>
     </header>
     ${
       items.length
-        ? `<ul class="food-rows">${items.map(foodRow).join("")}</ul>`
+        ? `<ul class="food-rows">${items.map((item) => foodRow(item, trays)).join("")}</ul>`
         : `<div class="empty">${art("shelf")}<p>${t("fridge.empty-shelf")}</p></div>`
     }
   </section>`;
@@ -122,6 +142,7 @@ function trayOptions(fridges) {
         fridgeId: fridge.id,
         zone: zone.kind ?? "SHELF",
         label: `${placeName(zone.name)}: ${placeName(tray.name)}`,
+        place: `${placeName(zone.name)}, ${placeName(tray.name).toLowerCase()}`,
       })),
     ),
   );
@@ -379,7 +400,7 @@ function wireAddFood(dialog, base, trays, onDone) {
       toast(t("fridge.toast-added", { grams: grams(body.grams), food: foodWord(body.food) }));
       onDone(tray.id);
     } catch (error) {
-      showError(form, error);
+      showError(form, fullMessage(error) ? { message: fullMessage(error) } : error);
     }
   });
 }
@@ -398,7 +419,11 @@ export async function openAddFood(household, { food = null, trayId = null, onDon
 export async function renderFridge(main, household) {
   const base = `/households/${household.id}`;
   const [fridges, inventory, prices] = await Promise.all([api(`${base}/fridges`), api(`${base}/inventory`), api(`${base}/prices`).catch(() => ({}))]);
-  const twins = await Promise.all(fridges.map((fridge) => api(`${base}/fridges/${fridge.id}/twin`)));
+  const [twins, spaces] = await Promise.all([
+    Promise.all(fridges.map((fridge) => api(`${base}/fridges/${fridge.id}/twin`))),
+    Promise.all(fridges.map((fridge) => api(`${base}/fridges/${fridge.id}/space`).catch(() => []))),
+  ]);
+  const space = new Map(spaces.flat().map((room) => [room.trayId, room]));
 
   if (fridges.length === 0) {
     main.innerHTML = `<section class="empty" aria-labelledby="fridge-title">
@@ -445,9 +470,10 @@ export async function renderFridge(main, household) {
     </header>
     ${shelfChips(fridges)}
     <div class="bento fridge-bento">
-      ${tray ? shelfTile(tray, inventory.filter((item) => item.trayId === tray.id)) : ""}
+      ${tray ? shelfTile(tray, inventory.filter((item) => item.trayId === tray.id), trays, space.get(tray.id)) : ""}
     </div>`;
 
+  showTray(selectedTray);
   main.querySelector("[data-fridge-shape]")?.addEventListener("click", () => openFridgeShape(household, fridges[0], () => renderFridge(main, household)));
   // The total rolls its digits from the last figure shown, like the money on Mercado and Números.
   ticker(main.querySelector("[data-total]"), grams(total));
@@ -522,6 +548,10 @@ export async function renderFridge(main, household) {
           const perKg = Number(prices[item.name] ?? prices[item.name.toLowerCase()] ?? 0);
           const lost = perKg ? t("fridge.toast-discarded-value", { food: the, money: formatMoney((perKg * item.grams) / 1000, household.currency) }) : t("fridge.toast-discarded", { food: the });
           await undoable(() => api(`${base}/items/${item.id}/discard`, { method: "POST" }), lost);
+          return;
+        } else if (action === "move") {
+          const target = trays.find((option) => option.id === new FormData(form).get("trayId"));
+          await undoable(() => api(`${base}/items/${item.id}/move`, { method: "POST", body: { trayId: target.id } }), t("stage.moved", { food: the, place: target.place }));
           return;
         } else if (action === "open") {
           const opened = await api(`${base}/items/${item.id}/open`, { method: "POST" });
