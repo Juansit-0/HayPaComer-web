@@ -1171,6 +1171,15 @@ a.button:active { transform: scale(0.97); }
 .pasto-photo img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-20); display: block; }
 .pasto-photo figcaption { font-size: 12px; }
 .land-cta { justify-items: start; }
+.land-float { position: fixed; z-index: 40; right: var(--space-l); bottom: var(--space-l); display: flex; gap: var(--space-xs); padding: var(--space-xs); border: 1px solid var(--color-border-strong); border-radius: var(--radius-full); background: var(--color-surface); box-shadow: var(--shadow-raised); opacity: 0; translate: 0 var(--space-m); pointer-events: none; transition: opacity var(--duration-base) var(--ease-emphasized), translate var(--duration-base) var(--ease-emphasized); }
+.land-float.shown { opacity: 1; translate: 0 0; pointer-events: auto; }
+@media (max-width: 640px) {
+  .land-float { left: var(--space-m); right: var(--space-m); bottom: calc(var(--space-m) + env(safe-area-inset-bottom)); }
+  .land-float .button { flex: 1; justify-content: center; white-space: nowrap; padding-inline: var(--space-s); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .land-float { translate: none; transition: opacity var(--duration-fast) linear; }
+}
 .land-footer { min-height: 70svh; align-content: space-between; padding-bottom: max(16px, 2vw); }
 .land-credits { margin: 0; max-width: 60ch; font-size: 15px; }
 .land-wordmark { margin: 0; font: 400 17vw/0.8 var(--font-display); text-transform: uppercase; letter-spacing: var(--tracking-display); white-space: nowrap; overflow: hidden; }
@@ -1217,6 +1226,10 @@ a.button:active { transform: scale(0.97); }
 .palette-ghost { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; box-shadow: var(--shadow-raised); cursor: grabbing; }
 .palette-other input { min-height: 44px; border-radius: var(--radius-full); width: 15ch; }
 .learn { justify-self: start; }
+.did-you-mean { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.row-form > .did-you-mean { flex: 0 0 auto; width: 100%; }
+.did-you-mean > span { color: var(--color-text-weak); font-weight: 600; }
+.did-you-mean .chip-button { min-height: 44px; padding: 0 var(--space-s); }
 
 /* Grams and days floating over each food while the 3D door is open */
 .stage-tags { position: absolute; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity var(--duration-base) var(--ease-standard); }
@@ -1244,6 +1257,12 @@ a.button:active { transform: scale(0.97); }
 .chat .answer b { font-weight: 700; }
 .chef-tile .chat:empty { display: none; }
 .chef-dishes { display: grid; gap: var(--space-s); margin-top: var(--space-xs); }
+.quick-replies { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-s); }
+.chat > li, .chat .quick-replies { scroll-margin-bottom: var(--ask-space, 96px); }
+.quick-replies .chip-button { min-height: 44px; padding: 0 var(--space-s); border: 1px solid var(--color-border-strong); }
+.quick-replies .chip-button.primary { border-color: transparent; background: var(--color-primary); color: var(--color-primary-fg); }
+.quick-replies .chip-button.primary:hover { background: var(--color-primary-hover); }
+.chat .answer:has(.quick-replies) .dish-card [data-cook] { display: none; }
 .chef-dishes .dish-card { grid-template-columns: 104px minmax(0, 1fr); align-items: center; padding: var(--space-s); border-radius: var(--radius-20); background: var(--color-white); }
 .chef-dishes .dish-photo img { aspect-ratio: 1; }
 .chef-dishes .dish-photo figcaption { display: none; }
@@ -1471,6 +1490,9 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 .shell:has(.stage:not([hidden])) .dish-row .dish-card { padding: var(--space-s); background: var(--card); border: 2px solid var(--line); border-radius: 6px; box-shadow: 4px 4px 0 var(--line); }
 .shell:has(.stage:not([hidden])) .chat .answer { background: var(--card); border: 2px solid var(--line); box-shadow: 3px 3px 0 var(--line); }
 .shell:has(.stage:not([hidden])) .chat .said { background: var(--line); color: var(--sheet); }
+.shell:has(.stage:not([hidden])) .chat .said .who { color: inherit; }
+.shell:has(.stage:not([hidden])) .quick-replies .chip-button.primary { background: var(--button-primary-bg); color: var(--button-primary-fg); box-shadow: none; }
+.shell:has(.stage:not([hidden])) .quick-replies .chip-button.primary:hover { background: var(--button-primary-bg-hover); }
 .shell:has(.stage:not([hidden])) :is(.chip-button, .shelf-chips a, .chip span) { border: 0; background: var(--card); color: var(--line); box-shadow: inset 0 0 0 1.5px var(--line); }
 .shell:has(.stage:not([hidden])) :is(.shelf-chips a[aria-current="true"], .chip input:checked + span) { background: var(--line); color: var(--sheet); }
 .shell:has(.stage:not([hidden])) main :is(input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea):not(.number-input *, .ask *) { background: var(--card); border: 2px solid var(--line); border-radius: 4px; }

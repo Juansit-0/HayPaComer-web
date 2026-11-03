@@ -137,7 +137,27 @@ export function renderLanding(main) {
         <p class="land-credits">${t("landing.credits")}</p>
         <p class="land-wordmark" aria-hidden="true" data-reveal>${[...WORDMARK].map((letter, index) => `<span style="--i:${index}">${letter}</span>`).join("")}</p>
       </footer>
+      <nav class="land-float" aria-label="${esc(t("landing.float.label"))}" data-float inert>
+        <a class="button primary" href="#/register">${t("auth.create-account")}</a>
+        <a class="button" href="#/signin">${t("auth.signin")}</a>
+      </nav>
     </div>`;
+
+  // Once the story has been scrolled past, account buttons float at the bottom; they step aside while the page shows its own.
+  const float = main.querySelector("[data-float]");
+  const story = main.querySelector("[data-story]");
+  const own = [main.querySelector(".land-hero .land-actions"), main.querySelector(".land-cta")];
+  const seen = new Map();
+  const watcher = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => seen.set(entry.target, entry));
+    const told = seen.get(story);
+    const past = Boolean(told && !told.isIntersecting && 0 > told.boundingClientRect.top);
+    const show = past && !own.some((element) => seen.get(element)?.isIntersecting);
+    float.classList.toggle("shown", show);
+    float.inert = !show;
+  });
+  [story, ...own].forEach((element) => watcher.observe(element));
+  page.defer(() => watcher.disconnect());
 
   main.querySelectorAll("[data-reveal]").forEach((element) => {
     const stop = inView(element, () => {

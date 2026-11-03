@@ -1,6 +1,7 @@
 import { foodName, formatNumber, plural, t } from "./i18n.js";
 import { easing, reduced, token } from "./motion.js";
 import { play } from "./sound.js";
+import { closest } from "./fuzzy.js";
 
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
@@ -180,19 +181,43 @@ export function foodOptions(id) {
   return `<datalist id="${id}"></datalist>`;
 }
 
+// A food typed that the catalog does not know gets the closest spellings under its form, one tap away.
 export function wireFoodSearch(input, api) {
   const list = document.getElementById(input.getAttribute("list"));
+  const guess = document.createElement("div");
+  guess.className = "did-you-mean";
+  guess.setAttribute("aria-live", "polite");
+  guess.hidden = true;
+  (input.closest("label") ?? input).after(guess);
+  let catalog = null;
   let timer;
   input.addEventListener("input", () => {
     clearTimeout(timer);
     const query = input.value.trim();
-    if (query.length < 2) return;
+    if (query.length < 2) {
+      guess.hidden = true;
+      return;
+    }
     timer = setTimeout(async () => {
-      const foods = await api(`/foods?q=${encodeURIComponent(query)}`);
+      const foods = await api(`/foods?q=${encodeURIComponent(query)}`).catch(() => []);
       list.innerHTML = foods
         .map((food) => `<option value="${esc(food.name)}" label="${esc(foodName(food.name))}"></option>`)
         .join("");
+      catalog = foods.length ? catalog : (catalog ?? (await api("/foods?q=").catch(() => [])));
+      const guesses = foods.length ? [] : closest(query, catalog.map((food) => ({ value: food.name, names: [food.name, foodName(food.name)] })));
+      if (input.value.trim() !== query) return;
+      guess.hidden = !guesses.length;
+      guess.innerHTML = guesses.length
+        ? `<span>${t("search.did-you-mean")}</span>${guesses.map((food) => `<button type="button" class="chip-button" data-guess-food="${esc(food)}">${esc(foodName(food))}</button>`).join("")}`
+        : "";
     }, 200);
+  });
+  guess.addEventListener("click", (event) => {
+    const food = event.target.closest("[data-guess-food]")?.dataset.guessFood;
+    if (!food) return;
+    input.value = food;
+    guess.hidden = true;
+    input.focus();
   });
 }
 

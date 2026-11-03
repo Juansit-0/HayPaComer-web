@@ -7,7 +7,7 @@ import { daysLeft, esc, grams, toast, whenText } from "./ui.js";
 import { easing, page, reduced, token } from "./motion.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
-const state = { conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, shown: null };
+const state = { conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, recipes: null, offered: new Set(), shown: null };
 
 const arrive = (element) => element?.animate([{ opacity: 0, translate: "0 var(--rise)" }, { opacity: 1, translate: "0 0" }], { duration: token("duration-slow"), easing: easing("ease-emphasized") });
 const scrollBehavior = () => (reduced() ? "auto" : "smooth");
@@ -33,10 +33,25 @@ function checked(evidence) {
   return tools.map((tool) => (TOOLS.includes(tool) ? t(`chef.tool.${tool}`) : tool)).join(", ");
 }
 
-function message(entry) {
+// Questions the Chef asks come with their answers as buttons: what to cook, what is missing, a change to confirm, or what to ask next.
+const FOLLOW_UPS = { chef: ["chef.follow.quick", "chef.follow.expiring"], market: ["chef.follow.buy", "chef.follow.budget"], cold: ["chef.follow.cold"], coach: ["chef.follow.coach"] };
+
+function followUps(runs) {
+  const keys = [...new Set((runs ?? []).flatMap((run) => FOLLOW_UPS[run.specialist] ?? []))];
+  return (keys.length ? keys : FOLLOW_UPS.chef).slice(0, 3).map((key) => ({ label: t(key), action: "ask", text: t(key) }));
+}
+
+function replies(entry, index) {
+  if (!entry.replies?.length) return "";
+  return `<div class="quick-replies" role="group" aria-label="${esc(t("chef.replies"))}">${entry.replies
+    .map((reply, choice) => `<button type="button" class="chip-button${reply.main ? " primary" : ""}" data-reply="${index}:${choice}">${esc(reply.label)}</button>`)
+    .join("")}</div>`;
+}
+
+function message(entry, index) {
   if (entry.role === "user") return `<li class="said"><span class="who">${t("chef.you")}</span><p>${esc(entry.text)}</p></li>`;
   const runs = (entry.runs || []).map((run) => (SPECIALISTS[run.specialist] ? t(SPECIALISTS[run.specialist]) : run.specialist)).join(", ");
-  return `<li class="answer">
+  return `<li class="answer" data-message="${index}">
     <span class="who">${esc(runs || t("chef.kitchen"))}</span>
     <p>${formatted(entry.text)}</p>
     ${entry.dishes?.length ? `<div class="chef-dishes">${entry.dishes.map(dishCard).join("")}</div>` : ""}
@@ -47,7 +62,20 @@ function message(entry) {
             .join("")}</ul></details>`
         : ""
     }
+    ${replies(entry, index)}
   </li>`;
+}
+
+const missingOf = (dish) => dish.evaluation.requirements.filter((requirement) => !requirement.substitute && Number(requirement.shortfallGrams) > 0);
+
+function offer(dish) {
+  state.offered.add(dish.recipe);
+  const options = [
+    { label: t("chef.offer.yes"), action: "cook", dish, main: true },
+    { label: t("chef.offer.other"), action: "other" },
+  ];
+  if (missingOf(dish).length) options.push({ label: t("chef.offer.missing"), action: "missing", dish });
+  return { role: "assistant", text: t("chef.offer.cook", { recipe: recipeName(dish.recipe) }), runs: [{ specialist: "chef" }], dishes: [dish], replies: options };
 }
 
 function mentioned(text, inventory) {
@@ -135,7 +163,7 @@ export async function renderChef(main, household) {
     ${side ? `<div class="chef-side">${side}</div>` : ""}
     ${sees(inventory)}
     <section class="chef-tile" aria-labelledby="chef-title">
-        <ol class="chat" aria-live="polite" data-chat>${state.messages.map(message).join("")}</ol>
+        <ol class="chat" aria-live="polite" data-chat>${state.messages.map((entry, index) => message(entry, index)).join("")}</ol>
         ${
           state.messages.length
             ? ""
@@ -165,6 +193,11 @@ export async function renderChef(main, household) {
 
   const form = main.querySelector("[data-ask]");
   const input = form.querySelector("[name=message]");
+  // The ask bar floats over the bottom of the screen: a new answer stops above it, with its buttons in sight.
+  const roomForAsk = () => main.style.setProperty("--ask-space", `${form.offsetHeight + (parseFloat(getComputedStyle(form).bottom) || 0) + 16}px`);
+  roomForAsk();
+  addEventListener("resize", roomForAsk);
+  page.defer(() => removeEventListener("resize", roomForAsk));
   const mic = main.querySelector("[data-mic]");
 
   async function cook(action) {
@@ -186,19 +219,25 @@ export async function renderChef(main, household) {
 
   async function dishesWith(foods) {
     try {
-      state.dishes ??= await kitchenRecipes(base).then((recipes) =>
-        recipes.length ? api(`${base}/suggestions`, { method: "POST", body: { servings: 2, candidates: recipes.slice(0, 50).map(candidate) } }).then((result) => result.suggestions) : [],
-      );
+      state.dishes ??= await kitchenRecipes(base).then((recipes) => {
+        state.recipes = recipes;
+        return recipes.length ? api(`${base}/suggestions`, { method: "POST", body: { servings: 2, candidates: recipes.slice(0, 50).map(candidate) } }).then((result) => result.suggestions) : [];
+      });
     } catch {
       return [];
     }
     const wanted = foods.map((food) => food.toLowerCase());
-    return state.dishes.filter((dish) => dish.evaluation.requirements.some((requirement) => wanted.includes(requirement.food.toLowerCase()))).slice(0, 2);
+    // Once every dish was offered, the round starts again.
+    if (state.dishes.every((dish) => state.offered.has(dish.recipe))) state.offered.clear();
+    const fresh = state.dishes.filter((dish) => !state.offered.has(dish.recipe));
+    const matching = fresh.filter((dish) => dish.evaluation.requirements.some((requirement) => wanted.includes(requirement.food.toLowerCase())));
+    return (matching.length ? matching : fresh).slice(0, 1);
   }
 
   async function ask(text) {
     const command = commandOf(text);
     if (command && (await cook(command))) return;
+    clearReplies();
     state.messages.push({ role: "user", text });
     input.value = "";
     const chat = main.querySelector("[data-chat]");
@@ -214,24 +253,149 @@ export async function renderChef(main, household) {
       state.conversationId = reply.conversationId;
       const foods = mentioned(reply.answer, inventory);
       const cooking = reply.runs?.some((run) => run.specialist === "chef");
-      const dishes = cooking && foods.length ? await dishesWith(foods) : [];
+      const dishes = cooking ? await dishesWith(foods) : [];
       // A run that only proposes a change answers with its English summary; say it in the person's language instead.
-      const text = reply.confirmation && /^Waiting for your confirmation/.test(reply.answer) ? t("chef.waiting-for", { what: confirmationText(reply.confirmation) }) : reply.answer;
-      state.messages.push({ role: "assistant", text, runs: reply.runs, evidence: reply.evidence, foods, dishes });
-      if (state.handsFree || mic.getAttribute("aria-pressed") === "true") speak(spoken(text), voiceLanguage());
+      const pending = reply.confirmation;
+      const said = pending && /^Waiting for your confirmation/.test(reply.answer) ? t("chef.confirm.ask", { what: confirmationText(pending) }) : reply.answer;
+      const options = pending
+        ? [
+            { label: t("chef.confirm.yes"), action: "approve", id: pending.id, pending, main: true },
+            { label: t("chef.confirm.no"), action: "reject", id: pending.id },
+          ]
+        : dishes.length
+          ? []
+          : followUps(reply.runs);
+      state.messages.push({ role: "assistant", text: said, runs: reply.runs, evidence: reply.evidence, foods, dishes: [], replies: options });
+      if (dishes.length) state.followUp = offer(dishes[0]);
+      if (state.handsFree || mic.getAttribute("aria-pressed") === "true") speak(spoken(said), voiceLanguage());
     } catch (error) {
       state.messages.push({ role: "assistant", text: error.message, runs: [] });
     }
     // Only the new answer is added: the typing dots give way to it and it is written in from the top, the rest of the screen stays put.
     const typing = chat.querySelector(".typing");
     if (!typing || !document.body.contains(chat)) return;
-    typing.outerHTML = message(state.messages.at(-1));
+    typing.outerHTML = message(state.messages.at(-1), state.messages.length - 1);
     const answer = chat.lastElementChild;
     state.shown = state.messages.length;
     if (!reduced()) answer.classList.add("fresh");
-    answer.querySelectorAll(".dish-card [data-cook]").forEach((button) => button.addEventListener("click", () => ask(t("chef.how-to", { recipe: recipeName(button.dataset.cook) }))));
     highlightFoods(state.messages.at(-1).foods ?? []);
-    answer.scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
+    (answer.querySelector(".quick-replies") ?? answer).scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
+    if (state.followUp) {
+      const next = state.followUp;
+      state.followUp = null;
+      say(next);
+    }
+  }
+
+  // Older buttons go once the talk moves on, except a change still waiting for its yes or no.
+  function clearReplies() {
+    state.messages.forEach((earlier, index) => {
+      if (!earlier.replies?.length || earlier.replies.some((reply) => reply.action === "approve")) return;
+      earlier.replies = [];
+      main.querySelector(`[data-message="${index}"] .quick-replies`)?.remove();
+    });
+  }
+
+  function say(entry) {
+    const chat = main.querySelector("[data-chat]");
+    if (!chat) return;
+    clearReplies();
+    state.messages.push(entry);
+    chat.insertAdjacentHTML("beforeend", message(entry, state.messages.length - 1));
+    state.shown = state.messages.length;
+    const added = chat.lastElementChild;
+    if (!reduced()) added.classList.add("fresh");
+    (added.querySelector(".quick-replies") ?? added).scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
+    if (entry.role === "assistant" && (state.handsFree || mic.getAttribute("aria-pressed") === "true")) speak(spoken(entry.text), voiceLanguage());
+  }
+
+  const recipeFor = (name) => state.recipes?.find((recipe) => recipe.name === name);
+
+  async function choose(reply) {
+    if (reply.action === "ask") return ask(reply.text);
+    say({ role: "user", text: reply.label });
+    if (reply.action === "go") {
+      location.hash = reply.href;
+      return;
+    }
+    if (reply.action === "approve" || reply.action === "reject") {
+      const entry = state.messages.find((earlier) => earlier.replies?.some((option) => option.id === reply.id));
+      if (entry) {
+        main.querySelector(`[data-message="${state.messages.indexOf(entry)}"] .quick-replies`)?.remove();
+        entry.replies = [];
+      }
+      const row = main.querySelector(`[data-approve="${CSS.escape(reply.id)}"]`);
+      if (reply.action === "approve") {
+        try {
+          const result = await api(`/agent/confirmations/${reply.id}/approve`, { method: "POST" });
+          const args = reply.pending?.arguments ?? {};
+          const done = reply.pending?.tool === "add_to_market" && args.food ? t("chef.offer.added", { foods: t("chef.offer.missing-item", { grams: grams(Number(args.grams) || 0), food: foodWord(args.food) }) }) : result.result;
+          if (row) settle(row, done, true);
+          say({ role: "assistant", text: done, runs: [], replies: followUps([{ specialist: "market" }]) });
+        } catch (error) {
+          say({ role: "assistant", text: error.message, runs: [] });
+        }
+      } else {
+        await api(`/agent/confirmations/${reply.id}/reject`, { method: "POST" }).catch(() => null);
+        if (row) settle(row, t("chef.nothing-changed"), false);
+        say({ role: "assistant", text: t("chef.nothing-changed"), runs: [], replies: followUps([{ specialist: "chef" }]) });
+      }
+      return;
+    }
+    if (reply.action === "other") {
+      const next = (state.dishes ?? []).find((dish) => !state.offered.has(dish.recipe));
+      say(next ? offer(next) : { role: "assistant", text: t("chef.offer.no-more"), runs: [{ specialist: "chef" }], replies: followUps([{ specialist: "chef" }]) });
+      return;
+    }
+    const dish = reply.dish;
+    const recipe = recipeFor(dish.recipe);
+    if (reply.action === "missing") {
+      const missing = missingOf(dish);
+      say({
+        role: "assistant",
+        text: t("chef.offer.missing-list", { recipe: recipeName(dish.recipe), foods: missing.map((requirement) => t("chef.offer.missing-item", { grams: grams(Number(requirement.shortfallGrams)), food: foodWord(requirement.food) })).join(", ") }),
+        runs: [{ specialist: "market" }],
+        replies: [
+          { label: t("chef.offer.add"), action: "add-missing", dish, main: true },
+          { label: t("chef.offer.no"), action: "decline" },
+        ],
+      });
+      return;
+    }
+    if (reply.action === "decline") {
+      say({ role: "assistant", text: t("chef.nothing-changed"), runs: [], replies: followUps([{ specialist: "chef" }]) });
+      return;
+    }
+    if (!recipe) {
+      say({ role: "assistant", text: t("error.generic"), runs: [] });
+      return;
+    }
+    const body = { ...candidate(recipe), targetServings: dish.evaluation.requestedServings || 2 };
+    if (reply.action === "add-missing") {
+      try {
+        const added = (await api(`${base}/recipes/missing-to-market`, { method: "POST", body })).filter((item) => Number(item.addedGrams) > 0);
+        say({
+          role: "assistant",
+          text: added.length ? t("chef.offer.added", { foods: added.map((item) => t("chef.offer.missing-item", { grams: grams(Number(item.addedGrams)), food: foodWord(item.food) })).join(", ") }) : t("chef.offer.already"),
+          runs: [{ specialist: "market" }],
+          replies: [
+            { label: t("chef.offer.see-market"), action: "go", href: "#/market" },
+            { label: t("chef.offer.yes"), action: "cook", dish, main: true },
+          ],
+        });
+      } catch (error) {
+        say({ role: "assistant", text: error.message, runs: [] });
+      }
+      return;
+    }
+    try {
+      const started = await api(`${base}/cooking-sessions`, { method: "POST", body: { name: body.name, servings: body.servings, minutes: body.minutes, requirements: body.requirements, steps: body.steps, targetServings: body.targetServings } });
+      state.messages.push({ role: "assistant", text: t("chef.offer.started", { recipe: recipeName(dish.recipe), step: started.step?.instruction ?? "" }).trim(), runs: [{ specialist: "chef" }] });
+      if (state.handsFree || mic.getAttribute("aria-pressed") === "true") speak(started.step?.instruction ?? "", voiceLanguage());
+      await renderChef(main, household);
+    } catch (error) {
+      say({ role: "assistant", text: error.message, runs: [] });
+    }
   }
 
   main.querySelectorAll("[data-prompt]").forEach((button) => button.addEventListener("click", () => ask(button.dataset.prompt)));
@@ -274,16 +438,26 @@ export async function renderChef(main, household) {
   });
 
   main.querySelectorAll(".cooking [data-cook]").forEach((button) => button.addEventListener("click", () => cook(button.dataset.cook)));
-  main.querySelectorAll(".dish-card [data-cook]").forEach((button) => button.addEventListener("click", () => ask(t("chef.how-to", { recipe: recipeName(button.dataset.cook) }))));
+  main.querySelector("[data-chat]").addEventListener("click", (event) => {
+    const dish = event.target.closest(".dish-card [data-cook]");
+    if (dish) return ask(t("chef.how-to", { recipe: recipeName(dish.dataset.cook) }));
+    const button = event.target.closest("[data-reply]");
+    if (!button) return;
+    const [index, choice] = button.dataset.reply.split(":").map(Number);
+    const reply = state.messages[index]?.replies?.[choice];
+    if (!reply) return;
+    button.closest(".quick-replies").querySelectorAll("button").forEach((other) => (other.disabled = true));
+    choose(reply);
+  });
   highlightFoods(state.messages.findLast((entry) => entry.role === "assistant")?.foods ?? []);
 
   // An answered confirmation keeps its place as a quiet line saying what happened, so the list still reads as a history.
-  const settle = (button, text, done) => {
-    const row = button.closest("[data-pending]");
+  function settle(target, text, done) {
+    const row = target.closest("[data-pending]");
     row.classList.add("resolved", done ? "done" : "declined");
     row.innerHTML = `<p class="resolved-line"><span class="item-name">${row.querySelector(".item-name").innerHTML}</span><span>${esc(text)}</span></p>`;
     if (!reduced()) arrive(row);
-  };
+  }
   main.querySelectorAll("[data-approve]").forEach((button) =>
     button.addEventListener("click", async () => {
       try {

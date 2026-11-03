@@ -62,6 +62,8 @@ const fridges = () => [{ id: F, type: "FRIDGE", kind: null, name: "Kitchen", gra
   { id: "z3", type: "ZONE", kind: "DOOR", name: "Door", grams: 0, items: 0, children: named(shape.doorRacks, [TRAYS.door], ["Rack"], "t-rack").map(([id], index) => tray(id, index ? `Rack ${index + 1}` : "Rack")) },
   { id: "z4", type: "ZONE", kind: "FREEZER", name: "Freezer", grams: 0, items: 0, children: named(shape.freezerShelves, [], ["Top"], "t-freezer").map(([id], index) => tray(id, level(index, shape.freezerShelves))) },
 ].filter((zone) => zone.children.length) }];
+let cooking = null;
+const pending = [];
 const requirement = (food, grams) => ({ food, grams, verdict: "ENOUGH", availableGrams: grams, shortfallGrams: 0, substitute: null });
 const recipe = (name, minutes, foods) => ({ id: name, name, servings: 2, minutes, requirements: foods.map(([food, grams]) => ({ food, grams, optional: false })), steps: [{ instruction: "Cook", timerSeconds: null, weighFood: null, weighGrams: null }] });
 const recipes = [recipe("Scrambled eggs with tomato", 10, [["Egg", 120], ["Tomato", 100]]), recipe("Pasta con tomate", 25, [["Tomato", 200], ["Cheese", 50]]), recipe("Arroz con pollo", 35, [["Chicken breast", 300], ["Carrot", 100]])];
@@ -93,7 +95,7 @@ const routes = [
   [/^\/households\/[^/]+\/kitchen$/, () => ({ totalGrams: inventory.reduce((t, e) => t + e.grams, 0), items: inventory.length, atRisk: 3, expired: 0 })],
   [/^\/households\/[^/]+\/recipes$/, () => recipes],
   [/^\/recipe-templates$/, () => []],
-  [/^\/households\/[^/]+\/suggestions$/, () => ({ suggestions: recipes.map((entry) => ({ recipe: entry.name, minutes: entry.minutes, rescuedFoods: ["Tomato"], score: 1, reason: "", evaluation: { requestedServings: 2, verdict: "ENOUGH", requirements: entry.requirements.map((r) => requirement(r.food, r.grams)) } })) })],
+  [/^\/households\/[^/]+\/suggestions$/, () => ({ suggestions: recipes.map((entry) => ({ recipe: entry.name, minutes: entry.minutes, rescuedFoods: ["Tomato"], score: 1, reason: "", evaluation: { requestedServings: 2, verdict: entry.name === "Arroz con pollo" ? "MISSING" : "ENOUGH", requirements: entry.requirements.map((r) => (entry.name === "Arroz con pollo" && r.food === "Carrot" ? { ...requirement(r.food, r.grams), verdict: "MISSING", availableGrams: 0, shortfallGrams: r.grams } : requirement(r.food, r.grams))) } })) })],
   [/^\/households\/[^/]+\/analytics\?/, () => ({ from: day(-29), to: day(0), currency: "COP", moneySaved: 6225, moneyWasted: 1760, unpriced: [], total: tally(520, 270, 80),
     days: Array.from({ length: 30 }, (_, index) => ({ day: day(index - 29), tally: tally(index % 4 ? 0 : 60, index % 6 ? 0 : 40, index === 20 ? 80 : 0) })),
     members: [{ userId: "u1", name: "Juan", tally: tally(320, 270, 0) }, { userId: "u2", name: "Jenifer", tally: tally(200, 0, 80) }],
@@ -102,14 +104,19 @@ const routes = [
   [/^\/households\/[^/]+\/agent\/chat$/, () => ({ conversationId: "c1", answer: "El **tomate** vence mañana y hay 360 g: úsalo hoy en unos huevos pericos o en una salsa para la pasta.\nLa pechuga de pollo también vence mañana.", runs: [{ specialist: "chef" }], evidence: [{ tool: "view_expiries", content: "Tomate 360 g, vence mañana" }, { tool: "query_inventory", content: "Pechuga de pollo 400 g, vence mañana" }] })],
   [/^\/households\/[^/]+\/prices$/, () => ({ Tomato: 4400, "Chicken breast": 18000, Tuna: 30000, Milk: 4200 })],
   [/^\/households\/[^/]+\/market-budget$/, () => ({ currency: "COP", monthly: 600000, spent: 210000, plannedCost: 48000, remaining: 342000, lines: [] })],
-  [/^\/households\/[^/]+\/cooking-sessions\/active$/, () => null],
+  [/^\/households\/[^/]+\/cooking-sessions\/active$/, () => cooking],
   [/^\/households\/[^/]+\/profiles$/, () => []],
   [/^\/households\/[^/]+\/settings$/, () => []],
   [/^\/me\/notification-preferences$/, () => ({ channels: ["INBOX"], telegramChatId: null })],
-  [/^\/agent\/confirmations$/, () => []],
+  [/^\/agent\/confirmations$/, () => pending],
   [/^\/notifications$/, () => notifications],
   [/^\/status$/, () => ({ state: "OK", degraded: [] })],
-  [/^\/foods\?/, () => inventory.map((entry) => ({ name: entry.name, category: "VEGETABLE" }))],
+  [/^\/foods\?q=([^&]*)/, (m) => {
+    const plain = (text) => String(text ?? "").toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+    const query = plain(decodeURIComponent(m[1]));
+    const names = [...new Set(inventory.map((entry) => entry.name))];
+    return names.filter((name) => [name, texts["es-CO"][`food.${name.toLowerCase()}`]].some((text) => plain(text).includes(query))).map((name) => ({ name, category: "VEGETABLE" }));
+  }],
 ];
 
 const TYPES = { ".js": "text/javascript", ".css": "text/css", ".html": "text/html", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".png": "image/png", ".woff2": "font/woff2", ".json": "application/json", ".glb": "model/gltf-binary" };
@@ -166,6 +173,38 @@ createServer((request, response) => {
         inventory.push(added);
         response.writeHead(201, { "content-type": "application/json" });
         response.end(JSON.stringify(added));
+      });
+      return;
+    }
+    // The Chef's buttons: a chat that proposes a change, its yes or no, a cooking session, and what a recipe is missing.
+    const chef = request.method === "POST" && path.match(/\/(agent\/chat|cooking-sessions|recipes\/missing-to-market|confirmations\/([^/]+)\/(approve|reject))$/);
+    if (chef) {
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk));
+      request.on("end", () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+        const answer = (status, value) => {
+          response.writeHead(status, { "content-type": status === 409 ? "application/problem+json" : "application/json" });
+          response.end(JSON.stringify(value));
+        };
+        if (chef[1] === "agent/chat" && /agrega|add/i.test(body.message ?? "")) {
+          const confirmation = { id: `p${pending.length + 1}`, tool: "add_to_market", arguments: { food: "Tomato", grams: 200 }, summary: "Add 200 g of Tomato to the market list" };
+          pending.push(confirmation);
+          return answer(200, { conversationId: "c1", answer: `Waiting for your confirmation: ${confirmation.summary}`, runs: [{ specialist: "market" }], evidence: [], confirmation });
+        }
+        if (chef[1] === "agent/chat") return answer(200, routes.find(([pattern]) => pattern.test(path))[1]());
+        if (chef[3]) {
+          const index = pending.findIndex((entry) => entry.id === chef[2]);
+          if (0 > index) return answer(409, { title: "Confirmation not pending", detail: "This confirmation was already answered or expired" });
+          pending.splice(index, 1);
+          return answer(200, { result: chef[3] === "approve" ? "Added 200 g of Tomato to the market list" : "Rejected" });
+        }
+        if (chef[1] === "cooking-sessions") {
+          if (cooking) return answer(409, { title: "Session already active", detail: "Ya hay una sesión de cocina activa en este hogar." });
+          cooking = { id: "s1", recipe: body.name, currentStep: 1, totalSteps: body.steps.length, phase: "COOKING", step: body.steps[0] ?? null };
+          return answer(201, cooking);
+        }
+        return answer(200, body.requirements.map((entry) => ({ food: entry.food, shortfallGrams: entry.grams, addedGrams: entry.grams, pendingGrams: entry.grams })));
       });
       return;
     }

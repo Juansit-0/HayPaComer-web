@@ -1,6 +1,7 @@
 import { art } from "./art/drawings.js";
 import { api, freshAccess, patiently } from "./api.js";
 import { reduced } from "./motion.js";
+import { closest } from "./fuzzy.js";
 import { foodName, foodWord, formatDay, formatMoney, formatNumber, placeName, plural, t, theFood } from "./i18n.js";
 import { focusFood, fullMessage, shapeClass, showTray, takeFocusRequest, undoable } from "./stage.js";
 import { openFridgeShape } from "./fridge-shape.js";
@@ -164,6 +165,7 @@ function addFoodBody(catalog, trays, trayId, chosen = null) {
       <legend>${t("add.step.food")}</legend>
       <label for="add-search" class="visually-hidden">${t("add.search")}</label>
       <input id="add-search" type="search" data-food-search autocomplete="off" placeholder="${esc(t("add.search"))}">
+      <div class="did-you-mean" data-guess aria-live="polite" hidden></div>
       <button type="button" class="learn" data-learn hidden></button>
       <p class="hint" data-learn-status aria-live="polite"></p>
       <div class="food-groups" data-food-groups>${[...groups.entries()]
@@ -251,6 +253,24 @@ function wireAddFood(dialog, base, trays, onDone) {
     const none = [...form.querySelectorAll("[data-chip]")].every((chip) => chip.hidden);
     learn.hidden = !query || !none;
     learn.textContent = t("add.learn", { food: search.value.trim() });
+    const options = [...form.querySelectorAll("[data-chip] input[name=food]")].map((input) => ({ value: input.value, names: [input.value, foodName(input.value)] }));
+    const guesses = none ? closest(query, options) : [];
+    guess.hidden = !guesses.length;
+    guess.innerHTML = guesses.length
+      ? `<span>${t("search.did-you-mean")}</span>${guesses.map((food) => `<button type="button" class="chip-button" data-guess-food="${esc(food)}">${esc(foodName(food))}</button>`).join("")}`
+      : "";
+  });
+
+  const guess = form.querySelector("[data-guess]");
+  guess.addEventListener("click", (event) => {
+    const food = event.target.closest("[data-guess-food]")?.dataset.guessFood;
+    if (!food) return;
+    search.value = foodName(food);
+    search.dispatchEvent(new Event("input"));
+    const radio = [...form.querySelectorAll("[data-chip] input[name=food]")].find((input) => input.value === food);
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", { bubbles: true }));
+    radio.focus();
   });
 
   const learn = form.querySelector("[data-learn]");
