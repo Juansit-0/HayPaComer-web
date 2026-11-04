@@ -9,6 +9,7 @@ import {
   kpi,
   moneyField,
   busy,
+  canonicalFood,
   moneyValue,
   numberField,
   showError,
@@ -224,8 +225,9 @@ export async function renderMarket(main, household) {
     const values = formData(add);
     await busy(add.querySelector("button[type=submit]"), async () => {
       try {
-        await api(`${base}/items`, { method: "POST", body: { food: values.food, grams: Number(values.grams) } });
-        toast(t("market.toast-added", { food: theFood(values.food) }));
+        const food = await canonicalFood(values.food, api);
+        await api(`${base}/items`, { method: "POST", body: { food, grams: Number(values.grams) } });
+        toast(t("market.toast-added", { food: theFood(food) }));
         refresh();
       } catch (error) {
         showError(add, error);

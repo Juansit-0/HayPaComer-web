@@ -1843,6 +1843,8 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 .shape-form { display: grid; gap: var(--space-m); }
 .shape-counts, .shape-size { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-s); }
 .shape-size { border: 0; padding: 0; margin: 0; }
+.shape-counts .number-input, .shape-size .number-input { display: flex; width: 100%; }
+.shape-counts .number-input input, .shape-size .number-input input { flex: 1 1 0; width: 0; }
 .shape-size legend { font-weight: 600; margin-bottom: var(--space-xs); padding: 0; }
 .shape-summary { display: flex; align-items: center; gap: var(--space-m); }
 .shape-summary .shape-drawing { width: 120px; margin: 0; }

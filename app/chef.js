@@ -23,6 +23,13 @@ function voiceLanguage() {
 
 const SPECIALISTS = { chef: "chef.specialist.chef", market: "chef.specialist.market", cold: "chef.specialist.cold", coach: "chef.specialist.coach" };
 
+// With no AI the agent only reads, and its answer is a raw list of what it read: that list stays under "checked", and the person gets this.
+function offlineText(answer) {
+  if (/^Offline answer based on measured data/.test(answer)) return t("chef.offline-answer");
+  if (/^No evidence available right now/.test(answer)) return t("chef.offline-none");
+  return answer;
+}
+
 function spoken(answer) {
   return answer.replace(/^Offline answer based on measured data:\s*/i, "").replace(/\b[a-z_]+: /g, "");
 }
@@ -122,6 +129,7 @@ function stepCard(session) {
       <button class="primary" type="button" data-cook="next">${ready ? t("chef.begin") : t("chef.next")}</button>
       <button type="button" data-cook="${session.phase === "PAUSED" ? "resume" : "pause"}">${session.phase === "PAUSED" ? t("chef.resume") : t("chef.pause")}</button>
       <button type="button" data-cook="repeat">${t("chef.read-aloud")}</button>
+      <button type="button" class="ghost" data-cook="abandon">${t("chef.abandon")}</button>
     </div>
     <p class="hint">${t("chef.voice-hint")}</p>
   </article>`;
@@ -262,7 +270,7 @@ export async function renderChef(main, household) {
       const dishes = cooking ? await dishesWith(foods) : [];
       // A run that only proposes a change answers with its English summary; say it in the person's language instead.
       const pending = reply.confirmation;
-      const said = pending && /^Waiting for your confirmation/.test(reply.answer) ? t("chef.confirm.ask", { what: confirmationText(pending) }) : reply.answer;
+      const said = pending && /^Waiting for your confirmation/.test(reply.answer) ? t("chef.confirm.ask", { what: confirmationText(pending) }) : offlineText(reply.answer);
       const options = pending
         ? [
             { label: t("chef.confirm.yes"), action: "approve", id: pending.id, pending, main: true },

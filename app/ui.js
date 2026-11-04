@@ -2,7 +2,7 @@ import { moneyValue, typingDecimals } from "./money.js";
 import { foodName, formatNumber, plural, t } from "./i18n.js";
 import { easing, reduced, token } from "./motion.js";
 import { play } from "./sound.js";
-import { closest } from "./fuzzy.js";
+import { closest, plain } from "./fuzzy.js";
 
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
@@ -286,6 +286,14 @@ export function wireSteppers(root) {
       });
     });
   });
+}
+
+// What people type is the name they read, in their language; the server knows foods by their catalog name.
+export async function canonicalFood(name, api) {
+  const typed = String(name ?? "").trim();
+  const foods = await api(`/foods?q=${encodeURIComponent(typed)}`).catch(() => []);
+  const wanted = plain(typed);
+  return foods.find((food) => plain(food.name) === wanted || plain(foodName(food.name)) === wanted)?.name ?? typed;
 }
 
 export function chips(name, legend, options, selected) {

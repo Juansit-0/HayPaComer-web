@@ -1,7 +1,7 @@
 import { api, session } from "./api.js";
 import { soundOn } from "./sound.js";
 import { currentLocale, formatNumber, loadLocale, locales, t } from "./i18n.js";
-import { errorText, esc, formData, numberField, openSheet, showError, toast, wireSteppers } from "./ui.js";
+import { canonicalFood, errorText, esc, formData, numberField, openSheet, showError, toast, wireSteppers } from "./ui.js";
 import { reduced } from "./motion.js";
 import { openFridgeShape, shapeDrawing } from "./fridge-shape.js";
 
@@ -352,10 +352,13 @@ export async function renderSettings(main, household, rerender) {
         body: {
           diet: data.get("diet"),
           allergies: data.getAll("allergies"),
-          avoidedFoods: String(data.get("avoided") ?? "")
-            .split(",")
-            .map((food) => food.trim())
-            .filter(Boolean),
+          avoidedFoods: await Promise.all(
+            String(data.get("avoided") ?? "")
+              .split(",")
+              .map((food) => food.trim())
+              .filter(Boolean)
+              .map((food) => canonicalFood(food, api)),
+          ),
         },
       });
       saved(profileForm);

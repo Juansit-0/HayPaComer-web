@@ -561,7 +561,7 @@ export async function refreshStage(chosen) {
     const week = metrics?.total;
     const moved = Number(week?.consumedGrams ?? 0) + Number(week?.discardedGrams ?? 0);
     scene.setShape(shape);
-    const signature = JSON.stringify([fridge?.id, inventory.map((item) => [item.id, item.grams, item.trayId, item.days, item.usable])]);
+    const signature = JSON.stringify([fridge?.id, fridge?.children?.map((zone) => zone.children.map((tray) => tray.id)), inventory.map((item) => [item.id, item.grams, item.trayId, item.days, item.usable])]);
     if (signature !== placedSignature) {
       placedSignature = signature;
       scene.placeItems(fridge, inventory);
