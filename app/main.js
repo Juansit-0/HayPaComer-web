@@ -392,13 +392,11 @@ document.querySelector("[data-signout]").addEventListener("click", async () => {
   accountMenu.hidePopover();
   const refreshToken = session.refresh;
   session.clear();
-  disconnectLive();
-  household = null;
+  location.hash = "#/now";
+  window.dispatchEvent(new Event("hpc:signed-out"));
   if (refreshToken) {
     await api("/auth/logout", { method: "POST", body: { refreshToken }, auth: false }).catch(() => null);
   }
-  location.hash = "#/now";
-  render();
 });
 
 document.querySelector("[data-inbox]").addEventListener("click", (event) => {

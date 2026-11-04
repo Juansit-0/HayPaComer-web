@@ -6,6 +6,7 @@ import { easing, reduced, token } from "./motion.js";
 const PERIODS = [7, 30, 90];
 let chosenDays = 30;
 let me = null;
+window.addEventListener("hpc:signed-out", () => (me = null));
 // What the last render showed, so a new period grows the rings and bars from there instead of from zero.
 let shown = null;
 

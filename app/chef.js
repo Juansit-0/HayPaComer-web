@@ -9,6 +9,9 @@ import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSuppor
 
 const state = { conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, recipes: null, offered: new Set(), shown: null };
 
+// A module outlives a sign-out, and one person's chat must never reach the next.
+window.addEventListener("hpc:signed-out", () => Object.assign(state, { conversationId: null, messages: [], dishes: null, recipes: null, offered: new Set(), shown: null }));
+
 const arrive = (element) => element?.animate([{ opacity: 0, translate: "0 var(--rise)" }, { opacity: 1, translate: "0 0" }], { duration: token("duration-slow"), easing: easing("ease-emphasized") });
 const scrollBehavior = () => (reduced() ? "auto" : "smooth");
 const TOOLS = ["query_inventory", "view_expiries", "view_market_list", "view_cold_chain", "view_weekly_plan", "recall_memory", "review_budget", "investigate_cold", "waste_patterns"];

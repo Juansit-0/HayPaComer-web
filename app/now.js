@@ -11,8 +11,9 @@ const LABELS = { inventory: "live.kind.inventory", sensor: "live.kind.sensor", a
 const ACTIONS = { STOCK_FOOD: "live.action.stock", CONSUME_FOOD: "live.action.consume", DISCARD_FOOD: "live.action.discard" };
 const DISHES = 3;
 const sentence = (text) => {
-  const stock = text.match(/^([A-Z_]+) ([\d.]+) g left$/);
-  if (stock) return t("live.stock-left", { action: t(ACTIONS[stock[1]] ?? "live.action.other"), grams: grams(stock[2]) });
+  const stock = text.match(/^([A-Z_]+)(?: ([\d.]+) g left)?$/);
+  if (stock?.[2]) return t("live.stock-left", { action: t(ACTIONS[stock[1]] ?? "live.action.other"), grams: grams(stock[2]) });
+  if (stock) return t(ACTIONS[stock[1]] ?? "live.action.other");
   return text.charAt(0).toUpperCase() + text.slice(1).replace(/ C$/, " °C");
 };
 
