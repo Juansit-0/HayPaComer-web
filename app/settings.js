@@ -1,7 +1,7 @@
-import { api } from "./api.js";
+import { api, session } from "./api.js";
 import { soundOn } from "./sound.js";
 import { currentLocale, formatNumber, loadLocale, locales, t } from "./i18n.js";
-import { esc, formData, numberField, showError, toast, wireSteppers } from "./ui.js";
+import { errorText, esc, formData, numberField, openSheet, showError, toast, wireSteppers } from "./ui.js";
 import { reduced } from "./motion.js";
 import { openFridgeShape, shapeDrawing } from "./fridge-shape.js";
 
@@ -126,6 +126,143 @@ function householdTile(settings, owner) {
 }
 
 // Each group confirms its own save with a stamp beside its button, where the eye already is.
+function memberRow(member, me, owner) {
+  const self = member.userId === me.id;
+  const name = member.name ?? t("settings.member-unknown");
+  const manage = owner && !self && member.role !== "OWNER";
+  return `<li class="member-row">
+    <span class="item-name">${esc(name)}${self ? ` <small>${t("settings.member-you")}</small>` : ""}</span>
+    ${
+      manage
+        ? `<select data-role="${esc(member.userId)}" aria-label="${esc(t("settings.member-role", { member: name }))}">${["MEMBER", "GUEST"]
+            .map((role) => `<option value="${role}" ${role === member.role ? "selected" : ""}>${t(`role.${role}`)}</option>`)
+            .join("")}</select>`
+        : `<span class="hint">${t(`role.${member.role}`)}</span>`
+    }
+    <span class="item-actions">${
+      manage
+        ? `<button type="button" class="ghost" data-make-owner="${esc(member.userId)}" data-name="${esc(name)}">${t("settings.make-owner")}</button>
+           <button type="button" class="ghost" data-remove-member="${esc(member.userId)}" data-name="${esc(name)}">${t("settings.member-remove")}</button>`
+        : self && !owner
+          ? `<button type="button" class="ghost" data-leave="${esc(member.userId)}">${t("settings.leave")}</button>`
+          : ""
+    }</span>
+  </li>`;
+}
+
+function membersTile(detail, me, owner, invitations, households) {
+  return `<section class="tile w-12" aria-labelledby="members-title">
+    <h2 id="members-title">${t("settings.members")}</h2>
+    <p class="hint">${t("settings.members-hint")}</p>
+    ${
+      households.length > 1
+        ? `<div class="chips-row" role="group" aria-label="${esc(t("settings.households"))}">${households
+            .map((home) => `<button type="button" class="chip-button" data-switch-home="${esc(home.id)}" ${home.id === detail.id ? 'aria-current="true" disabled' : ""}>${esc(home.name)}</button>`)
+            .join("")}</div>`
+        : ""
+    }
+    <ul class="list">${detail.members.map((member) => memberRow(member, me, owner)).join("")}</ul>
+    ${
+      owner
+        ? `<form class="row-form" data-invite>
+            <label class="grow">${t("settings.invite-email")}<input name="email" type="email" required autocomplete="off"></label>
+            <label>${t("settings.invite-role")}<select name="role"><option value="MEMBER">${t("role.MEMBER")}</option><option value="GUEST">${t("role.GUEST")}</option></select></label>
+            <button class="primary" type="submit">${t("settings.invite-send")}</button>
+          </form>
+          <div class="invite-link" data-invite-link hidden>
+            <p class="hint">${t("settings.invite-link-hint")}</p>
+            <div class="row-form"><input class="grow" readonly aria-label="${esc(t("settings.invite-link"))}"><button type="button" data-copy-link>${t("settings.copy")}</button></div>
+          </div>
+          ${
+            invitations.length
+              ? `<h3>${t("settings.pending")}</h3><ul class="list">${invitations
+                  .map(
+                    (invitation) => `<li class="member-row"><span class="item-name">${esc(invitation.email)}</span><span class="hint">${t(`role.${invitation.role}`)}</span>
+                      <span class="item-actions"><button type="button" class="ghost" data-cancel-invite="${esc(invitation.id)}" aria-label="${esc(t("settings.invite-cancel-one", { email: invitation.email }))}">${t("settings.invite-cancel")}</button></span></li>`,
+                  )
+                  .join("")}</ul>`
+              : ""
+          }`
+        : ""
+    }
+  </section>`;
+}
+
+// Removing someone, handing over the household, or leaving it cannot be undone from here, so each asks first.
+function confirmSheet(title, text, label, action) {
+  const sheet = openSheet(title, `<div class="stack"><p>${esc(text)}</p><button type="button" class="primary" data-yes>${esc(label)}</button></div>`, (dialog) => {
+    dialog.querySelector("[data-yes]").addEventListener("click", async (event) => {
+      event.currentTarget.disabled = true;
+      try {
+        await action();
+      } catch (error) {
+        toast(errorText(error));
+      }
+      sheet.close();
+    });
+  });
+}
+
+function wireMembers(main, base, rerender) {
+  const tile = main.querySelector("#members-title").closest("section");
+  const quiet = (action) => action().then(rerender, (error) => toast(errorText(error)));
+  const moveTo = (id) => {
+    session.household = id;
+    location.hash = "#/now";
+    location.reload();
+  };
+  tile.addEventListener("change", (event) => {
+    const user = event.target.dataset.role;
+    if (user) quiet(() => api(`${base}/members/${user}`, { method: "PATCH", body: { role: event.target.value } }));
+  });
+  tile.addEventListener("click", async (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    const { removeMember, makeOwner, leave, switchHome, cancelInvite, name } = button.dataset;
+    if (removeMember) {
+      confirmSheet(t("settings.member-remove"), t("settings.member-remove-ask", { member: name }), t("settings.member-remove"), async () => {
+        await api(`${base}/members/${removeMember}`, { method: "DELETE" });
+        rerender();
+      });
+    } else if (makeOwner) {
+      confirmSheet(t("settings.make-owner"), t("settings.make-owner-ask", { member: name }), t("settings.make-owner"), async () => {
+        await api(`${base}/owner`, { method: "PUT", body: { userId: makeOwner } });
+        rerender();
+      });
+    } else if (leave) {
+      confirmSheet(t("settings.leave"), t("settings.leave-ask"), t("settings.leave"), async () => {
+        await api(`${base}/members/${leave}`, { method: "DELETE" });
+        moveTo(null);
+      });
+    } else if (switchHome) {
+      moveTo(switchHome);
+    } else if (cancelInvite) {
+      quiet(() => api(`${base}/invitations/${cancelInvite}`, { method: "DELETE" }));
+    } else if ("copyLink" in button.dataset) {
+      const input = tile.querySelector("[data-invite-link] input");
+      await navigator.clipboard?.writeText(input.value).catch(() => input.select());
+      toast(t("settings.copied"));
+    }
+  });
+  tile.querySelector("[data-invite]")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const button = form.querySelector("button[type=submit]");
+    button.disabled = true;
+    try {
+      const invitation = await api(`${base}/invitations`, { method: "POST", body: formData(form) });
+      form.reset();
+      const box = tile.querySelector("[data-invite-link]");
+      box.querySelector("input").value = invitation.link;
+      box.hidden = false;
+    } catch (error) {
+      showError(form, error);
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 function saved(form, text = t("settings.saved")) {
   form.querySelector(".saved-stamp")?.remove();
   const stamp = document.createElement("span");
@@ -149,16 +286,18 @@ export async function renderSettings(main, household, rerender) {
   const base = `/households/${household.id}`;
   const fridges = await api(`${base}/fridges`).catch(() => []);
   const shape = fridges[0] ? await api(`${base}/fridges/${fridges[0].id}/shape`).catch(() => null) : null;
-  const [me, detail, profiles, preferences, settings] = await Promise.all([
+  const [me, detail, profiles, preferences, settings, households] = await Promise.all([
     api("/me"),
     api(base),
     api(`${base}/profiles`).catch(() => []),
     api("/me/notification-preferences").catch(() => null),
     api(`${base}/settings`).catch(() => []),
+    api("/households").catch(() => []),
   ]);
   const membership = detail.members.find((member) => member.userId === me.id);
   const profile = profiles.find((candidate) => candidate.memberId === membership?.memberId);
   const owner = detail.myRole === "OWNER";
+  const invitations = owner ? await api(`${base}/invitations`).catch(() => []) : [];
 
   main.innerHTML = `
     <header>
@@ -169,6 +308,7 @@ export async function renderSettings(main, household, rerender) {
       ["profile-title", "settings.profile"],
       ["language-title", "settings.language"],
       ["alerts-title", "settings.alerts"],
+      ["members-title", "settings.members"],
       ["household-settings-title", "settings.household"],
       ...(fridges[0] ? [["fridge-shape-title", "fridge-shape.title"]] : []),
     ]
@@ -180,11 +320,13 @@ export async function renderSettings(main, household, rerender) {
         ${languageTile()}
         ${notificationsTile(preferences)}
       </div>
+      ${membersTile(detail, me, owner, invitations, households)}
       ${householdTile(settings, owner)}
       ${fridges[0] ? fridgeTile(shape, owner) : ""}
     </div>`;
   main.querySelector("[data-fridge-shape]")?.addEventListener("click", () => openFridgeShape(household, fridges[0], rerender));
   wireSteppers(main);
+  wireMembers(main, base, rerender);
 
   // The index scrolls to a group; the route stays on Ajustes, so these are buttons, not hash links.
   main.querySelector(".settings-index").addEventListener("click", (event) => {

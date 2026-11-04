@@ -1760,6 +1760,11 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 .resolved.done .resolved-line > :last-child::before { content: "\2713  "; color: var(--color-positive-text); font-weight: 700; }
 
 /* Ajustes: an index of the groups, and a stamp that confirms each save beside its button */
+.list > li.member-row { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-xs); }
+.member-row small { color: var(--color-text-weak); }
+.chips-row { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.row-form .grow { flex: 1 1 220px; min-width: 0; }
+.invite-link { margin-block: var(--space-xs); }
 .settings-index { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
 .settings-index .chip-button { min-height: 44px; padding: 0 var(--space-s); }
 .saved-stamp { justify-self: start; align-self: center; display: inline-block; padding: 4px 10px; border: 2px solid currentColor; border-radius: 4px; color: var(--color-positive-text); font-weight: 700; font-size: var(--size-small); rotate: -3deg; }

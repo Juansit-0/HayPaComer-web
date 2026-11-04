@@ -2,7 +2,7 @@ import { art } from "./art/drawings.js";
 import { easing, newPage, reduced, token } from "./motion.js";
 import { play, setSound, soundOn } from "./sound.js";
 import { api, session } from "./api.js";
-import { chooseHousehold, householdLabel, renderSignIn } from "./auth.js";
+import { chooseHousehold, householdLabel, rememberJoin, renderForgot, renderReset, renderSignIn, renderVerify, takeJoin } from "./auth.js";
 import { renderFridge } from "./fridge.js";
 import { renderAnalytics } from "./analytics.js";
 import { renderChef } from "./chef.js";
@@ -14,7 +14,7 @@ import { renderLanding } from "./landing.js";
 import { openInbox } from "./inbox.js";
 import { mountStage, refreshStage, refreshStageSoon, showRoute } from "./stage.js";
 import { currentLocale, loadLocale, locales, plural, t, translatePage } from "./i18n.js";
-import { errorText, esc, skeleton, swap } from "./ui.js";
+import { errorText, esc, skeleton, swap, toast } from "./ui.js";
 
 const main = document.getElementById("main");
 const loader = document.querySelector("[data-loader]");
@@ -230,18 +230,38 @@ let renders = 0;
 async function render({ navigate = false, refresh = false } = {}) {
   const ticket = ++renders;
   newPage();
-  if (!session.signedIn) {
+  // Links in emails carry their token as #/page?token=..., and these pages work whether or not someone is signed in.
+  const [path, query = ""] = location.hash.replace(/^#\/?/, "").split("?");
+  const route = path.split("/")[0];
+  const token = new URLSearchParams(query).get("token");
+  if (route === "join" && token) rememberJoin(token);
+  const linked = token && (route === "reset-password" || route === "verify-email");
+  if (!session.signedIn || linked) {
     placePreferences(false);
     tabs.hidden = true;
     stageBox.hidden = true;
     sessionBar.hidden = true;
-    const route = location.hash.replace("#/", "").split("/")[0];
     document.documentElement.dataset.chapter = "now";
     delete document.documentElement.dataset.app;
     if (route === "signin" || route === "register") renderSignIn(main, render, route);
+    else if (route === "join") renderSignIn(main, render, "signin", t("auth.join-hint"));
+    else if (route === "forgot") renderForgot(main);
+    else if (route === "reset-password" && token) renderReset(main, token);
+    else if (route === "verify-email" && token) await renderVerify(main, token);
     else renderLanding(main);
     main.setAttribute("aria-busy", "false");
     return;
+  }
+  const joining = takeJoin();
+  if (joining) {
+    try {
+      household = await api("/invitations/accept", { method: "POST", body: { token: joining } });
+      session.household = household.id;
+      toast(t("auth.joined", { household: household.name }));
+    } catch (error) {
+      toast(errorText(error));
+    }
+    if (route === "join") history.replaceState(null, "", "#/now");
   }
   if (!household) {
     await chooseHousehold(main, (chosen) => {
@@ -265,17 +285,17 @@ async function render({ navigate = false, refresh = false } = {}) {
   }
   connectLive(household.id);
   document.querySelector("[data-household]").innerHTML = householdLabel(household);
-  const route = current();
-  document.documentElement.dataset.chapter = route;
-  showRoute(route);
-  if (refresh && main.dataset.route === route) {
-    await swap(main, () => views[route](main, household)).catch(() => null);
+  const screen = current();
+  document.documentElement.dataset.chapter = screen;
+  showRoute(screen);
+  if (refresh && main.dataset.screen === screen) {
+    await swap(main, () => views[screen](main, household)).catch(() => null);
     return;
   }
   main.setAttribute("aria-busy", "true");
   await paint(() => {
-    main.innerHTML = skeleton(route, t(`nav.${route}`));
-    main.dataset.route = route;
+    main.innerHTML = skeleton(screen, t(`nav.${screen}`));
+    main.dataset.screen = screen;
     if (navigate) {
       window.scrollTo(0, 0);
       document.querySelector(".column").scrollTop = 0;
@@ -284,17 +304,18 @@ async function render({ navigate = false, refresh = false } = {}) {
   });
   if (ticket !== renders) return;
   document.querySelectorAll(".tabs a, [data-settings-link]").forEach((link) => {
-    if (link.dataset.tab === route) link.setAttribute("aria-current", "page");
+    if (link.dataset.tab === screen) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
-  placeBlot(route);
+  placeBlot(screen);
   try {
-    await views[route](main, household);
+    await views[screen](main, household);
     if (ticket !== renders) return;
-    enter(route);
+    enter(screen);
     refreshInbox();
     refreshStatus();
   } catch (error) {
+    if (ticket !== renders) return;
     main.innerHTML = `<section class="empty">${art("plug")}<h1>${t("screen.failed")}</h1><p>${esc(errorText(error))}</p><button type="button" data-retry>${t("action.retry")}</button></section>`;
     main.querySelector("[data-retry]").addEventListener("click", render);
     enter();

@@ -1,6 +1,6 @@
 import { api, passwordProof, session } from "./api.js";
 import { currentLocale, t } from "./i18n.js";
-import { esc, formData, showError } from "./ui.js";
+import { esc, formData, showError, toast } from "./ui.js";
 
 function poster(content) {
   return `<section class="auth-split">
@@ -15,7 +15,102 @@ function poster(content) {
   </section>`;
 }
 
-export function renderSignIn(main, onDone, initial = "signin") {
+const MIN_PASSWORD = 10;
+const JOIN_KEY = "hpc.join";
+
+// An invitation link can open signed out, so its token waits here until there is an account to accept it with.
+export function rememberJoin(token) {
+  try {
+    sessionStorage.setItem(JOIN_KEY, token);
+  } catch {}
+}
+
+export function takeJoin() {
+  try {
+    const token = sessionStorage.getItem(JOIN_KEY);
+    sessionStorage.removeItem(JOIN_KEY);
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+function accountPage(id, title, lead, content) {
+  return poster(`
+    <section class="auth stack" aria-labelledby="${id}">
+      <div>
+        <h1 id="${id}">${title}</h1>
+        <p class="lead">${lead}</p>
+      </div>
+      ${content}
+    </section>`);
+}
+
+export function renderForgot(main) {
+  main.innerHTML = accountPage(
+    "forgot-title",
+    t("auth.forgot-title"),
+    t("auth.forgot-lead"),
+    `<form novalidate>
+      <label>${t("auth.email")}<input name="email" type="email" autocomplete="email" required></label>
+      <button class="primary" type="submit">${t("auth.forgot-send")}</button>
+    </form>
+    <a class="button ghost" href="#/signin">${t("auth.back-signin")}</a>`,
+  );
+  main.querySelector("form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const { email } = formData(event.target);
+    const button = event.target.querySelector("button[type=submit]");
+    button.disabled = true;
+    try {
+      await api("/auth/forgot-password", { method: "POST", body: { email }, auth: false });
+      event.target.innerHTML = `<p role="status">${t("auth.forgot-sent")}</p>`;
+    } catch (error) {
+      button.disabled = false;
+      showError(event.target, error);
+    }
+  });
+}
+
+export function renderReset(main, token) {
+  main.innerHTML = accountPage(
+    "reset-title",
+    t("auth.reset-title"),
+    t("auth.reset-lead"),
+    `<form novalidate>
+      <label>${t("auth.password-new")}<input name="password" type="password" autocomplete="new-password" required minlength="${MIN_PASSWORD}"></label>
+      <button class="primary" type="submit">${t("auth.reset-save")}</button>
+    </form>`,
+  );
+  main.querySelector("form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const { password } = formData(event.target);
+    if (MIN_PASSWORD > password.length) return showError(event.target, { message: t("auth.password-short") });
+    const button = event.target.querySelector("button[type=submit]");
+    button.disabled = true;
+    try {
+      await api("/auth/reset-password", { method: "POST", body: { token, password }, auth: false });
+      session.clear();
+      toast(t("auth.reset-done"));
+      location.hash = "#/signin";
+    } catch (error) {
+      button.disabled = false;
+      showError(event.target, error.status === 400 ? error : { message: t("auth.link-bad") });
+    }
+  });
+}
+
+export async function renderVerify(main, token) {
+  const done = await api("/auth/verify-email", { method: "POST", body: { token }, auth: false }).then(() => true, () => false);
+  main.innerHTML = accountPage(
+    "verify-title",
+    t("auth.verify-title"),
+    done ? t("auth.verify-done") : t("auth.link-bad"),
+    `<a class="button primary" href="#/now">${t("auth.continue")}</a>`,
+  );
+}
+
+export function renderSignIn(main, onDone, initial = "signin", notice = null) {
   let mode = initial;
   const draw = () => {
     const creating = mode === "register";
@@ -28,6 +123,7 @@ export function renderSignIn(main, onDone, initial = "signin") {
               ? t("auth.create-lead")
               : t("auth.signin-lead")
           }</p>
+          ${notice ? `<p role="status">${esc(notice)}</p>` : ""}
         </div>
         <form novalidate>
           ${
@@ -40,7 +136,7 @@ export function renderSignIn(main, onDone, initial = "signin") {
             <span class="password-field">
               <input name="password" type="password" autocomplete="${
                 creating ? "new-password" : "current-password"
-              }" required minlength="${creating ? 10 : 1}">
+              }" required minlength="${creating ? MIN_PASSWORD : 1}">
               <button class="ghost" type="button" data-reveal aria-pressed="false">${t("auth.show-password")}</button>
             </span>
           </label>
@@ -49,6 +145,7 @@ export function renderSignIn(main, onDone, initial = "signin") {
         <button class="ghost" type="button" data-switch>${
           creating ? t("auth.have-account") : t("auth.create-account")
         }</button>
+        ${creating ? "" : `<a class="button ghost" href="#/forgot">${t("auth.forgot-link")}</a>`}
       </section>`);
     main.querySelector("[data-reveal]").addEventListener("click", (event) => {
       const input = main.querySelector("[name=password]");
@@ -64,6 +161,8 @@ export function renderSignIn(main, onDone, initial = "signin") {
     main.querySelector("form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const values = formData(event.target);
+      // The server only ever sees a proof of the password, so its length can be checked only here.
+      if (creating && MIN_PASSWORD > values.password.length) return showError(event.target, { message: t("auth.password-short") });
       const button = event.target.querySelector("button[type=submit]");
       button.disabled = true;
       button.setAttribute("aria-busy", "true");
@@ -119,6 +218,8 @@ export async function chooseHousehold(main, onDone) {
   main.querySelector("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const values = formData(event.target);
+    const button = event.target.querySelector("button[type=submit]");
+    button.disabled = true;
     try {
       const household = await api("/households", {
         method: "POST",
@@ -131,6 +232,7 @@ export async function chooseHousehold(main, onDone) {
       session.household = household.id;
       onDone(household);
     } catch (error) {
+      button.disabled = false;
       showError(event.target, error);
     }
   });
