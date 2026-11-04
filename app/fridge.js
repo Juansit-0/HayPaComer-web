@@ -441,9 +441,19 @@ export async function openAddFood(household, { food = null, trayId = null, onDon
   });
 }
 
+function reviewNote(chain, fridges) {
+  const fridge = fridges.find((candidate) => candidate.id === chain.fridgeId);
+  return `<section class="tile review-note" aria-labelledby="review-${esc(chain.fridgeId)}">
+    <h2 id="review-${esc(chain.fridgeId)}">${esc(t("fridge.review-title", { fridge: placeName(fridge?.name ?? "") }))}</h2>
+    <p>${esc(t("fridge.review-lead", { celsius: formatNumber(chain.peakCelsius, 1) }))}</p>
+    ${chain.recovered ? `<button class="primary" type="button" data-review="${esc(chain.fridgeId)}">${t("fridge.review-done")}</button>` : `<p class="hint">${t("fridge.review-wait")}</p>`}
+  </section>`;
+}
+
 export async function renderFridge(main, household) {
   const base = `/households/${household.id}`;
   const [fridges, inventory, prices] = await Promise.all([api(`${base}/fridges`), api(`${base}/inventory`), api(`${base}/prices`).catch(() => ({}))]);
+  const chains = await api(`${base}/cold-chain`).catch(() => []);
   const [twins, spaces] = await Promise.all([
     Promise.all(fridges.map((fridge) => api(`${base}/fridges/${fridge.id}/twin`))),
     Promise.all(fridges.map((fridge) => api(`${base}/fridges/${fridge.id}/space`).catch(() => []))),
@@ -495,12 +505,26 @@ export async function renderFridge(main, household) {
       ${twins.map(twinLine).join("")}
       ${(household.myRole ?? household.role) === "OWNER" ? `<button type="button" class="ghost" data-fridge-shape>${t("fridge-shape.open")}</button>` : ""}
     </header>
+    ${chains.filter((chain) => chain.phase === "UNDER_REVIEW").map((chain) => reviewNote(chain, fridges)).join("")}
     ${shelfChips(fridges)}
     <div class="bento fridge-bento">
       ${tray ? shelfTile(tray, inventory.filter((item) => item.trayId === tray.id), trays, space.get(tray.id)) : ""}
     </div>`;
 
   showTray(selectedTray);
+  main.querySelectorAll("[data-review]").forEach((button) =>
+    button.addEventListener("click", () =>
+      busy(button, async () => {
+        try {
+          await api(`${base}/fridges/${button.dataset.review}/cold-chain/review`, { method: "POST" });
+          toast(t("fridge.review-toast"));
+          await renderFridge(main, household);
+        } catch (error) {
+          toast(error.message);
+        }
+      }),
+    ),
+  );
   main.querySelector("[data-fridge-shape]")?.addEventListener("click", () => openFridgeShape(household, fridges[0], () => renderFridge(main, household)));
   // The total rolls its digits from the last figure shown, like the money on Mercado and Números.
   ticker(main.querySelector("[data-total]"), grams(total));

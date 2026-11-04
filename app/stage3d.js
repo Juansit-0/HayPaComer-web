@@ -558,6 +558,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
           model.traverse((child) => {
             child.userData.item = item;
             child.userData.part = "fridge";
+            child.userData.inDrawer = slot.zone === "DRAWER";
           });
           model.userData.key = item.id;
           model.userData.behindDoor = Boolean(slot.behindDoor);
@@ -673,7 +674,10 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     const box = canvas.getBoundingClientRect();
     state.pointer.set(((x - box.left) / box.width) * 2 - 1, -((y - box.top) / box.height) * 2 + 1);
     raycaster.setFromCamera(state.pointer, camera);
-    return raycaster.intersectObjects(scene.children, true).find((hit) => hit.object.userData.part || hit.object.userData.item);
+    const hits = raycaster.intersectObjects(scene.children, true);
+    const first = hits.find((hit) => hit.object.userData.part || hit.object.userData.item);
+    // A drawer's food sits behind its front, and only there: food behind a closed door stays out of reach.
+    return (state.route === "fridge" && !first?.object.userData.item && hits.find((hit) => hit.object.userData.inDrawer)) || first;
   };
 
   const drag = { model: null, item: null, origin: new THREE.Vector3(), plane: new THREE.Plane(), target: null, moved: false, start: new THREE.Vector2() };

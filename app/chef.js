@@ -3,7 +3,7 @@ import { api } from "./api.js";
 import { currentLocale, foodName, foodWord, locales, plural, recipeName, t, theFood } from "./i18n.js";
 import { candidate, dishCard, kitchenRecipes } from "./now.js";
 import { highlightFoods, shapeClass } from "./stage.js";
-import { daysLeft, esc, grams, toast, whenText } from "./ui.js";
+import { busy, daysLeft, esc, formData, grams, showError, toast, whenText } from "./ui.js";
 import { easing, page, reduced, token } from "./motion.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
@@ -125,6 +125,15 @@ function stepCard(session) {
     <p class="cooking-step">${ready ? t("chef.steps-ready", { total: session.totalSteps }) : t("chef.step-of", { step: session.currentStep, total: session.totalSteps })}</p>
     <div class="item-meta"><span class="item-name">${esc(recipeName(session.recipe))}</span><span class="status">${esc(t(`chef.phase.${session.phase}`))}</span></div>
     <p class="step-text">${step ? esc(step.instruction) : ready ? t("chef.ready") : t("chef.all-done")}</p>
+    ${step?.timerSeconds ? `<p class="cooking-timer" role="timer" aria-label="${esc(t("chef.timer"))}" data-timer></p>` : ""}
+    ${
+      step?.weighFood
+        ? `<form class="row-form" data-weigh="${step.position}">
+            <label>${esc(t("chef.weigh-target", { grams: grams(step.weighGrams), food: foodName(step.weighFood) }))}<input class="grams" name="grams" type="number" inputmode="decimal" min="0" step="any" required value="${session.measuredGrams ?? ""}"></label>
+            <button type="submit">${t("chef.weigh")}</button>
+          </form>`
+        : ""
+    }
     <div class="row-form">
       <button class="primary" type="button" data-cook="next">${ready ? t("chef.begin") : t("chef.next")}</button>
       <button type="button" data-cook="${session.phase === "PAUSED" ? "resume" : "pause"}">${session.phase === "PAUSED" ? t("chef.resume") : t("chef.pause")}</button>
@@ -154,6 +163,23 @@ function confirmations(list) {
       )
       .join("")}</ul>
   </section>`;
+}
+
+// The server keeps the time; this only counts down between its answers, and stops by itself when the card is gone.
+async function runTimer(box, read) {
+  const status = await read().catch(() => null);
+  if (!status || !box.isConnected) return;
+  let left = status.remainingSeconds;
+  const show = () => {
+    box.textContent = 0 >= left ? t("chef.timer-done") : `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
+  };
+  show();
+  if (status.paused) return;
+  const ticking = setInterval(() => {
+    left -= 1;
+    if (!box.isConnected || 0 >= left) clearInterval(ticking);
+    if (box.isConnected) show();
+  }, 1000);
 }
 
 export async function renderChef(main, household) {
@@ -213,6 +239,22 @@ export async function renderChef(main, household) {
   addEventListener("resize", roomForAsk);
   page.defer(() => removeEventListener("resize", roomForAsk));
   const mic = main.querySelector("[data-mic]");
+
+  const timer = main.querySelector("[data-timer]");
+  if (timer) runTimer(timer, () => api(`${base}/cooking-sessions/${session.id}/timer`));
+  main.querySelector("[data-weigh]")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    await busy(form.querySelector("button[type=submit]"), async () => {
+      try {
+        const weighed = await api(`${base}/cooking-sessions/${session.id}/steps/${form.dataset.weigh}/weigh`, { method: "POST", body: { grams: Number(formData(form).grams) } });
+        toast(t(`chef.weigh-status.${weighed.status}`, { grams: grams(weighed.remainingGrams) }));
+        await renderChef(main, household);
+      } catch (error) {
+        showError(form, error);
+      }
+    });
+  });
 
   async function cook(action) {
     if (!session) return false;

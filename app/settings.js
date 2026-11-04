@@ -263,6 +263,71 @@ function wireMembers(main, base, rerender) {
   });
 }
 
+const DEVICE_KINDS = ["ESP32_DOOR_TEMP", "ESP32_SCALE", "SIMULATOR"];
+
+function devicesTile(devices) {
+  const when = (at) => new Date(at).toLocaleString(currentLocale(), { dateStyle: "medium", timeStyle: "short" });
+  return `<section class="tile w-12" aria-labelledby="devices-title">
+    <h2 id="devices-title">${t("settings.devices")}</h2>
+    <p class="hint">${t("settings.devices-hint")}</p>
+    <ul class="list">${devices
+      .map(
+        (device) => `<li class="member-row">
+          <span class="item-name">${esc(device.name)} <small>${t(`device.kind.${device.kind}`)}</small></span>
+          <span class="hint">${!device.active ? t("settings.device-off") : device.lastSeenAt ? esc(t("settings.device-seen", { when: when(device.lastSeenAt) })) : t("settings.device-never")}</span>
+          <span class="item-actions">${device.active ? `<button type="button" class="ghost" data-revoke-device="${esc(device.id)}" data-name="${esc(device.name)}">${t("settings.device-revoke")}</button>` : ""}</span>
+        </li>`,
+      )
+      .join("")}</ul>
+    <form class="row-form" data-device>
+      <label class="grow">${t("settings.device-name")}<input name="name" required maxlength="60"></label>
+      <label>${t("settings.device-kind")}<select name="kind">${DEVICE_KINDS.map((kind) => `<option value="${kind}">${t(`device.kind.${kind}`)}</option>`).join("")}</select></label>
+      <button class="primary" type="submit">${t("settings.device-add")}</button>
+    </form>
+    <div class="invite-link" data-device-key hidden>
+      <p class="hint">${t("settings.device-key-hint")}</p>
+      <div class="row-form"><input class="grow" readonly aria-label="${esc(t("settings.device-key"))}"><button type="button" data-copy-key>${t("settings.copy")}</button></div>
+    </div>
+  </section>`;
+}
+
+// shortcut: new sensors go to the first fridge, add a fridge choice when a household can have several.
+function wireDevices(main, base, fridgeId, rerender) {
+  const tile = main.querySelector("#devices-title")?.closest("section");
+  if (!tile) return;
+  tile.addEventListener("click", async (event) => {
+    const button = event.target.closest("button");
+    if (button?.dataset.revokeDevice) {
+      const { revokeDevice, name } = button.dataset;
+      confirmSheet(t("settings.device-revoke"), t("settings.device-revoke-ask", { device: name }), t("settings.device-revoke"), async () => {
+        await api(`${base}/devices/${revokeDevice}`, { method: "DELETE" });
+        rerender();
+      });
+    } else if (button && "copyKey" in button.dataset) {
+      const input = tile.querySelector("[data-device-key] input");
+      await navigator.clipboard?.writeText(input.value).catch(() => input.select());
+      toast(t("settings.copied"));
+    }
+  });
+  tile.querySelector("[data-device]").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const button = form.querySelector("button[type=submit]");
+    button.disabled = true;
+    try {
+      const created = await api(`${base}/devices`, { method: "POST", body: { ...formData(form), fridgeId } });
+      form.reset();
+      const box = tile.querySelector("[data-device-key]");
+      box.querySelector("input").value = created.apiKey;
+      box.hidden = false;
+    } catch (error) {
+      showError(form, error);
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 function saved(form, text = t("settings.saved")) {
   form.querySelector(".saved-stamp")?.remove();
   const stamp = document.createElement("span");
@@ -298,6 +363,7 @@ export async function renderSettings(main, household, rerender) {
   const profile = profiles.find((candidate) => candidate.memberId === membership?.memberId);
   const owner = detail.myRole === "OWNER";
   const invitations = owner ? await api(`${base}/invitations`).catch(() => []) : [];
+  const devices = owner && fridges[0] ? await api(`${base}/devices`).catch(() => []) : null;
 
   if (main.dataset.route !== "settings") return;
   main.innerHTML = `
@@ -310,6 +376,7 @@ export async function renderSettings(main, household, rerender) {
       ["language-title", "settings.language"],
       ["alerts-title", "settings.alerts"],
       ["members-title", "settings.members"],
+      ...(devices ? [["devices-title", "settings.devices"]] : []),
       ["household-settings-title", "settings.household"],
       ...(fridges[0] ? [["fridge-shape-title", "fridge-shape.title"]] : []),
     ]
@@ -322,12 +389,14 @@ export async function renderSettings(main, household, rerender) {
         ${notificationsTile(preferences)}
       </div>
       ${membersTile(detail, me, owner, invitations, households)}
+      ${devices ? devicesTile(devices) : ""}
       ${householdTile(settings, owner)}
       ${fridges[0] ? fridgeTile(shape, owner) : ""}
     </div>`;
   main.querySelector("[data-fridge-shape]")?.addEventListener("click", () => openFridgeShape(household, fridges[0], rerender));
   wireSteppers(main);
   wireMembers(main, base, rerender);
+  wireDevices(main, base, fridges[0]?.id, rerender);
 
   // The index scrolls to a group; the route stays on Ajustes, so these are buttons, not hash links.
   main.querySelector(".settings-index").addEventListener("click", (event) => {
