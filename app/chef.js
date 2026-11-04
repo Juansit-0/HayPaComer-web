@@ -69,7 +69,8 @@ function message(entry, index) {
   </li>`;
 }
 
-const missingOf = (dish) => dish.evaluation.requirements.filter((requirement) => !requirement.substitute && Number(requirement.shortfallGrams) > 0);
+// The same foods the server adds to the market: everything mandatory that falls short.
+const missingOf = (dish) => dish.evaluation.requirements.filter((requirement) => !requirement.optional && Number(requirement.shortfallGrams) > 0);
 
 function offer(dish) {
   state.offered.add(dish.recipe);
@@ -112,12 +113,13 @@ function prompts(inventory) {
 function stepCard(session) {
   if (!session) return "";
   const step = session.step;
+  const ready = session.phase === "PREPARING";
   return `<article class="tile cooking" aria-label="${esc(t("chef.cooking", { recipe: recipeName(session.recipe) }))}">
-    <p class="cooking-step">${t("chef.step-of", { step: session.currentStep, total: session.totalSteps })}</p>
+    <p class="cooking-step">${ready ? t("chef.steps-ready", { total: session.totalSteps }) : t("chef.step-of", { step: session.currentStep, total: session.totalSteps })}</p>
     <div class="item-meta"><span class="item-name">${esc(recipeName(session.recipe))}</span><span class="status">${esc(t(`chef.phase.${session.phase}`))}</span></div>
-    <p class="step-text">${step ? esc(step.instruction) : t("chef.all-done")}</p>
+    <p class="step-text">${step ? esc(step.instruction) : ready ? t("chef.ready") : t("chef.all-done")}</p>
     <div class="row-form">
-      <button class="primary" type="button" data-cook="next">${t("chef.next")}</button>
+      <button class="primary" type="button" data-cook="next">${ready ? t("chef.begin") : t("chef.next")}</button>
       <button type="button" data-cook="${session.phase === "PAUSED" ? "resume" : "pause"}">${session.phase === "PAUSED" ? t("chef.resume") : t("chef.pause")}</button>
       <button type="button" data-cook="repeat">${t("chef.read-aloud")}</button>
     </div>
@@ -158,6 +160,7 @@ export async function renderChef(main, household) {
     .sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity));
 
   const side = stepCard(session) + confirmations(pending);
+  if (main.dataset.route !== "chef") return;
   main.innerHTML = `
     <header>
       <h1 id="chef-title">${t("chef.title")}</h1>
@@ -206,7 +209,7 @@ export async function renderChef(main, household) {
   async function cook(action) {
     if (!session) return false;
     if (action === "repeat") {
-      speak(session.step?.instruction ?? t("chef.all-done"), voiceLanguage());
+      speak(session.step?.instruction ?? (session.phase === "PREPARING" ? t("chef.ready") : t("chef.all-done")), voiceLanguage());
       return true;
     }
     const updated = await api(`${base}/cooking-sessions/${session.id}/${action}`, { method: "POST" }).catch((error) => {
@@ -396,6 +399,7 @@ export async function renderChef(main, household) {
       state.messages.push({ role: "assistant", text: t("chef.offer.started", { recipe: recipeName(dish.recipe), step: started.step?.instruction ?? "" }).trim(), runs: [{ specialist: "chef" }] });
       if (state.handsFree || mic.getAttribute("aria-pressed") === "true") speak(started.step?.instruction ?? "", voiceLanguage());
       await renderChef(main, household);
+      main.querySelector(".tile.cooking")?.scrollIntoView({ block: "center", behavior: scrollBehavior() });
     } catch (error) {
       say({ role: "assistant", text: error.message, runs: [] });
     }

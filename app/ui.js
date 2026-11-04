@@ -1,3 +1,4 @@
+import { moneyValue, typingDecimals } from "./money.js";
 import { foodName, formatNumber, plural, t } from "./i18n.js";
 import { easing, reduced, token } from "./motion.js";
 import { play } from "./sound.js";
@@ -241,23 +242,20 @@ export function numberField({ name, label, unit, value = "", min = 0, max, step 
 
 export function moneyField({ name, label, currency, value = "", step = 10000, hint }) {
   const id = `field-${name}-${Math.random().toString(36).slice(2, 8)}`;
-  const shown = value === "" ? "" : formatNumber(value);
+  const shown = value === "" ? "" : formatNumber(value, 2);
   return `<div class="number-field">
     <label for="${id}">${esc(label)}</label>
     ${hint ? `<p class="hint">${esc(hint)}</p>` : ""}
     <div class="number-input" data-stepper>
       <button type="button" data-step="-1" aria-label="${esc(t("stepper.less", { label }))}">\u2212</button>
-      <input id="${id}" class="money" name="${esc(name)}" type="text" inputmode="numeric" autocomplete="off" data-money data-big-step="${step}" value="${esc(shown)}" required>
+      <input id="${id}" class="money" name="${esc(name)}" type="text" inputmode="decimal" autocomplete="off" data-money data-big-step="${step}" value="${esc(shown)}" required>
       <span class="unit" aria-hidden="true">${esc(currency)}</span>
       <button type="button" data-step="1" aria-label="${esc(t("stepper.more", { label }))}">+</button>
     </div>
   </div>`;
 }
 
-export function moneyValue(text) {
-  const digits = String(text ?? "").replace(/\D/g, "");
-  return digits ? Number(digits) : 0;
-}
+export { moneyValue };
 
 export function wireSteppers(root) {
   root.querySelectorAll("[data-stepper]").forEach((box) => {
@@ -265,8 +263,13 @@ export function wireSteppers(root) {
     const money = input.hasAttribute("data-money");
     if (money) {
       input.addEventListener("input", () => {
+        if (typingDecimals(input.value)) return;
         const amount = moneyValue(input.value);
-        input.value = amount ? formatNumber(amount) : "";
+        input.value = amount ? formatNumber(amount, 2) : "";
+      });
+      input.addEventListener("change", () => {
+        const amount = moneyValue(input.value);
+        input.value = amount ? formatNumber(amount, 2) : "";
       });
     }
     box.querySelectorAll("[data-step]").forEach((button) => {
@@ -278,7 +281,7 @@ export function wireSteppers(root) {
         const min = input.min === "" ? -Infinity : Number(input.min);
         const max = input.max === "" ? Infinity : Number(input.max);
         const bounded = Math.min(max, Math.max(min, next));
-        input.value = money ? formatNumber(Math.max(0, bounded)) : String(bounded);
+        input.value = money ? formatNumber(Math.max(0, bounded), 2) : String(bounded);
         input.dispatchEvent(new Event("input", { bubbles: true }));
       });
     });
@@ -472,7 +475,7 @@ export function portions(total) {
   ]
     .map(
       ([share, key, mark]) =>
-        `<button class="chip-button" type="button" data-share="${Math.max(1, Math.round(total * share))}" aria-pressed="${share === 0.5}" ${mark ? `aria-label="${esc(t(key))}"` : ""}>${mark || esc(t(key))}</button>`,
+        `<button class="chip-button" type="button" data-share="${share === 1 ? total : Math.min(total, Math.max(1, Math.round(total * share)))}" aria-pressed="${share === 0.5}" ${mark ? `aria-label="${esc(t(key))}"` : ""}>${mark || esc(t(key))}</button>`,
     )
     .join("")}</span>`;
 }

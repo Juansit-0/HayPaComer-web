@@ -104,6 +104,7 @@ export async function renderNow(main, household) {
   ]);
   const urgent = inventory.filter((item) => item.usable && item.statuses.some((status) => URGENT.includes(status)));
 
+  if (main.dataset.route !== "now") return;
   main.innerHTML = `
     <header class="now-hero">
       <h1 id="now-title">${t("now.question")}</h1>

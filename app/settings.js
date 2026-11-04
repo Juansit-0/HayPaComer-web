@@ -299,6 +299,7 @@ export async function renderSettings(main, household, rerender) {
   const owner = detail.myRole === "OWNER";
   const invitations = owner ? await api(`${base}/invitations`).catch(() => []) : [];
 
+  if (main.dataset.route !== "settings") return;
   main.innerHTML = `
     <header>
       <h1>${t("settings.title")}</h1>

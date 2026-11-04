@@ -8,6 +8,7 @@ import {
   grams,
   kpi,
   moneyField,
+  busy,
   moneyValue,
   numberField,
   showError,
@@ -141,6 +142,7 @@ export async function renderMarket(main, household) {
   const lines = new Map((budget?.lines ?? []).map((line) => [line.itemId, line]));
   const first = !main.querySelector(".market-bento");
 
+  if (main.dataset.route !== "market") return;
   main.innerHTML = `
     <header class="market-hero">
       <h1 id="market-title">${t("market.title")}</h1>
@@ -220,31 +222,41 @@ export async function renderMarket(main, household) {
   add.addEventListener("submit", async (event) => {
     event.preventDefault();
     const values = formData(add);
-    try {
-      await api(`${base}/items`, { method: "POST", body: { food: values.food, grams: Number(values.grams) } });
-      toast(t("market.toast-added", { food: theFood(values.food) }));
-      refresh();
-    } catch (error) {
-      showError(add, error);
-    }
+    await busy(add.querySelector("button[type=submit]"), async () => {
+      try {
+        await api(`${base}/items`, { method: "POST", body: { food: values.food, grams: Number(values.grams) } });
+        toast(t("market.toast-added", { food: theFood(values.food) }));
+        refresh();
+      } catch (error) {
+        showError(add, error);
+      }
+    });
   });
 
-  main.querySelector("[data-plan]").addEventListener("click", async () => {
-    try {
-      const delta = await api(`${base}/from-plan`, { method: "POST" });
-      const added = delta.filter((item) => Number(item.addedGrams) > 0).length;
-      toast(added ? plural("market.toast-plan", added) : t("market.plan-covered"));
-      refresh();
-    } catch (error) {
-      toast(error.status === 404 ? t("market.no-plan") : error.message);
-    }
-  });
+  main.querySelector("[data-plan]").addEventListener("click", (event) =>
+    busy(event.currentTarget, async () => {
+      try {
+        const delta = await api(`${base}/from-plan`, { method: "POST" });
+        const added = delta.filter((item) => Number(item.addedGrams) > 0).length;
+        toast(added ? plural("market.toast-plan", added) : t("market.plan-covered"));
+        refresh();
+      } catch (error) {
+        toast(error.status === 404 ? t("market.no-plan") : error.message);
+      }
+    }),
+  );
 
-  main.querySelector("[data-clear]")?.addEventListener("click", async () => {
-    await api(`${base}/checked`, { method: "DELETE" });
-    toast(t("market.toast-cleared"));
-    refresh();
-  });
+  main.querySelector("[data-clear]")?.addEventListener("click", (event) =>
+    busy(event.currentTarget, async () => {
+      await api(`${base}/checked`, { method: "DELETE" }).then(
+        () => {
+          toast(t("market.toast-cleared"));
+          refresh();
+        },
+        (error) => toast(error.message),
+      );
+    }),
+  );
   }
 
   const refresh = () => swap(main, async () => {

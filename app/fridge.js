@@ -89,7 +89,7 @@ function foodRow(item, trays) {
         ? `<div class="row-actions" id="${actions}" inert><div><form class="card-actions" data-item="${esc(item.id)}">
             ${portions(item.grams)}
             <label class="visually-hidden" for="use-${esc(item.id)}">${esc(t("fridge.grams-of", { food: foodName(item.name) }))}</label>
-            <input id="use-${esc(item.id)}" class="grams" name="grams" type="number" inputmode="numeric" min="1" step="1" required value="${Math.max(1, Math.round(item.grams / 2))}">
+            <input id="use-${esc(item.id)}" class="grams" name="grams" type="number" inputmode="decimal" min="0.01" step="any" required value="${Math.min(item.grams, Math.max(1, Math.round(item.grams / 2)))}">
             <button type="submit" name="action" value="consume">${t("fridge.use")}</button>
             ${item.openedOn ? "" : `<button class="ghost" type="submit" name="action" value="open" formnovalidate>${t("fridge.opened")}</button>`}
             <button class="ghost danger" type="submit" name="action" value="discard" formnovalidate data-hold aria-describedby="hold-hint">${t("fridge.discard")}</button>
@@ -417,14 +417,16 @@ function wireAddFood(dialog, base, trays, onDone) {
       body.expiresOn = proposal.expiresOn;
       body.expirySource = "LABEL";
     }
-    try {
-      await api(`${base}/items`, { method: "POST", body });
-      dialog.close();
-      toast(t("fridge.toast-added", { grams: grams(body.grams), food: foodWord(body.food) }));
-      onDone(tray.id);
-    } catch (error) {
-      showError(form, fullMessage(error) ? { message: fullMessage(error) } : error);
-    }
+    await busy(event.submitter ?? form.querySelector("button[type=submit]"), async () => {
+      try {
+        await api(`${base}/items`, { method: "POST", body });
+        dialog.close();
+        toast(t("fridge.toast-added", { grams: grams(body.grams), food: foodWord(body.food) }));
+        onDone(tray.id);
+      } catch (error) {
+        showError(form, fullMessage(error) ? { message: fullMessage(error) } : error);
+      }
+    });
   });
 }
 
@@ -449,6 +451,7 @@ export async function renderFridge(main, household) {
   const space = new Map(spaces.flat().map((room) => [room.trayId, room]));
 
   if (fridges.length === 0) {
+    if (main.dataset.route !== "fridge") return;
     main.innerHTML = `<section class="empty" aria-labelledby="fridge-title">
       <h1 id="fridge-title">${t("fridge.setup-title")}</h1>
       <p>${t("fridge.setup-lead")}</p>
@@ -483,6 +486,7 @@ export async function renderFridge(main, household) {
     .find((candidate) => candidate.id === selectedTray);
   const total = fridges.reduce((sum, fridge) => sum + Number(fridge.grams), 0);
 
+  if (main.dataset.route !== "fridge") return;
   main.innerHTML = `
     <header class="fridge-hero">
       <h1>${t("fridge.title")}</h1>

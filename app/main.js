@@ -288,14 +288,14 @@ async function render({ navigate = false, refresh = false } = {}) {
   const screen = current();
   document.documentElement.dataset.chapter = screen;
   showRoute(screen);
-  if (refresh && main.dataset.screen === screen) {
+  if (refresh && main.dataset.route === screen) {
     await swap(main, () => views[screen](main, household)).catch(() => null);
     return;
   }
   main.setAttribute("aria-busy", "true");
   await paint(() => {
     main.innerHTML = skeleton(screen, t(`nav.${screen}`));
-    main.dataset.screen = screen;
+    main.dataset.route = screen;
     if (navigate) {
       window.scrollTo(0, 0);
       document.querySelector(".column").scrollTop = 0;

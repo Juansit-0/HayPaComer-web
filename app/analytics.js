@@ -150,6 +150,7 @@ export async function renderAnalytics(main, household) {
   const wasted = [...metrics.foods].sort((a, b) => Number(b.tally.discardedGrams) - Number(a.tally.discardedGrams))[0];
   const foodLabel = (food) => (food.foodKey === "unknown" ? t("numbers.unknown-food") : esc(foodName(food.foodKey)));
 
+  if (main.dataset.route !== "numbers") return;
   main.innerHTML = `
     <header class="numbers-head">
       <div>
