@@ -7,7 +7,7 @@ import { busy, daysLeft, esc, formData, grams, showError, toast, whenText } from
 import { easing, page, reduced, token } from "./motion.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
-const state = { conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, recipes: null, offered: new Set(), shown: null };
+const state = { cooking: false, conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, recipes: null, offered: new Set(), shown: null };
 
 // A module outlives a sign-out, and one person's chat must never reach the next.
 window.addEventListener("hpc:signed-out", () => Object.assign(state, { conversationId: null, messages: [], dishes: null, recipes: null, offered: new Set(), shown: null }));
@@ -81,10 +81,7 @@ const missingOf = (dish) => dish.evaluation.requirements.filter((requirement) =>
 
 function offer(dish) {
   state.offered.add(dish.recipe);
-  const options = [
-    { label: t("chef.offer.yes"), action: "cook", dish, main: true },
-    { label: t("chef.offer.other"), action: "other" },
-  ];
+  const options = [...(state.cooking ? [] : [{ label: t("chef.offer.yes"), action: "cook", dish, main: true }]), { label: t("chef.offer.other"), action: "other" }];
   if (missingOf(dish).length) options.push({ label: t("chef.offer.missing"), action: "missing", dish });
   return { role: "assistant", text: t("chef.offer.cook", { recipe: recipeName(dish.recipe) }), runs: [{ specialist: "chef" }], dishes: [dish], replies: options };
 }
@@ -136,7 +133,7 @@ function stepCard(session) {
     }
     <div class="row-form">
       <button class="primary" type="button" data-cook="next">${ready ? t("chef.begin") : t("chef.next")}</button>
-      <button type="button" data-cook="${session.phase === "PAUSED" ? "resume" : "pause"}">${session.phase === "PAUSED" ? t("chef.resume") : t("chef.pause")}</button>
+      ${ready ? "" : `<button type="button" data-cook="${session.phase === "PAUSED" ? "resume" : "pause"}">${session.phase === "PAUSED" ? t("chef.resume") : t("chef.pause")}</button>`}
       <button type="button" data-cook="repeat">${t("chef.read-aloud")}</button>
       <button type="button" class="ghost" data-cook="abandon">${t("chef.abandon")}</button>
     </div>
@@ -186,13 +183,14 @@ export async function renderChef(main, household) {
   const base = `/households/${household.id}`;
   const [session, pending, listed] = await Promise.all([
     api(`${base}/cooking-sessions/active`).catch(() => null),
-    api("/agent/confirmations").catch(() => []),
+    api("/agent/confirmations").then((list) => list.filter((pending) => pending.householdId === household.id), () => []),
     api(`${base}/inventory`).catch(() => []),
   ]);
   const inventory = listed
     .map((item) => ({ ...item, days: daysLeft(item.expiresOn) }))
     .sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity));
 
+  state.cooking = Boolean(session);
   const side = stepCard(session) + confirmations(pending);
   if (main.dataset.route !== "chef") return;
   main.innerHTML = `
@@ -290,8 +288,10 @@ export async function renderChef(main, household) {
     return (matching.length ? matching : fresh).slice(0, 1);
   }
 
-  async function ask(text) {
-    const command = commandOf(text);
+  async function ask(text, spoken = false) {
+    if (!text) return;
+    // Spoken commands drive the session; typed words like "ya" or "listo" are just a message.
+    const command = spoken ? commandOf(text) : null;
     if (command && (await cook(command))) return;
     clearReplies();
     state.messages.push({ role: "user", text });
@@ -467,7 +467,7 @@ export async function renderChef(main, household) {
     state.recognition = listen({
       lang: voiceLanguage(),
       continuous,
-      onText: (text) => ask(text.trim()),
+      onText: (text) => ask(text.trim(), true),
       onState: (now) => {
         mic.setAttribute("aria-pressed", String(now === "listening"));
         mic.textContent = now === "listening" ? t("chef.listening") : t("chef.speak");

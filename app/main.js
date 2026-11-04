@@ -322,7 +322,11 @@ async function render({ navigate = false, refresh = false } = {}) {
   }
 }
 
-window.addEventListener("hashchange", () => render({ navigate: true }));
+// A sheet belongs to the screen that opened it, so moving away takes it along.
+window.addEventListener("hashchange", () => {
+  document.querySelectorAll("dialog.sheet[open]").forEach((sheet) => sheet.close());
+  render({ navigate: true });
+});
 
 // Phones: a sideways swipe on the page moves to the neighbouring section. The page follows the finger and springs back if the swipe falls
 // short; swipes inside sideways scrollers, fields and dialogs, near the screen edges (system back) or mostly vertical are left alone.

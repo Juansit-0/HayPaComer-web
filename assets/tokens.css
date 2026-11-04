@@ -108,7 +108,7 @@
   --color-primary-hover: var(--color-cobre-hover);
   --color-primary-active: var(--color-cobre-active);
   --color-attention: var(--color-tomate);
-  --color-attention-text: var(--color-tomate);
+  --color-attention-text: #a8341a;
   --color-positive-text: var(--color-cilantro);
   --color-attention-fg: var(--color-arroz);
   --color-warning: var(--color-papa);

@@ -18,6 +18,10 @@ test("thousands separators only group", () => {
   assert.equal(moneyValue("$ 4500"), 4500);
 });
 
+test("a negative amount is not a positive one", () => {
+  assert.equal(moneyValue("-500"), 0);
+});
+
 test("nothing typed is zero", () => {
   assert.equal(moneyValue(""), 0);
   assert.equal(moneyValue("abc"), 0);
