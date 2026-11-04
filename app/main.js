@@ -175,7 +175,10 @@ async function refreshStatus() {
     notice.hidden = true;
     return;
   }
-  const parts = status.degraded.map((item) => item.component).join(", ");
+  const parts = [...new Set(status.degraded.map((item) => {
+    const name = t(`status.component.${item.component.replaceAll(" ", "-")}`);
+    return name.startsWith("status.component.") ? t("status.component.other") : name;
+  }))].join(", ");
   notice.textContent = t("status.saved-mode", { parts });
   notice.hidden = false;
 }

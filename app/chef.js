@@ -518,8 +518,8 @@ export async function renderChef(main, household) {
   main.querySelectorAll("[data-approve]").forEach((button) =>
     button.addEventListener("click", async () => {
       try {
-        const result = await api(`/agent/confirmations/${button.dataset.approve}/approve`, { method: "POST" });
-        settle(button, result.result, true);
+        await api(`/agent/confirmations/${button.dataset.approve}/approve`, { method: "POST" });
+        settle(button, t("chef.done"), true);
       } catch (error) {
         toast(error.message);
       }

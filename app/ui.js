@@ -159,11 +159,8 @@ export function formData(form) {
 }
 
 export function errorText(error) {
-  if (error?.problem?.errors) {
-    return Object.entries(error.problem.errors)
-      .map(([field, message]) => `${field} ${message}`)
-      .join(". ");
-  }
+  const fields = Object.keys(error?.problem?.errors ?? {}).map((field) => t(`field.${field}`)).filter((name) => !name.startsWith("field."));
+  if (fields.length) return t("error.fields", { fields: fields.join(", ") });
   return error?.message || t("error.generic");
 }
 

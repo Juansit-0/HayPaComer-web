@@ -11,6 +11,11 @@ const LABELS = { inventory: "live.kind.inventory", sensor: "live.kind.sensor", a
 const ACTIONS = { STOCK_FOOD: "live.action.stock", CONSUME_FOOD: "live.action.consume", DISCARD_FOOD: "live.action.discard" };
 const DISHES = 3;
 const sentence = (text) => {
+  if (/^door open/i.test(text)) return t("live.door-open");
+  if (/^door closed/i.test(text)) return t("live.door-closed");
+  if (/^What to check after/.test(text)) return t("live.alert.check");
+  if (/^Fridge door left open/.test(text)) return t("live.alert.door");
+  if (/^Fridge too warm/.test(text)) return t("live.alert.warm");
   const stock = text.match(/^([A-Z_]+)(?: ([\d.]+) g left)?$/);
   if (stock?.[2]) return t("live.stock-left", { action: t(ACTIONS[stock[1]] ?? "live.action.other"), grams: grams(stock[2]) });
   if (stock) return t(ACTIONS[stock[1]] ?? "live.action.other");
