@@ -296,7 +296,7 @@ export function mountStory(main) {
       page.defer(() => cancelAnimationFrame(frameId));
 
       showProgress(0);
-      if (location.search.includes("dev")) {
+      if (new URLSearchParams(location.search).has("dev")) {
         window.__hpc = Object.assign(window.__hpc ?? {}, {
           seek(value) {
             gates.forEach((gate) => (gate.open = value > gate.at));

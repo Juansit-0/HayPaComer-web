@@ -326,6 +326,18 @@ async function render({ navigate = false, refresh = false } = {}) {
     refreshStatus();
   } catch (error) {
     if (ticket !== renders) return;
+    // Someone removed from this household while the app was open starts over with the homes they still have.
+    if (error.status === 404) {
+      const homes = await api("/households").catch(() => null);
+      if (homes && !homes.some((home) => home.id === household.id)) {
+        session.household = null;
+        household = null;
+        stageHousehold = null;
+        toast(t("home.gone"));
+        render();
+        return;
+      }
+    }
     main.innerHTML = `<section class="empty">${art("plug")}<h1>${t("screen.failed")}</h1><p>${esc(errorText(error))}</p><button type="button" data-retry>${t("action.retry")}</button></section>`;
     main.querySelector("[data-retry]").addEventListener("click", render);
     enter();

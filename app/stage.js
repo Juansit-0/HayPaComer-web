@@ -459,7 +459,7 @@ function openPart(part, data) {
   } else location.hash = `#/${part}`;
 }
 
-if (location.search.includes("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { openPart });
+if (new URLSearchParams(location.search).has("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { openPart });
 
 export function takeFocusRequest() {
   const itemId = focusRequest;

@@ -251,7 +251,7 @@ export async function createStory(canvas, story, { tier = "high", onStills, onPr
   film = loop(canvas, tick, { gpu: true, idleHz: 24, onFrameTime: (dt) => governor.sample(dt) });
   resize();
 
-  if (location.search.includes("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { story: { tier, renderer } });
+  if (new URLSearchParams(location.search).has("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { story: { tier, renderer } });
 
   return {
     seek(progress) {

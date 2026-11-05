@@ -1091,7 +1091,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     return moving;
   }
   film = loop(canvas, tick, { gpu: true });
-  if (location.search.includes("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { fridge: { renderer, flights, items, doorItems, camera, canvas, pick, state, setShape: (shape) => setShape(shape), shelves: () => [...shelfSlots.map((slot) => slot.slab)] } });
+  if (new URLSearchParams(location.search).has("dev")) window.__hpc = Object.assign(window.__hpc ?? {}, { fridge: { renderer, flights, items, doorItems, camera, canvas, pick, state, setShape: (shape) => setShape(shape), shelves: () => [...shelfSlots.map((slot) => slot.slab)] } });
 
   return {
     goTo,
