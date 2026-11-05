@@ -40,7 +40,7 @@ const sum = (trayId) => inventory.filter((entry) => entry.trayId === trayId).red
 const tray = (id, name) => ({ id, type: "TRAY", kind: null, name, grams: sum(id), items: inventory.filter((entry) => entry.trayId === id).length, children: [] });
 // The fridge's trays come from its shape, as the backend fits them; the first trays keep the ids the inventory above uses.
 const SHAPE_EXAMPLES = [
-  ["challenger-cr050", { type: "MINIBAR", shelves: 2, doorRacks: 3, drawers: 0, freezerShelves: 1, hinge: "LEFT", widthCm: 43, heightCm: 58, depthCm: 49 }],
+  ["challenger-cr121", { type: "MINIBAR", shelves: 2, doorRacks: 3, drawers: 0, freezerShelves: 1, hinge: "LEFT", widthCm: 49, heightCm: 85, depthCm: 60 }],
   ["top-freezer", { type: "TOP_FREEZER", shelves: 3, doorRacks: 3, drawers: 1, freezerShelves: 1, hinge: "LEFT", widthCm: 60, heightCm: 165, depthCm: 65 }],
   ["bottom-freezer", { type: "BOTTOM_FREEZER", shelves: 3, doorRacks: 3, drawers: 1, freezerShelves: 2, hinge: "LEFT", widthCm: 60, heightCm: 185, depthCm: 65 }],
   ["side-by-side", { type: "SIDE_BY_SIDE", shelves: 4, doorRacks: 4, drawers: 2, freezerShelves: 4, hinge: "LEFT", widthCm: 90, heightCm: 178, depthCm: 70 }],
