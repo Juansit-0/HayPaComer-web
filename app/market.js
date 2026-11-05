@@ -71,10 +71,11 @@ function budgetTile(budget, currency) {
   const spent = Number(budget.spent);
   const planned = Number(budget.plannedCost);
   const remaining = Number(budget.remaining);
-  const over = budget.lines.filter((line) => line.estimatedCost !== null && !line.withinBudget);
+  const over = budget.lines.filter((line) => line.estimatedCost !== null && !line.withinBudget).slice(0, 5);
+  const overspent = Math.max(0, spent - monthly);
   return `<section class="tile budget-tile" aria-labelledby="budget-title">
     <h2 id="budget-title">${t("market.budget")}</h2>
-    <div class="budget-head">${budgetRing(spent, planned, monthly)}${kpi(formatMoney(remaining, budget.currency), t("market.left"), remaining > 0 ? "positive" : "attention")}</div>
+    <div class="budget-head">${budgetRing(spent, planned, monthly)}${kpi(formatMoney(overspent || remaining, budget.currency), overspent ? t("market.over") : t("market.left"), remaining > 0 ? "positive" : "attention")}</div>
     <dl class="budget-figures">
       <div><dt><span class="key spent"></span>${t("market.spent")}</dt><dd class="data">${formatMoney(spent, budget.currency)}</dd></div>
       <div><dt><span class="key planned"></span>${t("market.planned")}</dt><dd class="data">${formatMoney(planned, budget.currency)}</dd></div>
@@ -87,7 +88,7 @@ function budgetTile(budget, currency) {
               (line) => `<li>
                 <span class="item-name">${esc(t("market.does-not-fit", { food: foodName(line.food), cost: formatMoney(line.estimatedCost, budget.currency) }))}</span>
                 ${
-                  line.cheaper
+                  line.cheaper && remaining >= Number(line.cheaper.estimatedCost ?? Infinity)
                     ? `<span class="status">${esc(t("market.cheaper", { food: foodName(line.cheaper.food), grams: grams(line.cheaper.grams), cost: formatMoney(line.cheaper.estimatedCost, budget.currency) }))}</span>`
                     : ""
                 }

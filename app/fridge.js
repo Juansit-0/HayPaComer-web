@@ -7,6 +7,7 @@ import { focusFood, fullMessage, shapeClass, showTray, takeFocusRequest, undoabl
 import { openFridgeShape } from "./fridge-shape.js";
 import {
   busy,
+  chips,
   daysLeft,
   portions,
   esc,
@@ -80,7 +81,7 @@ function foodRow(item, trays) {
     <button class="food-row-head" type="button" ${item.usable ? `aria-expanded="false" aria-controls="${actions}"` : "disabled"}>
       <i class="${shapeClass(item.name)}" aria-hidden="true"></i>
       <span class="item-name">${esc(foodName(item.name))}</span>
-      <span class="value">${grams(item.grams)}</span>
+      ${hidden ? "" : `<span class="value">${grams(item.grams)}</span>`}
       <span class="row-expiry ${days !== null && 1 >= days ? "attention" : ""}">${hidden ? t("fridge.private") : expiryText(item)}</span>
       ${notable.length ? statusPill(notable) : ""}
     </button>
@@ -184,7 +185,7 @@ function addFoodBody(catalog, trays, trayId, chosen = null) {
     </fieldset>
     <fieldset class="step">
       <legend>${t("add.step.amount")}</legend>
-      ${numberField({ name: "grams", label: t("field.grams"), unit: "g", min: 1, bigStep: 50, value: "" })}
+      ${numberField({ name: "grams", label: t("field.grams"), unit: "g", min: 1, max: 100000, bigStep: 50, value: "" })}
     </fieldset>
     <fieldset class="step">
       <legend>${t("add.step.where")}</legend>
@@ -194,6 +195,7 @@ function addFoodBody(catalog, trays, trayId, chosen = null) {
         )
         .join("")}</div>
       <label class="check"><input type="checkbox" name="opened">${t("add.opened")}</label>
+      ${chips("visibility", t("add.visibility"), ["SHARED", "ASK_FIRST", "PRIVATE"].map((value) => [value, t(`add.visibility.${value}`)]), "SHARED")}
     </fieldset>
     <fieldset class="step">
       <legend>${t("add.step.expiry")}</legend>
@@ -406,6 +408,7 @@ function wireAddFood(dialog, base, trays, onDone) {
       food: values.food,
       grams: Number(values.grams),
       opened: Boolean(values.opened),
+      visibility: values.visibility,
       expiresOn: null,
       expirySource: null,
     };

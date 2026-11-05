@@ -22,6 +22,13 @@ const sentence = (text) => {
   return text.charAt(0).toUpperCase() + text.slice(1).replace(/ C$/, " °C");
 };
 
+function figures(snapshot) {
+  return `${kpi(grams(snapshot.totalGrams), t("now.kpi.measured"))}
+    ${kpi(String(snapshot.items), t("now.kpi.items"))}
+    ${kpi(String(snapshot.atRisk), t("now.kpi.at-risk"), snapshot.atRisk ? "attention" : "")}
+    ${kpi(String(snapshot.expired), t("now.kpi.expired"), snapshot.expired ? "attention" : "")}`;
+}
+
 export function candidate(recipe) {
   return {
     name: recipe.name,
@@ -137,12 +144,7 @@ export async function renderNow(main, household) {
 
     <section class="summary-row" aria-labelledby="summary-title">
       <h2 id="summary-title">${t("now.summary")}</h2>
-      <div class="summary-figures">
-        ${kpi(grams(snapshot.totalGrams), t("now.kpi.measured"))}
-        ${kpi(String(snapshot.items), t("now.kpi.items"))}
-        ${kpi(String(snapshot.atRisk), t("now.kpi.at-risk"), snapshot.atRisk ? "attention" : "")}
-        ${kpi(String(snapshot.expired), t("now.kpi.expired"), snapshot.expired ? "attention" : "")}
-      </div>
+      <div class="summary-figures" data-figures>${figures(snapshot)}</div>
     </section>
 
     <section class="tile feed-tile" aria-labelledby="live-title">
@@ -167,12 +169,15 @@ export async function renderNow(main, household) {
       : `<li><span class="lead">${t("now.live-empty")}</span></li>`;
   };
   drawFeed();
-  const onLive = () => {
+  const onLive = async (event) => {
     if (!document.body.contains(feed)) {
       window.removeEventListener("hpc:live", onLive);
       return;
     }
     drawFeed();
+    if (event.detail?.kind !== "inventory") return;
+    const fresh = await api(`${base}/kitchen`).catch(() => null);
+    if (fresh) main.querySelector("[data-figures]").innerHTML = figures(fresh);
   };
   window.addEventListener("hpc:live", onLive);
 

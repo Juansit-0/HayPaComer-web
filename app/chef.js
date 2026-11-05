@@ -7,10 +7,10 @@ import { busy, daysLeft, esc, formData, grams, showError, toast, whenText } from
 import { easing, page, reduced, token } from "./motion.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
-const state = { cooking: false, conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, recipes: null, offered: new Set(), shown: null };
+const state = { cooking: false, restored: false, conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, recipes: null, offered: new Set(), shown: null };
 
 // A module outlives a sign-out, and one person's chat must never reach the next.
-window.addEventListener("hpc:signed-out", () => Object.assign(state, { conversationId: null, messages: [], dishes: null, recipes: null, offered: new Set(), shown: null }));
+window.addEventListener("hpc:signed-out", () => Object.assign(state, { restored: false, conversationId: null, messages: [], dishes: null, recipes: null, offered: new Set(), shown: null }));
 
 const arrive = (element) => element?.animate([{ opacity: 0, translate: "0 var(--rise)" }, { opacity: 1, translate: "0 0" }], { duration: token("duration-slow"), easing: easing("ease-emphasized") });
 const scrollBehavior = () => (reduced() ? "auto" : "smooth");
@@ -179,7 +179,19 @@ async function runTimer(box, read) {
   }, 1000);
 }
 
+// The server keeps the conversation, so a reload picks it up where it was.
+async function restoreChat() {
+  if (state.restored || state.messages.length) return;
+  state.restored = true;
+  const [latest] = await api("/agent/conversations").catch(() => []);
+  if (!latest) return;
+  const messages = await api(`/agent/conversations/${latest.id}`).catch(() => []);
+  state.conversationId = latest.id;
+  state.messages = messages.map((entry) => ({ role: entry.role === "USER" ? "user" : "assistant", text: offlineText(entry.text), runs: [] }));
+}
+
 export async function renderChef(main, household) {
+  await restoreChat();
   const base = `/households/${household.id}`;
   const [session, pending, listed] = await Promise.all([
     api(`${base}/cooking-sessions/active`).catch(() => null),

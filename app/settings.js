@@ -92,7 +92,7 @@ function householdTile(settings, owner) {
     <p class="hint">${owner ? t("settings.household-hint") : t("settings.household-readonly")}</p>
     <ul class="settings-list">${settings
       .map((setting) => {
-        const step = setting.kind === "DECIMAL" ? 0.5 : 1;
+        const step = setting.kind === "DECIMAL" ? 0.1 : 1;
         return `<li>
           <form class="setting-row" data-setting="${esc(setting.key)}">
             <div class="setting-text">

@@ -75,7 +75,11 @@ function shapeForm(shape, examples) {
 function read(form) {
   const data = new FormData(form);
   const shape = { type: data.get("type"), hinge: data.get("hinge") };
-  NUMBERS.forEach((name) => (shape[name] = Math.round(Number(data.get(name)) || 0)));
+  // What the drawing and the 3D fridge use stays inside the limits of each field.
+  NUMBERS.forEach((name) => {
+    const input = form.querySelector(`input[name=${name}]`);
+    shape[name] = Math.min(Number(input.max), Math.max(Number(input.min), Math.round(Number(data.get(name)) || 0)));
+  });
   // A freezer type keeps at least one freezer shelf, and none of them more than its type allows.
   const most = MAX_FREEZER[shape.type];
   shape.freezerShelves = Math.min(most, Math.max(NEEDS_FREEZER.includes(shape.type) ? 1 : 0, shape.freezerShelves));
@@ -98,7 +102,10 @@ export async function openFridgeShape(household, fridge, onSaved) {
     const form = sheet.querySelector("[data-shape-form]");
     const redraw = () => {
       const current = read(form);
-      form.querySelector("input[name=freezerShelves]").max = MAX_FREEZER[current.type];
+      const freezer = form.querySelector("input[name=freezerShelves]");
+      freezer.max = MAX_FREEZER[current.type];
+      freezer.min = NEEDS_FREEZER.includes(current.type) ? 1 : 0;
+      if (Number(freezer.value) !== current.freezerShelves) freezer.value = current.freezerShelves;
       form.querySelector("[data-shape-preview]").innerHTML = shapeDrawing(current);
       previewShape(current);
     };

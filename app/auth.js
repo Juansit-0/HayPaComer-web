@@ -178,7 +178,7 @@ export function renderSignIn(main, onDone, initial = "signin", notice = null) {
         const login = (body) => api("/auth/login", { method: "POST", body: { email: values.email, ...body }, auth: false });
         session.store(
           await login({ passwordProof: proof }).catch((error) =>
-            error.status === 401 ? login({ password: values.password }) : Promise.reject(error),
+            error.problem?.sendPassword ? login({ password: values.password }) : Promise.reject(error),
           ),
         );
         // A new account starts with this device's language; an existing one brings the language it saved.
@@ -212,7 +212,7 @@ export async function chooseHousehold(main, onDone) {
         <p class="lead">${t("home.lead")}</p>
       </div>
       <form>
-        <label>${t("home.name")}<input name="name" required maxlength="60" placeholder="${esc(t("home.name-example"))}"></label>
+        <label>${t("home.name")}<input name="name" required maxlength="80" placeholder="${esc(t("home.name-example"))}"></label>
         <label>${t("home.currency")}<input name="currency" required value="COP" maxlength="3" class="grams"></label>
         <button class="primary" type="submit">${t("home.create")}</button>
       </form>
@@ -222,14 +222,15 @@ export async function chooseHousehold(main, onDone) {
   main.querySelector("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const values = formData(event.target);
+    if (!values.name.trim() || values.currency.trim().length !== 3) return showError(event.target, { message: t("home.check") });
     const button = event.target.querySelector("button[type=submit]");
     button.disabled = true;
     try {
       const household = await api("/households", {
         method: "POST",
         body: {
-          name: values.name,
-          currency: values.currency.toUpperCase(),
+          name: values.name.trim(),
+          currency: values.currency.trim().toUpperCase(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
       });

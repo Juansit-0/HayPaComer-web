@@ -291,7 +291,7 @@ export function wireSteppers(root) {
         const step = Number(input.step) || 1;
         const big = Number(input.dataset.bigStep) || step;
         const current = money ? moneyValue(input.value) : Number(input.value) || 0;
-        const next = current + Number(button.dataset.step) * big;
+        const next = Math.round((current + Number(button.dataset.step) * big) * 100) / 100;
         const min = input.min === "" ? -Infinity : Number(input.min);
         const max = input.max === "" ? Infinity : Number(input.max);
         const bounded = Math.min(max, Math.max(min, next));
