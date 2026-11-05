@@ -14,6 +14,23 @@ const KEYED = "[data-key]";
 const onScreen = (rect) => rect.width > 0 && rect.bottom > 0 && innerHeight > rect.top;
 
 // Re-render in place: keyed items that moved slide from where they were, new ones grow in, removed ones fade out as inert copies, focus stays.
+// A screen drawn again takes the focus with it: this notes where it was and puts it back, so a keyboard user keeps their place.
+export function rememberFocus(root) {
+  const active = root.contains(document.activeElement) ? document.activeElement : null;
+  if (!active) return () => {};
+  const form = active.closest("[data-setting]")?.dataset.setting;
+  const within = form ? `[data-setting="${CSS.escape(form)}"] ` : "";
+  const data = Object.entries(active.dataset)[0];
+  const place = active.id
+    ? `#${CSS.escape(active.id)}`
+    : active.name
+      ? `${within}[name="${CSS.escape(active.name)}"]`
+      : data
+        ? `${within}[data-${data[0].replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}="${CSS.escape(data[1])}"]`
+        : null;
+  return () => place && root.querySelector(place)?.focus({ preventScroll: true });
+}
+
 export async function swap(root, update) {
   const still = reduced();
   const active = root.contains(document.activeElement) ? document.activeElement : null;
@@ -159,7 +176,7 @@ export function formData(form) {
 }
 
 export function errorText(error) {
-  const fields = Object.keys(error?.problem?.errors ?? {}).map((field) => t(`field.${field}`)).filter((name) => !name.startsWith("field."));
+  const fields = Object.keys(error?.problem?.errors ?? {}).map((field) => t(`error.field.${field}`)).filter((name) => !name.startsWith("error.field."));
   if (fields.length) return t("error.fields", { fields: fields.join(", ") });
   return error?.message || t("error.generic");
 }

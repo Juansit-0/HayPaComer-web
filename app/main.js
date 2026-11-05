@@ -14,7 +14,7 @@ import { renderLanding } from "./landing.js";
 import { openInbox } from "./inbox.js";
 import { mountStage, refreshStage, refreshStageSoon, showRoute } from "./stage.js";
 import { currentLocale, loadLocale, locales, plural, t, translatePage } from "./i18n.js";
-import { errorText, esc, skeleton, swap, toast } from "./ui.js";
+import { errorText, esc, rememberFocus, skeleton, swap, toast } from "./ui.js";
 
 const main = document.getElementById("main");
 const loader = document.querySelector("[data-loader]");
@@ -73,10 +73,12 @@ const views = {
   market: renderMarket,
   numbers: renderAnalytics,
   chef: renderChef,
-  settings: (main, household) => renderSettings(main, household, () => {
+  settings: (main, household) => renderSettings(main, household, async () => {
+    const back = rememberFocus(main);
     drawLanguages();
     translatePage();
-    render();
+    await render();
+    back();
   }),
 };
 let household = null;
@@ -270,6 +272,8 @@ async function render({ navigate = false, refresh = false } = {}) {
     await chooseHousehold(main, (chosen) => {
       household = chosen;
       render();
+    }).catch((error) => {
+      if (session.signedIn) toast(errorText(error));
     });
     return;
   }
@@ -289,6 +293,9 @@ async function render({ navigate = false, refresh = false } = {}) {
   connectLive(household.id);
   document.querySelector("[data-household]").innerHTML = householdLabel(household);
   const screen = current();
+  if (route === "inbox") openInbox(refreshInbox);
+  // The address names the screen on view, also after signing in or following a wrong link.
+  if (route !== screen) history.replaceState(null, "", `#/${screen}`);
   document.documentElement.dataset.chapter = screen;
   showRoute(screen);
   if (refresh && main.dataset.route === screen) {
@@ -451,6 +458,7 @@ function drawLanguages() {
 languageSwitch.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-locale]");
   if (!button || button.getAttribute("aria-pressed") === "true") return;
+  const typed = session.signedIn ? [] : [...main.querySelectorAll("form input[name]")].map((input) => [input.name, input.value]);
   await loadLocale(button.dataset.locale);
   drawLanguages();
   languageSwitch.querySelector(`[data-locale="${CSS.escape(button.dataset.locale)}"]`)?.focus();
@@ -459,7 +467,12 @@ languageSwitch.addEventListener("click", async (event) => {
   }
   translatePage();
   await render();
+  typed.forEach(([name, value]) => {
+    const input = main.querySelector(`form input[name="${CSS.escape(name)}"]`);
+    if (input) input.value = value;
+  });
 });
+window.addEventListener("hpc:locale", drawLanguages);
 
 progress(0.2);
 const fontsOrLate = Promise.race([document.fonts.load("900 1em Fraunces").catch(() => null), new Promise((resolve) => setTimeout(resolve, 600))]);

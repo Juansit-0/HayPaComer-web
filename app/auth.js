@@ -1,5 +1,5 @@
 import { api, passwordProof, session } from "./api.js";
-import { currentLocale, t } from "./i18n.js";
+import { currentLocale, loadLocale, t } from "./i18n.js";
 import { esc, formData, showError, toast } from "./ui.js";
 
 function poster(content) {
@@ -181,7 +181,9 @@ export function renderSignIn(main, onDone, initial = "signin", notice = null) {
             error.status === 401 ? login({ password: values.password }) : Promise.reject(error),
           ),
         );
-        await api("/me/locale", { method: "PUT", body: { locale: currentLocale() } }).catch(() => null);
+        // A new account starts with this device's language; an existing one brings the language it saved.
+        if (creating) await api("/me/locale", { method: "PUT", body: { locale: currentLocale() } }).catch(() => null);
+        else await api("/i18n").then((info) => info.current !== currentLocale() && loadLocale(info.current)).catch(() => null);
         onDone();
       } catch (error) {
         showError(event.target, error);
@@ -214,7 +216,9 @@ export async function chooseHousehold(main, onDone) {
         <label>${t("home.currency")}<input name="currency" required value="COP" maxlength="3" class="grams"></label>
         <button class="primary" type="submit">${t("home.create")}</button>
       </form>
+      <button class="ghost" type="button" data-leave>${t("nav.signout")}</button>
     </section>`);
+  main.querySelector("[data-leave]").addEventListener("click", () => document.querySelector("[data-signout]").click());
   main.querySelector("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const values = formData(event.target);

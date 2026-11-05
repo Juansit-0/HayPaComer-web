@@ -812,6 +812,9 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
     }
   };
   canvas.addEventListener("pointercancel", cancelDrag);
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") cancelDrag();
+  });
   canvas.addEventListener("lostpointercapture", cancelDrag);
 
   canvas.addEventListener("pointerleave", () => {

@@ -50,17 +50,21 @@ export async function openInbox(onChange) {
   });
   const body = dialog.querySelector("[data-inbox-body]");
 
+  let marking = false;
   async function markRead(ids) {
+    if (marking) return;
+    marking = true;
     const notifications = ids ? null : await api("/notifications").catch(() => []);
-    for (const id of ids ?? notifications.filter((note) => !note.readAt).map((note) => note.id)) {
-      await api(`/notifications/${id}/read`, { method: "PATCH" }).catch(() => null);
-    }
+    const unread = ids ?? notifications.filter((note) => !note.readAt).map((note) => note.id);
+    await Promise.all(unread.map((id) => api(`/notifications/${id}/read`, { method: "PATCH" }).catch(() => null)));
+    marking = false;
     await draw();
     onChange?.();
   }
 
   // A failed load says so and offers a retry, instead of looking like an empty inbox.
   async function draw() {
+    if (!body.childElementCount) body.innerHTML = `<p class="hint" role="status">${t("inbox.loading")}</p>`;
     const notifications = await api("/notifications").catch(() => null);
     const unread = notifications?.filter((note) => !note.readAt).length ?? 0;
     await grow(body, () => {

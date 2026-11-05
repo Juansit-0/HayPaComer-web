@@ -152,6 +152,13 @@ export async function renderMarket(main, household) {
     </header>    <div class="bento market-bento">
       <section class="tile w-7 notepad" aria-labelledby="aisles-title">
         <h2 id="aisles-title">${t("market.aisles")}</h2>
+        <h3 id="add-title" class="notepad-add">${t("market.add-title")}</h3>
+        <form class="row-form market-add" data-add aria-labelledby="add-title">
+          <label class="grow">${t("field.food")}<input name="food" list="market-foods" required autocomplete="off" placeholder="${esc(t("market.food-example"))}"></label>
+          ${numberField({ name: "grams", label: t("field.grams"), unit: "g", min: 1, bigStep: 250, value: 500 })}
+          ${foodOptions("market-foods")}
+          <button class="primary" type="submit">${t("market.add")}</button>
+        </form>
         ${
           list.pending.length
             ? list.pending
@@ -167,13 +174,6 @@ export async function renderMarket(main, household) {
                 <figcaption><span>${t("market.empty")}</span><small>${esc(t("photo.credit", { credit: "michael clarke stuff, CC BY-SA 2.0" }))}</small></figcaption>
               </figure>`
         }
-        <h3 id="add-title" class="notepad-add">${t("market.add-title")}</h3>
-        <form class="row-form market-add" data-add aria-labelledby="add-title">
-          <label class="grow">${t("field.food")}<input name="food" list="market-foods" required autocomplete="off" placeholder="${esc(t("market.food-example"))}"></label>
-          ${numberField({ name: "grams", label: t("field.grams"), unit: "g", min: 1, bigStep: 250, value: 500 })}
-          ${foodOptions("market-foods")}
-          <button class="primary" type="submit">${t("market.add")}</button>
-        </form>
         <button type="button" data-plan>${t("market.add-plan")}</button>
       </section>
       <div class="w-5 stack">

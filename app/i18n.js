@@ -128,5 +128,6 @@ export async function loadLocale(code) {
   write(STORE, code);
   document.documentElement.lang = code;
   translatePage();
+  window.dispatchEvent(new Event("hpc:locale"));
   return code;
 }

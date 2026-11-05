@@ -1,7 +1,7 @@
 import { api, session } from "./api.js";
 import { soundOn } from "./sound.js";
 import { currentLocale, formatNumber, loadLocale, locales, t } from "./i18n.js";
-import { canonicalFood, errorText, esc, formData, numberField, openSheet, showError, toast, wireSteppers } from "./ui.js";
+import { canonicalFood, errorText, esc, formData, numberField, openSheet, rememberFocus, showError, toast, wireSteppers } from "./ui.js";
 import { reduced } from "./motion.js";
 import { openFridgeShape, shapeDrawing } from "./fridge-shape.js";
 
@@ -96,7 +96,7 @@ function householdTile(settings, owner) {
         return `<li>
           <form class="setting-row" data-setting="${esc(setting.key)}">
             <div class="setting-text">
-              <span class="item-name">${esc(setting.description)}</span>
+              ${owner ? "" : `<span class="item-name">${esc(setting.description)}</span>`}
               <span class="hint">${t("settings.default", { value: `${formatNumber(setting.defaultValue, 1)} ${unitOf(setting.key)}` })}${
                 setting.overridden ? ` <span class="status">${t("settings.changed")}</span>` : ""
               }</span>
@@ -105,7 +105,7 @@ function householdTile(settings, owner) {
               owner
                 ? `${numberField({
                     name: "value",
-                    label: t("settings.value"),
+                    label: setting.description,
                     unit: unitOf(setting.key),
                     value: setting.value,
                     min: setting.min,
@@ -330,6 +330,7 @@ function wireDevices(main, base, fridgeId, rerender) {
 
 function saved(form, text = t("settings.saved")) {
   form.querySelector(".saved-stamp")?.remove();
+  form.querySelector(".error")?.remove();
   const stamp = document.createElement("span");
   stamp.className = "saved-stamp";
   stamp.setAttribute("role", "status");
@@ -460,7 +461,9 @@ export async function renderSettings(main, household, rerender) {
           method: "PUT",
           body: { key: form.dataset.setting, value: reset ? null : String(new FormData(form).get("value")) },
         });
+        const back = rememberFocus(main);
         await renderSettings(main, household, rerender);
+        back();
         saved(main.querySelector(`[data-setting="${CSS.escape(form.dataset.setting)}"]`), reset ? t("settings.toast-reset") : t("settings.saved"));
       } catch (error) {
         showError(form, error);

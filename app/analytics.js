@@ -1,6 +1,6 @@
 import { api, freshAccess, patiently } from "./api.js";
 import { foodName, foodWord, formatDay, formatMoney, formatNumber, t } from "./i18n.js";
-import { canonicalFood, esc, foodOptions, formData, grams, moneyField, moneyValue, showError, ticker, toast, wireFoodSearch, wireSteppers } from "./ui.js";
+import { canonicalFood, esc, foodOptions, rememberFocus, formData, grams, moneyField, moneyValue, showError, ticker, toast, wireFoodSearch, wireSteppers } from "./ui.js";
 import { easing, reduced, token } from "./motion.js";
 
 const PERIODS = [7, 30, 90];
@@ -9,6 +9,7 @@ let me = null;
 window.addEventListener("hpc:signed-out", () => (me = null));
 // What the last render showed, so a new period grows the rings and bars from there instead of from zero.
 let shown = null;
+let asking = 0;
 
 function money(value, currency) {
   return formatMoney(value, currency);
@@ -130,14 +131,18 @@ async function download(base, format, from, to) {
 
 export async function renderAnalytics(main, household) {
   const base = `/households/${household.id}`;
-  const to = new Date();
+  const asked = ++asking;
+  // The household's calendar decides what today is, not this browser's.
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: household.timezone }).format(new Date());
+  const to = new Date(`${today}T00:00:00Z`);
   const from = new Date(to);
-  from.setDate(from.getDate() - (chosenDays - 1));
+  from.setUTCDate(from.getUTCDate() - (chosenDays - 1));
   const [metrics, profile] = await Promise.all([
-    api(`${base}/analytics?from=${isoDay(from)}&to=${isoDay(to)}`),
+    api(`${base}/analytics?from=${isoDay(from)}&to=${today}`),
     me ? Promise.resolve(null) : api("/me").catch(() => null),
   ]);
   if (profile) me = profile.id;
+  if (asked !== asking) return;
   const total = metrics.total;
   const moved = Number(total.consumedGrams) + Number(total.discardedGrams);
 
@@ -241,9 +246,11 @@ export async function renderAnalytics(main, household) {
   shown = now;
 
   main.querySelectorAll("[data-days]").forEach((button) =>
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       chosenDays = Number(button.dataset.days);
-      renderAnalytics(main, household);
+      const back = rememberFocus(main);
+      await renderAnalytics(main, household);
+      back();
     }),
   );
   main.querySelectorAll("[data-download]").forEach((button) =>
@@ -257,7 +264,9 @@ export async function renderAnalytics(main, household) {
     try {
       await api(`${base}/prices`, { method: "PUT", body: { food: await canonicalFood(values.food, api), pricePerKg: moneyValue(values.price) } });
       toast(t("numbers.toast-price", { food: foodWord(values.food) }));
-      renderAnalytics(main, household);
+      const back = rememberFocus(main);
+      await renderAnalytics(main, household);
+      back();
     } catch (error) {
       showError(price, error);
     }

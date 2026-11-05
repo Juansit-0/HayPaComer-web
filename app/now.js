@@ -46,7 +46,7 @@ export function dishCard(dish, index) {
   const requirements = dish.evaluation.requirements;
   const used = requirements.filter((requirement) => requirement.verdict === "ENOUGH" && Number(requirement.availableGrams) > 0);
   const swaps = requirements.filter((requirement) => requirement.substitute);
-  const missing = requirements.filter((requirement) => !requirement.substitute && Number(requirement.shortfallGrams) > 0);
+  const missing = requirements.filter((requirement) => !requirement.optional && !requirement.substitute && Number(requirement.shortfallGrams) > 0);
   return `<article class="dish-card" style="--i:${index}">
     ${dishPicture(dish.recipe, requirements.map((requirement) => requirement.food))}
     <div class="dish-body">

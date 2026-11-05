@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { placeName, t } from "./i18n.js";
-import { chips, esc, numberField, openSheet, showError, toast } from "./ui.js";
+import { busy, chips, esc, numberField, openSheet, showError, toast } from "./ui.js";
 import { previewShape, refreshStage } from "./stage.js";
 
 const TYPES = ["MINIBAR", "TOP_FREEZER", "BOTTOM_FREEZER", "SIDE_BY_SIDE", "SINGLE_DOOR"];
@@ -102,31 +102,37 @@ export async function openFridgeShape(household, fridge, onSaved) {
       form.querySelector("[data-shape-preview]").innerHTML = shapeDrawing(current);
       previewShape(current);
     };
-    form.addEventListener("input", redraw);
-    form.addEventListener("change", (event) => {
-      if (event.target.name === "example") {
-        const example = examples.find((candidate) => candidate.key === event.target.value);
-        if (example) fill(form, example.shape);
-      }
+    form.addEventListener("input", (event) => {
+      // An edit by hand leaves the example behind, so choosing it again starts over.
+      if (event.target.name !== "example") form.querySelectorAll("input[name=example]").forEach((input) => (input.checked = false));
+      redraw();
+    });
+    form.addEventListener("change", redraw);
+    form.addEventListener("click", (event) => {
+      if (event.target.name !== "example") return;
+      const example = examples.find((candidate) => candidate.key === event.target.value);
+      if (example) fill(form, example.shape);
       redraw();
     });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      try {
-        await api(`${base}/shape`, { method: "PUT", body: read(form) });
-        saved = true;
-        toast(t("fridge-shape.saved"));
-        sheet.close();
-        await refreshStage();
-        onSaved?.();
-      } catch (error) {
-        const tray = fridge.children.flatMap((zone) => zone.children.map((child) => ({ zone, child }))).find(({ child }) => child.id === error.problem?.trayId);
-        if (tray) {
-          showError(form, { message: t("fridge-shape.tray-full", { tray: `${placeName(tray.zone.name)}: ${placeName(tray.child.name)}` }) });
-        } else {
-          showError(form, error);
+      await busy(event.submitter ?? form.querySelector("button[type=submit]"), async () => {
+        try {
+          await api(`${base}/shape`, { method: "PUT", body: read(form) });
+          saved = true;
+          toast(t("fridge-shape.saved"));
+          sheet.close();
+          await refreshStage();
+          onSaved?.();
+        } catch (error) {
+          const tray = fridge.children.flatMap((zone) => zone.children.map((child) => ({ zone, child }))).find(({ child }) => child.id === error.problem?.trayId);
+          if (tray) {
+            showError(form, { message: t("fridge-shape.tray-full", { tray: `${placeName(tray.zone.name)}: ${placeName(tray.child.name)}` }) });
+          } else {
+            showError(form, error);
+          }
         }
-      }
+      });
     });
   });
   dialog.addEventListener("close", () => {
