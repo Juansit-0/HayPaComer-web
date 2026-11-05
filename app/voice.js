@@ -49,7 +49,7 @@ export function listen({ lang, continuous, onText, onState }) {
   };
   recognition.onstart = () => onState("listening");
   recognition.onend = () => onState("idle");
-  recognition.onerror = (event) => onState(event.error === "not-allowed" ? "blocked" : "idle");
+  recognition.onerror = (event) => onState(["not-allowed", "service-not-allowed", "audio-capture"].includes(event.error) ? "blocked" : "idle");
   recognition.start();
   return recognition;
 }

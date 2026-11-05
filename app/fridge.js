@@ -205,7 +205,7 @@ function addFoodBody(catalog, trays, trayId, chosen = null) {
         <label class="chip"><input type="radio" name="expiryMode" value="photo"><span>${t("add.expiry.photo")}</span></label>
       </div>
       <div data-mode="known" hidden>
-        <label>${t("fridge.expires")}<input type="date" name="expiresOn"></label>
+        <label>${t("fridge.expires")}<input type="date" name="expiresOn" min="${new Date().toLocaleDateString("en-CA")}"></label>
       </div>
       <div data-mode="photo" hidden>
         <label>${t("add.photo")}<input type="file" name="photo" accept="image/jpeg,image/png,image/webp" capture="environment"></label>
@@ -373,6 +373,12 @@ function wireAddFood(dialog, base, trays, onDone) {
 
   form.addEventListener("change", async (event) => {
     if (event.target.name === "photo" && event.target.files[0]) {
+      const file = event.target.files[0];
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 4 * 1024 * 1024) {
+        event.target.value = "";
+        preview.textContent = t("add.photo-check");
+        return;
+      }
       const tray = chosenTray();
       const values = formData(form);
       if (!values.food || !tray) {
@@ -381,7 +387,7 @@ function wireAddFood(dialog, base, trays, onDone) {
       }
       preview.textContent = t("add.photo-reading");
       try {
-        proposal = await readLabel(base, values, event.target.files[0], tray);
+        proposal = await readLabel(base, values, file, tray);
         preview.textContent = t("add.photo-result", {
           date: formatDay(proposal.expiresOn, { day: "numeric", month: "long" }),
           reason: proposal.reason,

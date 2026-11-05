@@ -86,6 +86,7 @@ export function renderReset(main, token) {
     event.preventDefault();
     const { password } = formData(event.target);
     if (MIN_PASSWORD > password.length) return showError(event.target, { message: t("auth.password-short") });
+    if (new Set(password).size === 1) return showError(event.target, { message: t("auth.password-weak") });
     const button = event.target.querySelector("button[type=submit]");
     button.disabled = true;
     try {
@@ -163,6 +164,7 @@ export function renderSignIn(main, onDone, initial = "signin", notice = null) {
       const values = formData(event.target);
       // The server only ever sees a proof of the password, so its length can be checked only here.
       if (creating && MIN_PASSWORD > values.password.length) return showError(event.target, { message: t("auth.password-short") });
+      if (creating && new Set(values.password).size === 1) return showError(event.target, { message: t("auth.password-weak") });
       const button = event.target.querySelector("button[type=submit]");
       button.disabled = true;
       button.setAttribute("aria-busy", "true");

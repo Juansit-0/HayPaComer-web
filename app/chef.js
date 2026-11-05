@@ -54,7 +54,7 @@ function followUps(runs) {
 function replies(entry, index) {
   if (!entry.replies?.length) return "";
   return `<div class="quick-replies" role="group" aria-label="${esc(t("chef.replies"))}">${entry.replies
-    .map((reply, choice) => `<button type="button" class="chip-button${reply.main ? " primary" : ""}" data-reply="${index}:${choice}">${esc(reply.label)}</button>`)
+    .map((reply, choice) => `<button type="button" class="chip-button${reply.main ? " primary" : ""}" data-reply="${index}:${choice}"${reply.action === "approve" ? ' data-hold aria-describedby="hold-hint"' : ""}>${esc(reply.label)}</button>`)
     .join("")}</div>`;
 }
 
@@ -180,18 +180,19 @@ async function runTimer(box, read) {
 }
 
 // The server keeps the conversation, so a reload picks it up where it was.
-async function restoreChat() {
-  if (state.restored || state.messages.length) return;
-  state.restored = true;
-  const [latest] = await api("/agent/conversations").catch(() => []);
+async function restoreChat(household) {
+  if (state.restored === household.id) return;
+  Object.assign(state, { restored: household.id, conversationId: null, messages: [], dishes: null, recipes: null, offered: new Set(), shown: null });
+  const conversations = `/households/${household.id}/agent/conversations`;
+  const [latest] = await api(conversations).catch(() => []);
   if (!latest) return;
-  const messages = await api(`/agent/conversations/${latest.id}`).catch(() => []);
+  const messages = await api(`${conversations}/${latest.id}`).catch(() => []);
   state.conversationId = latest.id;
   state.messages = messages.map((entry) => ({ role: entry.role === "USER" ? "user" : "assistant", text: offlineText(entry.text), runs: [] }));
 }
 
 export async function renderChef(main, household) {
-  await restoreChat();
+  await restoreChat(household);
   const base = `/households/${household.id}`;
   const [session, pending, listed] = await Promise.all([
     api(`${base}/cooking-sessions/active`).catch(() => null),
@@ -476,16 +477,25 @@ export async function renderChef(main, household) {
 
   function startListening(continuous) {
     state.recognition?.stop();
-    state.recognition = listen({
+    const recognition = listen({
       lang: voiceLanguage(),
       continuous,
       onText: (text) => ask(text.trim(), true),
       onState: (now) => {
         mic.setAttribute("aria-pressed", String(now === "listening"));
         mic.textContent = now === "listening" ? t("chef.listening") : t("chef.speak");
-        if (now === "blocked") toast(t("chef.mic-blocked"));
+        if (now === "blocked") {
+          toast(t("chef.mic-blocked"));
+          state.handsFree = false;
+          const toggle = main.querySelector("[data-hands-free]");
+          if (toggle) toggle.checked = false;
+        }
+        // Browsers end listening after a silence; hands-free carries on until it is turned off.
+        const goesOn = () => now === "idle" && state.handsFree && state.recognition === recognition && main.dataset.route === "chef";
+        if (goesOn()) setTimeout(() => goesOn() && startListening(true), 400);
       },
     });
+    state.recognition = recognition;
   }
 
   mic.addEventListener("click", () => {
@@ -501,6 +511,8 @@ export async function renderChef(main, household) {
     if (state.handsFree) startListening(true);
     else state.recognition?.stop();
   });
+
+  if (state.handsFree && voiceSupported) startListening(true);
 
   main.querySelector("[data-lang]").addEventListener("change", (event) => {
     state.lang = event.target.value;

@@ -475,6 +475,23 @@ export function highlightFoods(names) {
   three?.highlight(names);
 }
 
+// The stage outlives a language change, so its own words follow it here.
+window.addEventListener("hpc:locale", () => {
+  const tray = root?.closest(".stage")?.querySelector(".stage-palette");
+  if (tray) {
+    tray.querySelector(".palette-head .hint").textContent = t("stage.palette");
+    tray.querySelector("[data-freezer]").textContent = t("stage.freezer");
+    tray.querySelectorAll("[data-food]").forEach((chip) => (chip.lastChild.textContent = foodName(chip.dataset.food)));
+    tray.querySelector("[for=palette-other]").textContent = t("stage.other");
+    tray.querySelector("#palette-other").placeholder = t("stage.other");
+  }
+  if (zones) {
+    zones.querySelector("[data-zone=use]").textContent = t("fridge.use");
+    zones.querySelector("[data-zone=discard]").textContent = t("fridge.discard");
+  }
+  refreshStage();
+});
+
 function setFreezer(on) {
   freezerButton?.setAttribute("aria-pressed", String(on));
   three?.showFreezer(on);
