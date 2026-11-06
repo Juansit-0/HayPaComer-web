@@ -59,6 +59,10 @@ export function recipeName(name) {
   return texts[`recipe.${String(name ?? "").trim().toLowerCase()}`] ?? name;
 }
 
+export function stepText(text) {
+  return texts[`step.${String(text ?? "").trim().toLowerCase()}`] ?? text;
+}
+
 export function placeName(name) {
   return texts[`place.${String(name ?? "").trim().toLowerCase()}`] ?? name;
 }

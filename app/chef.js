@@ -1,6 +1,6 @@
 import { art } from "./art/drawings.js";
 import { api } from "./api.js";
-import { currentLocale, foodName, foodWord, locales, plural, recipeName, t, theFood } from "./i18n.js";
+import { currentLocale, foodName, foodWord, locales, plural, recipeName, stepText, t, theFood } from "./i18n.js";
 import { candidate, dishCard, kitchenRecipes } from "./now.js";
 import { highlightFoods, shapeClass } from "./stage.js";
 import { busy, daysLeft, esc, formData, grams, showError, toast, whenText } from "./ui.js";
@@ -121,7 +121,7 @@ function stepCard(session) {
   return `<article class="tile cooking" aria-label="${esc(t("chef.cooking", { recipe: recipeName(session.recipe) }))}">
     <p class="cooking-step">${ready ? t("chef.steps-ready", { total: session.totalSteps }) : t("chef.step-of", { step: session.currentStep, total: session.totalSteps })}</p>
     <div class="item-meta"><span class="item-name">${esc(recipeName(session.recipe))}</span><span class="status">${esc(t(`chef.phase.${session.phase}`))}</span></div>
-    <p class="step-text">${step ? esc(step.instruction) : ready ? t("chef.ready") : t("chef.all-done")}</p>
+    <p class="step-text">${step ? esc(stepText(step.instruction)) : ready ? t("chef.ready") : t("chef.all-done")}</p>
     ${step?.timerSeconds ? `<p class="cooking-timer" role="timer" aria-label="${esc(t("chef.timer"))}" data-timer></p>` : ""}
     ${
       step?.weighFood
@@ -270,7 +270,7 @@ export async function renderChef(main, household) {
   async function cook(action) {
     if (!session) return false;
     if (action === "repeat") {
-      speak(session.step?.instruction ?? (session.phase === "PREPARING" ? t("chef.ready") : t("chef.all-done")), voiceLanguage());
+      speak(stepText(session.step?.instruction) ?? (session.phase === "PREPARING" ? t("chef.ready") : t("chef.all-done")), voiceLanguage());
       return true;
     }
     const updated = await api(`${base}/cooking-sessions/${session.id}/${action}`, { method: "POST" }).catch((error) => {
@@ -278,7 +278,7 @@ export async function renderChef(main, household) {
       return null;
     });
     if (updated) {
-      if (action === "next") speak(updated.step?.instruction ?? t("chef.last-step"), voiceLanguage());
+      if (action === "next") speak(stepText(updated.step?.instruction) ?? t("chef.last-step"), voiceLanguage());
       await renderChef(main, household);
     }
     return true;
@@ -459,8 +459,8 @@ export async function renderChef(main, household) {
     }
     try {
       const started = await api(`${base}/cooking-sessions`, { method: "POST", body: { name: body.name, servings: body.servings, minutes: body.minutes, requirements: body.requirements, steps: body.steps, targetServings: body.targetServings } });
-      state.messages.push({ role: "assistant", text: t("chef.offer.started", { recipe: recipeName(dish.recipe), step: started.step?.instruction ?? "" }).trim(), runs: [{ specialist: "chef" }] });
-      if (state.handsFree || mic.getAttribute("aria-pressed") === "true") speak(started.step?.instruction ?? "", voiceLanguage());
+      state.messages.push({ role: "assistant", text: t("chef.offer.started", { recipe: recipeName(dish.recipe), step: stepText(started.step?.instruction) ?? "" }).trim(), runs: [{ specialist: "chef" }] });
+      if (state.handsFree || mic.getAttribute("aria-pressed") === "true") speak(stepText(started.step?.instruction) ?? "", voiceLanguage());
       await renderChef(main, household);
       main.querySelector(".tile.cooking")?.scrollIntoView({ block: "center", behavior: scrollBehavior() });
     } catch (error) {
