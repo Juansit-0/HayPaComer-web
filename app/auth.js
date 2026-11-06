@@ -183,9 +183,13 @@ export function renderSignIn(main, onDone, initial = "signin", notice = null) {
             error.problem?.sendPassword ? login({ password: values.password }) : Promise.reject(error),
           ),
         );
-        // A new account starts with this device's language; an existing one brings the language it saved.
-        if (creating) await api("/me/locale", { method: "PUT", body: { locale: currentLocale() } }).catch(() => null);
-        else await api("/i18n").then((info) => info.current !== currentLocale() && loadLocale(info.current)).catch(() => null);
+        // An account that saved a language brings it; any other keeps the one chosen on this device.
+        const info = creating ? null : await api("/i18n").catch(() => null);
+        if (info?.saved) {
+          if (info.current !== currentLocale()) await loadLocale(info.current);
+        } else if (creating || info) {
+          await api("/me/locale", { method: "PUT", body: { locale: currentLocale() } }).catch(() => null);
+        }
         onDone();
       } catch (error) {
         showError(event.target, error);

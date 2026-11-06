@@ -444,7 +444,7 @@ export async function renderSettings(main, household, rerender) {
     try {
       await api("/me/notification-preferences", {
         method: "PUT",
-        body: { channels: data.getAll("channels"), telegramChatId: formData(alertsForm).telegramChatId?.trim() || null },
+        body: { channels: data.getAll("channels"), telegramChatId: (preferences?.telegramReady ? formData(alertsForm).telegramChatId?.trim() : preferences?.telegramChatId) || null },
       });
       saved(alertsForm);
     } catch (error) {

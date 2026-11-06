@@ -166,7 +166,9 @@ function fridgeView(G) {
   const x = G.offset + (G.cold.x0 + G.cold.x1) / 2;
   const y = (G.cold.y0 + G.top) / 2;
   const reach = Math.min(G.top, (G.shelves[0] ?? G.top) + 0.16) - (y + 0.2);
-  const z = Math.max(0.6 + (G.top - G.cold.y0) * 0.66, G.D / 2 + reach / Math.tan((15 * Math.PI) / 180));
+  // A drawer sits at the very bottom, so a fridge with one stands further back to keep it in sight.
+  const depth = G.drawers.length ? 0.78 : 0.66;
+  const z = Math.max(0.6 + (G.top - G.cold.y0) * depth, G.D / 2 + reach / Math.tan((15 * Math.PI) / 180));
   return { position: [x + 0.2, y + 0.2, z], target: [x, y, 0] };
 }
 
