@@ -77,10 +77,10 @@ function notificationsTile(preferences) {
     <p class="hint">${t("settings.alerts-hint")}</p>
     <form class="stack" data-alerts-form>
       <fieldset class="chips"><legend class="visually-hidden">${t("settings.alerts")}</legend>
-        <label class="chip"><input type="checkbox" name="channels" value="WEB" ${channels.has("WEB") ? "checked" : ""}><span>${t("channel.WEB")}</span></label>
-        <label class="chip"><input type="checkbox" name="channels" value="TELEGRAM" ${channels.has("TELEGRAM") ? "checked" : ""}><span>${t("channel.TELEGRAM")}</span></label>
+        <label class="chip"><input type="checkbox" name="channels" value="WEB" checked disabled><span>${t("channel.WEB")}</span></label>
+        ${preferences?.telegramReady ? `<label class="chip"><input type="checkbox" name="channels" value="TELEGRAM" ${channels.has("TELEGRAM") ? "checked" : ""}><span>${t("channel.TELEGRAM")}</span></label>` : ""}
       </fieldset>
-      <label>${t("settings.telegram")}<input name="telegramChatId" inputmode="numeric" autocomplete="off" value="${esc(preferences?.telegramChatId ?? "")}"></label>
+      ${preferences?.telegramReady ? `<label>${t("settings.telegram")}<input name="telegramChatId" inputmode="numeric" autocomplete="off" value="${esc(preferences.telegramChatId ?? "")}"></label>` : ""}
       <button type="submit">${t("settings.save-alerts")}</button>
     </form>
   </section>`;

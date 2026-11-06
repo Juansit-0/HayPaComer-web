@@ -323,6 +323,7 @@ function palette(stageBox, canvas) {
       chip.removeEventListener("pointermove", move);
       chip.removeEventListener("pointerup", drop);
       chip.removeEventListener("pointercancel", finish);
+      window.removeEventListener("keydown", escape);
       three.showTarget(null, null);
       ghost?.remove();
       ghost = null;
@@ -336,6 +337,8 @@ function palette(stageBox, canvas) {
     chip.addEventListener("pointerup", drop);
     // A drag the browser takes back (a scroll, a call, the pointer lost) puts the chip back and adds nothing.
     chip.addEventListener("pointercancel", finish);
+    const escape = (key) => key.key === "Escape" && finish();
+    window.addEventListener("keydown", escape);
   });
   tray.querySelector("[data-other]").addEventListener("submit", async (event) => {
     event.preventDefault();

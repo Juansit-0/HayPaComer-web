@@ -83,6 +83,7 @@ const views = {
 };
 let household = null;
 let stageHousehold = null;
+let wanted = null;
 
 function current() {
   const route = location.hash.replace("#/", "").split("/")[0];
@@ -235,6 +236,10 @@ let renders = 0;
 async function render({ navigate = false, refresh = false } = {}) {
   const ticket = ++renders;
   newPage();
+  if (session.signedIn && wanted) {
+    history.replaceState(null, "", wanted);
+    wanted = null;
+  }
   // Links in emails carry their token as #/page?token=..., and these pages work whether or not someone is signed in.
   const [path, query = ""] = location.hash.replace(/^#\/?/, "").split("?");
   const route = path.split("/")[0];
@@ -253,7 +258,11 @@ async function render({ navigate = false, refresh = false } = {}) {
     else if (route === "forgot") renderForgot(main);
     else if (route === "reset-password" && token) renderReset(main, token);
     else if (route === "verify-email" && token) await renderVerify(main, token);
-    else renderLanding(main);
+    else {
+      // A link to a screen waits behind the sign-in instead of being lost.
+      if (views[route] || route === "inbox") wanted = location.hash;
+      renderLanding(main);
+    }
     main.setAttribute("aria-busy", "false");
     return;
   }
