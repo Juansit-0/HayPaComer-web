@@ -7,10 +7,10 @@ import { busy, daysLeft, esc, formData, grams, showError, toast, whenText } from
 import { easing, page, reduced, token } from "./motion.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
-const state = { cooking: false, restored: false, conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, recipes: null, offered: new Set(), shown: null };
+const state = { cooking: false, restored: false, conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, recipes: null, offered: new Set(), shown: null, leftover: null };
 
 // A module outlives a sign-out, and one person's chat must never reach the next.
-window.addEventListener("hpc:signed-out", () => Object.assign(state, { restored: false, conversationId: null, messages: [], dishes: null, recipes: null, offered: new Set(), shown: null }));
+window.addEventListener("hpc:signed-out", () => Object.assign(state, { restored: false, conversationId: null, messages: [], dishes: null, recipes: null, offered: new Set(), shown: null, leftover: null }));
 
 const arrive = (element) => element?.animate([{ opacity: 0, translate: "0 var(--rise)" }, { opacity: 1, translate: "0 0" }], { duration: token("duration-slow"), easing: easing("ease-emphasized") });
 const scrollBehavior = () => (reduced() ? "auto" : "smooth");
@@ -141,6 +141,18 @@ function stepCard(session) {
   </article>`;
 }
 
+function leftoverCard(recipe) {
+  if (!recipe) return "";
+  return `<section class="tile" aria-labelledby="leftover-title">
+    <h2 id="leftover-title">${esc(t("chef.leftover.title", { recipe: recipeName(recipe) }))}</h2>
+    <p>${t("chef.leftover.lead")}</p>
+    <div class="row-form">
+      <button class="primary" type="button" data-leftover="save">${t("chef.leftover.save")}</button>
+      <button type="button" class="ghost" data-leftover="none">${t("chef.leftover.none")}</button>
+    </div>
+  </section>`;
+}
+
 // What the Chef asks to do, said in the person's language from the tool and its arguments; the server's English summary only as a fallback.
 export function confirmationText(pending) {
   const args = pending.arguments ?? {};
@@ -204,7 +216,8 @@ export async function renderChef(main, household) {
     .sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity));
 
   state.cooking = Boolean(session);
-  const side = stepCard(session) + confirmations(pending);
+  if (session) state.leftover = null;
+  const side = stepCard(session) + leftoverCard(state.leftover) + confirmations(pending);
   if (main.dataset.route !== "chef") return;
   main.innerHTML = `
     <header>
@@ -278,6 +291,7 @@ export async function renderChef(main, household) {
       return null;
     });
     if (updated) {
+      if (updated.phase === "FINISHED") state.leftover = session.recipe;
       if (action === "next") speak(stepText(updated.step?.instruction) ?? t("chef.last-step"), voiceLanguage());
       await renderChef(main, household);
     }
@@ -518,6 +532,17 @@ export async function renderChef(main, household) {
     state.lang = event.target.value;
   });
 
+  main.querySelectorAll("[data-leftover]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const done = () => {
+        state.leftover = null;
+        return renderChef(main, household);
+      };
+      if (button.dataset.leftover === "none") return done();
+      const { openAddFood } = await import("./fridge.js");
+      openAddFood(household, { food: "Leftovers", onDone: done });
+    }),
+  );
   main.querySelectorAll(".cooking [data-cook]").forEach((button) => button.addEventListener("click", () => cook(button.dataset.cook)));
   main.querySelector("[data-chat]").addEventListener("click", (event) => {
     const dish = event.target.closest(".dish-card [data-cook]");
