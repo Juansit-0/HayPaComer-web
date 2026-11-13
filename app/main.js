@@ -178,11 +178,13 @@ async function refreshStatus() {
     notice.hidden = true;
     return;
   }
-  const parts = [...new Set(status.degraded.map((item) => {
+  const saved = status.degraded.filter((item) => item.component !== "chef-memory");
+  const parts = [...new Set(saved.map((item) => {
     const name = t(`status.component.${item.component.replaceAll(" ", "-")}`);
     return name.startsWith("status.component.") ? t("status.component.other") : name;
   }))].join(", ");
-  notice.textContent = t("status.saved-mode", { parts });
+  const chefAway = saved.length < status.degraded.length;
+  notice.textContent = [saved.length ? t("status.saved-mode", { parts }) : "", chefAway ? t("status.chef-memory") : ""].filter(Boolean).join(" ");
   notice.hidden = false;
 }
 
