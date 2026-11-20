@@ -630,7 +630,9 @@ function cluster(make, count, spacing) {
   return result;
 }
 
-const count = (grams, each, max) => Math.max(1, Math.min(max, Math.round(Number(grams || each) / each)));
+// Food added by units says how many pieces there are; then that number is drawn, not a guess from the weight.
+let unitsWanted = null;
+const count = (grams, each, max) => unitsWanted ?? Math.max(1, Math.min(max, Math.round(Number(grams || each) / each)));
 
 function egg() {
   return mesh(lathe([[0, 0], [0.018, 0.004], [0.022, 0.018], [0.02, 0.04], [0.012, 0.056], [0, 0.06]]), paint("#f4ead8"));
@@ -1473,9 +1475,50 @@ function packageModel(pack, grams, pieceGrams) {
   );
 }
 
+// Pieces counted by the person stand side by side, facing the front, so all of them can be counted at a glance: long ones
+// (carrots, bananas) turn to point at the viewer, and a long line folds into rows going back.
+function lineUp(make, units) {
+  const probe = new THREE.Box3().setFromObject(make());
+  const width = probe.max.x - probe.min.x;
+  const depth = probe.max.z - probe.min.z;
+  const turn = width > depth * 1.8;
+  // Long pieces sit at an angle: the body still shows, and the next one fits close beside it.
+  const angle = 1.05;
+  const step = turn ? (width * Math.cos(angle) + depth * Math.sin(angle)) * 0.62 : width * 1.08 + 0.004;
+  const reach = (turn ? width * Math.sin(angle) : depth) * 1.05;
+  const perRow = Math.min(units, 6);
+  return group(
+    ...Array.from({ length: units }, (_, index) => {
+      const piece = group(make());
+      const column = index % perRow;
+      const row = Math.floor(index / perRow);
+      if (turn) piece.rotation.y = angle;
+      piece.position.set((column - (perRow - 1) / 2) * step, 0, -row * reach);
+      return piece;
+    }),
+  );
+}
+
 export function foodModel(name, category, grams, pieceGrams) {
   const pack = DETAILED[name] || FOODS[name] ? null : packagingOf(name, category);
-  const model = pack ? packageModel(pack, grams, pieceGrams) : DETAILED[name] ? DETAILED[name](grams) : (FOODS[name] ?? BY_CATEGORY[category] ?? BY_CATEGORY.VEGETABLE)();
+  const units = Number(pieceGrams) > 0 && Number(grams) > 0 ? Math.max(1, Math.min(24, Math.round(Number(grams) / Number(pieceGrams)))) : null;
+  let model;
+  if (pack) model = packageModel(pack, grams, pieceGrams);
+  else if (units > 1 && FOODS[name] && name !== "Egg") model = lineUp(FOODS[name], units);
+  else if (DETAILED[name]) {
+    unitsWanted = units;
+    try {
+      model = DETAILED[name](grams);
+    } finally {
+      unitsWanted = null;
+    }
+  } else {
+    const single = FOODS[name] ?? BY_CATEGORY[category] ?? BY_CATEGORY.VEGETABLE;
+    if (units > 1) {
+      const probe = sized(group(single()));
+      model = cluster(() => single(), units, Math.max(0.035, Math.min(0.12, probe.userData.width * 0.95)));
+    } else model = single();
+  }
   return outline(group(model));
 }
 

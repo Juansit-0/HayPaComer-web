@@ -9,6 +9,8 @@ const icon = (body) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"
 const KINDS = {
   DOOR_LEFT_OPEN: { glyph: icon('<rect x="5" y="3" width="10" height="18" rx="1.5"/><path d="M15 5l4 1.5v12L15 20"/><path class="hatch" d="M8 8l4-3M8 12l4-3"/>'), action: "inbox.action.fridge", route: "#/fridge" },
   COLD_CHAIN_BREACH: { glyph: icon('<path d="M10 4a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0z"/><path d="M12 9v7"/><path class="hatch" d="M17 6h3M17 9h2"/>'), action: "inbox.action.check", route: "#/fridge" },
+  FOOD_REQUEST: { glyph: icon('<path d="M7 4h7l4 4v12H7z"/><path d="M14 4v4h4"/><path class="hatch" d="M10 12h5M10 15h5"/>'), action: "inbox.action.answer", route: "#/fridge" },
+  FOOD_REQUEST_ANSWERED: { glyph: icon('<path d="M7 4h7l4 4v12H7z"/><path d="M14 4v4h4"/><path d="M9.5 14l2 2 3.5-4"/>'), action: "inbox.action.fridge", route: "#/fridge" },
   BRIEFING: { glyph: icon('<path d="M4 11h16v2a6 6 0 0 1-6 6h-4a6 6 0 0 1-6-6z"/><path d="M8 7c0-1.5 1.5-1.5 1.5-3M12 7c0-1.5 1.5-1.5 1.5-3M16 7c0-1.5 1.5-1.5 1.5-3"/>'), action: "inbox.action.cook", route: "#/now" },
 };
 

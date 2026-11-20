@@ -46,8 +46,17 @@ export function foodWord(name) {
 }
 
 // A food with its article, which in Spanish follows its gender and number (el tomate, la pechuga de pollo, los fríjoles negros, las lentejas).
+// Foods learned by the AI have no gender in the catalog; Spanish nearly always shows it in the first word (la cerveza, los fríjoles).
+function guessGender(name) {
+  const first = foodWord(name).split(/\s+/)[0] ?? "";
+  if (/as$/.test(first)) return "fp";
+  if (/(os|es)$/.test(first)) return "mp";
+  if (/(a|ión|dad)$/.test(first)) return "f";
+  return "m";
+}
+
 export function theFood(name) {
-  const gender = texts[`food-gender.${String(name ?? "").trim().toLowerCase()}`] ?? "m";
+  const gender = texts[`food-gender.${String(name ?? "").trim().toLowerCase()}`] ?? guessGender(name);
   return t(`article.the-${["m", "f", "mp", "fp"].includes(gender) ? gender : "m"}`, { food: foodWord(name) });
 }
 

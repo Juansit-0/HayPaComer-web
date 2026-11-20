@@ -424,11 +424,15 @@ window.addEventListener("hpc:live-state", (event) => {
 });
 
 // A new alert rings the bell once (when the page is in view), so it is noticed without a banner taking over the screen.
+// Requests for "ask first" food arrive as fridge changes; they also land in someone's notifications.
+const REQUEST_NEWS = new Set(["Someone asked to use a food", "A food request was answered"]);
+
 window.addEventListener("hpc:live", async (event) => {
-  if (event.detail.kind !== "alert") {
+  if (event.detail.kind !== "alert" && !REQUEST_NEWS.has(event.detail.detail)) {
     refreshStageSoon();
     return;
   }
+  if (event.detail.kind !== "alert") refreshStageSoon();
   await refreshInbox();
   if (document.hidden || reduced()) return;
   play("pop");
