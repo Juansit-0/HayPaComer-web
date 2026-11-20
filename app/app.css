@@ -1494,7 +1494,8 @@ h1, h2.display, .now-hero h1 { font-variation-settings: "opsz" 144, "SOFT" 100, 
 .landing .how-fragment { position: absolute; left: -24px; bottom: -24px; min-width: 0; padding: var(--space-m); border-radius: 0; background: var(--paper); color: var(--ink-color); border: 3px solid var(--ink-color); box-shadow: 6px 6px 0 var(--ink-color); }
 .landing .how-names { color: var(--color-text-weak); }
 .landing .how-names li[aria-current="step"] { color: var(--ink-color); }
-.landing .land-footer { gap: var(--space-m); }
+.landing .land-footer { gap: var(--space-m); min-height: 0; align-content: end; overflow: clip; padding-top: calc(clamp(32px, 4vw, 56px) + 28px); }
+.landing .land-cta { min-height: 0; }
 .landing .land-wordmark { color: var(--ink-color); }
 @media (max-width: 900px) {
   .landing .kit { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-l) var(--space-s); }
