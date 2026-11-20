@@ -1935,3 +1935,5 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 .legal-accept { margin: 0; font-size: 14px; line-height: 1.5; }
 .demo-fill { justify-self: start; }
 .ask-line { padding: 0 var(--space-s, 0.75rem) var(--space-xs, 0.5rem); }
+.scale-tools { grid-column: 1 / -1; flex-basis: 100%; width: 100%; align-items: end; flex-wrap: wrap; }
+.scale-tools [data-scale-status] { flex-basis: 100%; margin: 0; }

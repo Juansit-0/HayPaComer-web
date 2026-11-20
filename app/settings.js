@@ -1,7 +1,7 @@
 import { api, session } from "./api.js";
 import { soundOn } from "./sound.js";
 import { currentLocale, formatNumber, loadLocale, locales, t } from "./i18n.js";
-import { canonicalFood, errorText, esc, formData, numberField, openSheet, rememberFocus, showError, toast, wireSteppers } from "./ui.js";
+import { canonicalFood, errorText, esc, formData, grams, numberField, openSheet, rememberFocus, showError, toast, wireSteppers } from "./ui.js";
 import { reduced } from "./motion.js";
 import { openFridgeShape, shapeDrawing } from "./fridge-shape.js";
 import { legalLinks } from "./legal.js";
@@ -144,6 +144,17 @@ export function confirmSheet(title, text, label, action) {
 
 const DEVICE_KINDS = ["ESP32_DOOR_TEMP", "ESP32_SCALE", "SIMULATOR"];
 
+// Tare with the plate empty, then calibrate with something whose weight is known; both only talk to the scale endpoints.
+function scaleTools(device) {
+  return `<div class="row-form scale-tools" data-scale="${esc(device.id)}">
+    <button type="button" data-scale-tare>${t("settings.scale-tare")}</button>
+    <label class="grow">${t("settings.scale-known")}<input name="knownGrams" type="number" inputmode="decimal" min="1" max="20000" step="any" value="206"></label>
+    <button type="button" data-scale-calibrate>${t("settings.scale-calibrate")}</button>
+    <button type="button" class="ghost" data-scale-read>${t("settings.scale-read")}</button>
+    <p class="hint" data-scale-status aria-live="polite"></p>
+  </div>`;
+}
+
 function devicesTile(devices) {
   const when = (at) => new Date(at).toLocaleString(currentLocale(), { dateStyle: "medium", timeStyle: "short" });
   return `<section class="tile w-12" aria-labelledby="devices-title">
@@ -155,6 +166,7 @@ function devicesTile(devices) {
           <span class="item-name">${esc(device.name)} <small>${t(`device.kind.${device.kind}`)}</small></span>
           <span class="hint">${!device.active ? t("settings.device-off") : device.lastSeenAt ? esc(t("settings.device-seen", { when: when(device.lastSeenAt) })) : t("settings.device-never")}</span>
           <span class="item-actions">${device.active ? `<button type="button" class="ghost" data-revoke-device="${esc(device.id)}" data-name="${esc(device.name)}">${t("settings.device-revoke")}</button>` : ""}</span>
+          ${device.active && device.kind === "ESP32_SCALE" ? scaleTools(device) : ""}
         </li>`,
       )
       .join("")}</ul>
@@ -182,6 +194,27 @@ function wireDevices(main, base, fridgeId, rerender) {
         await api(`${base}/devices/${revokeDevice}`, { method: "DELETE" });
         rerender();
       });
+    } else if (button?.closest("[data-scale]")) {
+      const box = button.closest("[data-scale]");
+      const path = `${base}/devices/${box.dataset.scale}/scale`;
+      const status = box.querySelector("[data-scale-status]");
+      button.disabled = true;
+      try {
+        if ("scaleTare" in button.dataset) {
+          await api(`${path}/tare`, { method: "POST" });
+          status.textContent = t("settings.scale-tared");
+        } else if ("scaleCalibrate" in button.dataset) {
+          await api(`${path}/calibrate`, { method: "POST", body: { knownGrams: Number(box.querySelector("[name=knownGrams]").value) } });
+          status.textContent = t("settings.scale-calibrated");
+        } else {
+          const reading = await api(`${path}/reading`);
+          status.textContent = reading.calibrated && reading.grams !== null ? t("settings.scale-now", { grams: grams(Number(reading.grams)) }) : t("settings.scale-uncalibrated");
+        }
+      } catch (error) {
+        status.textContent = errorText(error);
+      } finally {
+        button.disabled = false;
+      }
     } else if (button && "copyKey" in button.dataset) {
       const input = tile.querySelector("[data-device-key] input");
       await navigator.clipboard?.writeText(input.value).catch(() => input.select());

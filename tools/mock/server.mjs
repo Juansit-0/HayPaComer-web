@@ -111,6 +111,8 @@ const routes = [
   [/^\/agent\/confirmations$/, () => pending],
   [/^\/notifications$/, () => notifications],
   [/^\/status$/, () => ({ state: "OK", degraded: [] })],
+  [/^\/households\/[^/]+\/devices$/, () => [{ id: "d1", fridgeId: "f1", name: "Bascula", kind: "ESP32_SCALE", active: true, createdAt: "2026-11-20T20:00:00Z", lastSeenAt: "2026-11-20T21:22:00Z" }]],
+  [/^\/households\/[^/]+\/devices\/[^/]+\/scale\/reading$/, () => ({ rawCounts: 87000, grams: 205.6, calibrated: true, at: "2026-11-20T21:30:00Z" })],
   [/^\/auth\/demo$/, () => ({ email: "revisor@demo.haypacomer.test", password: "mock-password" })],
   [/^\/households\/[^/]+\/foods\/density\?food=([^&]*)/, (m) => {
     const food = decodeURIComponent(m[1]);
