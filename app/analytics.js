@@ -182,31 +182,31 @@ export async function renderAnalytics(main, household) {
     ${
       moved === 0
         ? ""
-        : `<section class="numbers-facts">
-            <article class="fact">
-              <h2>${t("numbers.most-wasted")}</h2>
-              ${
-                wasted && Number(wasted.tally.discardedGrams)
-                  ? `<p class="fact-value">${foodLabel(wasted)} <span class="data">${grams(wasted.tally.discardedGrams)}</span></p>`
-                  : `<p class="fact-value">${t("numbers.nothing-wasted")}</p>`
-              }
-              ${Number(metrics.moneyWasted) ? `<p class="hint">${t("numbers.money-lost", { money: esc(money(metrics.moneyWasted, metrics.currency)) })}</p>` : ""}
-            </article>
+        : `<div class="bento numbers-bento">
+          <section class="tile w-4 fact" aria-labelledby="wasted-title">
+            <h2 id="wasted-title">${t("numbers.most-wasted")}</h2>
+            ${
+              wasted && Number(wasted.tally.discardedGrams)
+                ? `<p class="fact-value">${foodLabel(wasted)} <span class="data">${grams(wasted.tally.discardedGrams)}</span></p>`
+                : `<p class="fact-value">${t("numbers.nothing-wasted")}</p>`
+            }
+            ${Number(metrics.moneyWasted) ? `<p class="hint">${t("numbers.money-lost", { money: esc(money(metrics.moneyWasted, metrics.currency)) })}</p>` : ""}
           </section>
-          <section class="tile" aria-labelledby="daily-title">
+          <section class="tile w-8" aria-labelledby="daily-title">
             <h2 id="daily-title">${t("numbers.daily")}</h2>
             ${chart(metrics.days)}
           </section>
           ${
             metrics.members.length > 1
-              ? `<section class="tile" aria-labelledby="ranking-title"><h2 id="ranking-title">${t("numbers.ranking")}</h2>${together(metrics.members, total)}</section>`
+              ? `<section class="tile ${metrics.foods.length ? "w-6" : "w-12"}" aria-labelledby="ranking-title"><h2 id="ranking-title">${t("numbers.ranking")}</h2>${together(metrics.members, total)}</section>`
               : ""
           }
           ${
             metrics.foods.length
-              ? `<section class="tile" aria-labelledby="foods-title"><h2 id="foods-title">${t("numbers.foods")}</h2>${foods(metrics.foods)}</section>`
+              ? `<section class="tile ${metrics.members.length > 1 ? "w-6" : "w-12"}" aria-labelledby="foods-title"><h2 id="foods-title">${t("numbers.foods")}</h2>${foods(metrics.foods)}</section>`
               : ""
-          }`
+          }
+        </div>`
     }
 
     <details class="numbers-more">

@@ -3,6 +3,7 @@ import { foodName, formatNumber, plural, t } from "./i18n.js";
 import { easing, reduced, token } from "./motion.js";
 import { play } from "./sound.js";
 import { closest, plain } from "./fuzzy.js";
+import { art } from "./art/drawings.js";
 
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
@@ -388,24 +389,64 @@ export function openSheet(title, body, onReady) {
   return dialog;
 }
 
-const SKELETONS = {
-  now: [[7, 340], [5, 340], [4], [4], [4]],
-  fridge: [[5, 520], [7, 520]],
-  market: [[5, 300], [7, 300], [12]],
-  numbers: [[12, 280], [8, 300], [4, 300]],
-  chef: [[8, 460], [4, 460]],
-  settings: [[7, 360], [5, 360], [12]],
+const line = (kind = "") => `<span class="skel-line ${kind}"></span>`;
+const block = (size = "") => `${line("mid")}${line()}${size === "short" ? "" : line("short")}`;
+const tile = (cls = "", height = 160) => `<div class="tile skel-tile ${cls}" style="--h:${height}px">${block()}</div>`;
+const card = (cls = "") => `<div class="skel-card ${cls}">${block()}</div>`;
+const rows = (count, cls) => Array.from({ length: count }, () => card(cls)).join("");
+
+// Each screen's loading state is drawn on the same grid as the screen itself, so nothing moves when the content arrives.
+const LAYOUTS = {
+  now: () => `<section class="dish-row">${Array.from({ length: 3 }, (_, index) => `<div class="dish-card skel" style="--i:${index}"><span class="skel-photo"></span><div class="dish-body">${line("big")}${line("mid")}</div></div>`).join("")}</section>
+    <section class="today"><h2>${line("big")}</h2><ul class="today-list">${Array.from({ length: 3 }, () => `<li class="today-card">${line("big")}${block("short")}</li>`).join("")}</ul></section>
+    <section class="summary-row"><h2>${line("big")}</h2><div class="summary-figures">${Array.from({ length: 4 }, () => `<div class="kpi">${line("big")}${line("short")}</div>`).join("")}</div></section>`,
+  fridge: () => `<div class="shelf-chips">${Array.from({ length: 6 }, () => '<span class="skel-chip"></span>').join("")}</div>
+    <div class="bento fridge-bento"><div class="tile w-12 shelf-tile skel-tile" style="--h:360px">${line("big")}${rows(3, "food-card")}</div></div>`,
+  market: () => `<div class="bento market-bento"><div class="tile w-7 notepad skel-tile" style="--h:420px">${line("big")}${rows(4, "list-row")}</div>
+    <div class="w-5 stack">${tile("", 200)}${tile("", 160)}</div></div>`,
+  numbers: () => `<section class="numbers-hero">${line("big")}${line("mid")}</section>
+    <section class="numbers-rings">${Array.from({ length: 3 }, () => `<div class="ring"><span class="skel-ring"></span>${line("mid")}</div>`).join("")}</section>
+    ${tile("", 260)}`,
+  chef: () => `<section class="chef-sees skel-tile" style="--h:150px">${block()}</section>
+    <section class="chef-tile tile skel-tile" style="--h:300px">${rows(2, "chat-row")}</section>`,
+  settings: () => `<div class="bento"><div class="tile w-7 skel-tile" style="--h:340px">${line("big")}${rows(3, "list-row")}</div>
+    <div class="w-5 stack">${tile("", 160)}${tile("", 160)}</div>${tile("w-12", 160)}</div>`,
 };
 
+const HEADERS = { numbers: "numbers-head", now: "now-hero", fridge: "fridge-hero", market: "market-hero" };
+// The figure and the status pills that head the Fridge and Market bands, so the band keeps its height.
+const HEAD_EXTRAS = { fridge: `${'<span class="skel-line figure"></span>'}<span class="skel-pills"><i></i><i></i></span>`, market: '<span class="skel-line figure"></span>' };
+const ART = { now: "plate", fridge: "shelf", market: "basket", numbers: "scale", chef: "pot", settings: "plug" };
+
 export function skeleton(route, title) {
-  const tiles = (SKELETONS[route] ?? SKELETONS.now)
-    .map(
-      ([width, height], index) => `<div class="skel w-${width}" style="--i:${index};--h:${height ?? 220}px">
-        <span class="skel-line big"></span><span class="skel-line mid"></span><span class="skel-line short"></span>
-      </div>`,
-    )
-    .join("");
-  return `<header><h1>${esc(title)}</h1></header><div class="bento skeleton-screen" aria-hidden="true">${tiles}</div>`;
+  const heading = `<h1>${esc(title)}</h1><p class="loading-note">${art(ART[route] ?? "plate")}<span data-loading-caption>${esc(t(`loading.${route}.1`))}</span></p>${HEAD_EXTRAS[route] ?? ""}`;
+  const header = route === "numbers" ? `<header class="numbers-head"><div>${heading}</div></header>` : `<header class="${HEADERS[route] ?? ""}">${heading}</header>`;
+  return `${header}<div class="skeleton-screen" aria-hidden="true">${(LAYOUTS[route] ?? LAYOUTS.now)()}</div>`;
+}
+
+// The caption turns through a few kitchen sayings while the screen loads. When the shell says the server is slow (the data-state of the
+// network notice, set by hpc:network), the caption says so too and stops turning. It stops by itself once the skeleton is gone.
+export function rotateCaptions(route) {
+  const note = document.querySelector("[data-loading-caption]");
+  const net = document.querySelector("[data-net]");
+  if (!note) return;
+  const say = (text) => {
+    if (note.textContent === text) return;
+    note.textContent = text;
+    if (!reduced()) note.animate({ opacity: [0, 1] }, { duration: 300, easing: easing("ease-standard") });
+  };
+  const waiting = () => ({ slow: "net.slow", waking: "net.waking" })[net?.dataset.state];
+  let index = 1;
+  const timer = setInterval(() => {
+    if (!note.isConnected) return clearInterval(timer);
+    if (!waiting()) say(t(`loading.${route}.${(index = (index % 3) + 1)}`));
+  }, 2600);
+  const watcher = new MutationObserver(() => {
+    if (!note.isConnected) return watcher.disconnect();
+    if (waiting()) say(t(waiting()));
+  });
+  if (net) watcher.observe(net, { attributes: true, attributeFilter: ["data-state"] });
+  if (waiting()) say(t(waiting()));
 }
 
 export async function busy(button, task) {

@@ -14,7 +14,7 @@ import { renderLanding } from "./landing.js";
 import { openInbox } from "./inbox.js";
 import { mountStage, refreshStage, refreshStageSoon, showRoute } from "./stage.js";
 import { currentLocale, loadLocale, locales, plural, t, translatePage } from "./i18n.js";
-import { errorText, esc, rememberFocus, skeleton, swap, toast } from "./ui.js";
+import { errorText, esc, rememberFocus, rotateCaptions, skeleton, swap, toast } from "./ui.js";
 
 const main = document.getElementById("main");
 const loader = document.querySelector("[data-loader]");
@@ -34,19 +34,21 @@ function netState(state, key) {
   net.dataset.state = state;
   netNote.textContent = key ? t(key) : "";
 }
+// A failed notice stays until the person retries or a request gets through again; requests that start meanwhile do not hide it.
 window.addEventListener("hpc:network", ({ detail }) => {
   netTimers.forEach(clearTimeout);
   netTimers = [];
+  if (net.dataset.state === "failed") return;
   if (!detail.waiting) {
-    if (net.dataset.state !== "failed") netState("idle");
+    netState("idle");
     return;
   }
-  if (net.dataset.state === "failed") netState("idle");
   const waited = Date.now() - detail.since;
-  [[700, "busy"], [4000, "slow", "net.slow"], [12000, "waking", "net.waking"]].forEach(([at, state, key]) => {
-    netTimers.push(setTimeout(() => netState(state, key), Math.max(0, at - waited)));
+  [[700, "busy"], [4000, "slow", "net.slow"], [12000, "waking", "net.waking"]].slice(0, detail.quiet ? 1 : 3).forEach(([at, state, key]) => {
+    netTimers.push(setTimeout(() => net.dataset.state !== "failed" && netState(state, key), Math.max(0, at - waited)));
   });
 });
+window.addEventListener("hpc:network-ok", () => net.dataset.state === "failed" && netState("idle"));
 window.addEventListener("hpc:network-failed", () => {
   netTimers.forEach(clearTimeout);
   netState("failed", "net.failed");
@@ -324,6 +326,7 @@ async function render({ navigate = false, refresh = false } = {}) {
     }
   });
   if (ticket !== renders) return;
+  rotateCaptions(screen);
   document.querySelectorAll(".tabs a, [data-settings-link]").forEach((link) => {
     if (link.dataset.tab === screen) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");

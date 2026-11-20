@@ -141,6 +141,12 @@ createServer((request, response) => {
   }
   if (url.startsWith("/api/v1/")) {
     const path = url.slice(7);
+    // API_DELAY and CHAT_DELAY (ms) slow the answers down so the loading states can be reviewed.
+    const delay = Number(path.includes("agent/chat") ? process.env.CHAT_DELAY : path.startsWith("/i18n") ? 0 : process.env.API_DELAY) || 0;
+    if (delay && !path.includes("/stream")) {
+      const end = response.end.bind(response);
+      response.end = (...args) => (setTimeout(() => end(...args), delay), response);
+    }
     if (path.includes("/stream")) { response.writeHead(200, { "content-type": "text/event-stream" }); return; }
     const marketItem = request.method !== "GET" && path.match(/\/market-list\/items\/([^/]+)(\/check)?$/);
     const failing = path.match(/\/items\/[^/]+\/(move|consume|discard)$/)?.[1] ?? (marketItem ? (marketItem[2] ? "check" : "remove") : null);

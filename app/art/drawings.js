@@ -5,6 +5,8 @@ const ART = {
   plug: '<path d="M18 70h20a10 10 0 0 0 10-10V52H28v8a10 10 0 0 1-10 10z"/><path d="M33 52V40M43 52V40"/><path d="M102 70H82a10 10 0 0 1-10-10v-8h20v8a10 10 0 0 0 10 10z"/><path d="M78 56h-4M78 62h-4"/><path d="M18 70c-6 0-8 10-14 10M102 70c6 0 8 10 14 10"/><path class="hatch" d="M30 66l8-8M36 66l8-8M76 66l8-8M84 66l8-8"/><path d="M56 44l4-6M62 50l6-2M54 52l-6-2"/>',
   pot: '<path d="M26 54h68v24a18 18 0 0 1-18 18H44a18 18 0 0 1-18-18z"/><path d="M18 56h8M94 56h8"/><path d="M30 44l58-8"/><path d="M56 40l1-6h8l1 5"/><path class="hatch" d="M32 70l12-12M32 84l26-26M46 92l30-30M64 92l26-26M82 90l10-10"/><path d="M40 106h40"/>',
   plate: '<ellipse cx="60" cy="68" rx="40" ry="16"/><ellipse cx="60" cy="66" rx="26" ry="9"/><path d="M14 52v26M10 52v10c0 4 2 6 4 6s4-2 4-6V52"/><path d="M106 52c4 0 6 6 6 14h-6v12"/><path class="hatch" d="M30 74l10-6M44 80l14-8M64 80l16-9M84 76l8-5"/>',
+  basket: '<path d="M18 52h84l-9 44a8 8 0 0 1-8 6H35a8 8 0 0 1-8-6z"/><path d="M34 52l14-26M86 52L72 26"/><path d="M52 52v50M68 52v50M24 74h72"/><path class="hatch" d="M32 84l8-8M38 96l14-14M74 96l14-14M82 90l8-8"/><circle cx="60" cy="38" r="5"/>',
+  scale: '<path d="M24 100h72"/><path d="M60 100V38"/><path d="M26 44h68"/><path d="M26 44l-12 30h24zM94 44l-12 30h24z"/><path d="M14 74a12 5 0 0 0 24 0M82 74a12 5 0 0 0 24 0"/><circle cx="60" cy="30" r="5"/><path class="hatch" d="M18 72l8-12M24 74l10-16M86 72l8-12M92 74l10-16M50 96l10-10M62 96l8-8"/>',
 };
 
 export function art(kind) {

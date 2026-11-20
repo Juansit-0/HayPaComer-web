@@ -1,13 +1,13 @@
 import { art } from "./art/drawings.js";
 import { api } from "./api.js";
-import { currentLocale, foodName, foodWord, locales, plural, recipeName, stepText, t, theFood } from "./i18n.js";
+import { currentLocale, foodName, foodWord, formatMoney, locales, placeName, plural, recipeName, stepText, t, theFood } from "./i18n.js";
 import { candidate, dishCard, kitchenRecipes } from "./now.js";
 import { highlightFoods, shapeClass } from "./stage.js";
 import { busy, daysLeft, esc, formData, grams, showError, toast, whenText } from "./ui.js";
 import { easing, page, reduced, token } from "./motion.js";
 import { commandOf, defaultLanguage, listen, speak, speechSupported, voiceSupported } from "./voice.js";
 
-const state = { cooking: false, restored: false, conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, recipes: null, offered: new Set(), shown: null, leftover: null };
+const state = { busy: false, currency: "COP", cooking: false, restored: false, conversationId: null, messages: [], lang: null, handsFree: false, recognition: null, dishes: null, recipes: null, offered: new Set(), shown: null, leftover: null };
 
 // A module outlives a sign-out, and one person's chat must never reach the next.
 window.addEventListener("hpc:signed-out", () => Object.assign(state, { restored: false, conversationId: null, messages: [], dishes: null, recipes: null, offered: new Set(), shown: null, leftover: null }));
@@ -154,11 +154,28 @@ function leftoverCard(recipe) {
 }
 
 // What the Chef asks to do, said in the person's language from the tool and its arguments; the server's English summary only as a fallback.
+const amount = (args) => grams(Number(args.grams) || 0);
+const CONFIRMATIONS = {
+  add_to_market: (args) => args.food && t("chef.confirm.add_to_market", { grams: amount(args), food: foodWord(args.food) }),
+  remember: (args) => args.subject && t("chef.confirm.remember", { subject: args.subject, value: args.value ?? "" }),
+  stock_food: (args) => args.food && t("chef.confirm.stock_food", { grams: amount(args), food: foodWord(args.food), place: args.place ? placeName(args.place) : t("chef.confirm.place-default") }),
+  use_food: (args) => args.food && t("chef.confirm.use_food", { grams: amount(args), food: foodWord(args.food) }),
+  discard_food: (args) => args.food && t("chef.confirm.discard_food", { food: foodWord(args.food) }),
+  mark_opened: (args) => args.food && t("chef.confirm.mark_opened", { food: foodWord(args.food) }),
+  undo_last_change: () => t("chef.confirm.undo_last_change"),
+  update_market: (args) => args.food && ["check", "uncheck", "remove"].includes(String(args.action).toLowerCase()) && t(`chef.confirm.update_market.${String(args.action).toLowerCase()}`, { food: foodWord(args.food) }),
+  clear_checked_market: () => t("chef.confirm.clear_checked_market"),
+  set_market_budget: (args) => Number(args.amount) > 0 && t("chef.confirm.set_market_budget", { amount: formatMoney(Number(args.amount), state.currency) }),
+  missing_to_market: (args) => args.recipe && Number(args.servings) > 0 && plural("chef.confirm.missing_to_market", Number(args.servings), { recipe: recipeName(args.recipe) }),
+  plan_to_market: () => t("chef.confirm.plan_to_market"),
+  start_cooking: (args) => args.recipe && Number(args.servings) > 0 && plural("chef.confirm.start_cooking", Number(args.servings), { recipe: recipeName(args.recipe) }),
+  cooking_step: (args) => ["next", "pause", "resume", "abandon"].includes(String(args.action).toLowerCase()) && t(`chef.confirm.cooking_step.${String(args.action).toLowerCase()}`),
+  generate_week_plan: (args) => Number(args.servings) > 0 && plural("chef.confirm.generate_week_plan", Number(args.servings)),
+};
+const COOKING_TOOLS = new Set(["start_cooking", "cooking_step"]);
+
 export function confirmationText(pending) {
-  const args = pending.arguments ?? {};
-  if (pending.tool === "add_to_market" && args.food) return t("chef.confirm.add_to_market", { grams: grams(Number(args.grams) || 0), food: foodWord(args.food) });
-  if (pending.tool === "remember" && args.subject) return t("chef.confirm.remember", { subject: args.subject, value: args.value ?? "" });
-  return pending.summary;
+  return CONFIRMATIONS[pending.tool]?.(pending.arguments ?? {}) || pending.summary;
 }
 
 function confirmations(list) {
@@ -167,7 +184,7 @@ function confirmations(list) {
     <h2 id="confirm-title">${t("chef.waiting")}</h2>
     <ul class="list">${list
       .map(
-        (pending) => `<li data-pending><span class="item-name">${esc(confirmationText(pending))}</span>
+        (pending) => `<li data-pending data-tool="${esc(pending.tool)}"><span class="item-name">${esc(confirmationText(pending))}</span>
           <span class="item-actions"><button class="primary" type="button" data-approve="${esc(pending.id)}" data-hold aria-describedby="hold-hint">${t("chef.approve")}</button><button type="button" data-reject="${esc(pending.id)}">${t("chef.reject")}</button></span></li>`,
       )
       .join("")}</ul>
@@ -203,17 +220,18 @@ async function restoreChat(household) {
   state.messages = messages.map((entry) => ({ role: entry.role === "USER" ? "user" : "assistant", text: offlineText(entry.text), runs: [] }));
 }
 
+const withDays = (listed) => listed.map((item) => ({ ...item, days: daysLeft(item.expiresOn) })).sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity));
+
 export async function renderChef(main, household) {
   await restoreChat(household);
+  state.currency = household.currency ?? "COP";
   const base = `/households/${household.id}`;
   const [session, pending, listed] = await Promise.all([
     api(`${base}/cooking-sessions/active`).catch(() => null),
     api("/agent/confirmations").then((list) => list.filter((pending) => pending.householdId === household.id), () => []),
     api(`${base}/inventory`).catch(() => []),
   ]);
-  const inventory = listed
-    .map((item) => ({ ...item, days: daysLeft(item.expiresOn) }))
-    .sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity));
+  const inventory = withDays(listed);
 
   state.cooking = Boolean(session);
   if (session) state.leftover = null;
@@ -238,7 +256,7 @@ export async function renderChef(main, household) {
         <form class="ask" data-ask>
           <label class="grow"><span class="visually-hidden">${t("chef.question")}</span><input name="message" autocomplete="off" maxlength="1000" required placeholder="${esc(t("chef.question-example"))}"></label>
           <button class="round" type="button" data-mic aria-pressed="false" aria-label="${esc(t("chef.speak"))}" ${voiceSupported ? "" : "disabled"}>${t("chef.speak")}</button>
-          <button class="primary round" type="submit">${t("chef.ask")}</button>
+          <button class="primary round" type="submit" ${state.busy ? 'disabled aria-busy="true"' : ""}>${t("chef.ask")}</button>
         </form>
         <details class="voice-options">
           <summary>${t("chef.voice")}</summary>
@@ -320,18 +338,25 @@ export async function renderChef(main, household) {
     // Spoken commands drive the session; typed words like "ya" or "listo" are just a message.
     const command = spoken ? commandOf(text) : null;
     if (command && (await cook(command))) return;
+    if (state.busy) return;
     clearReplies();
     state.messages.push({ role: "user", text });
     input.value = "";
     const chat = main.querySelector("[data-chat]");
-    chat.insertAdjacentHTML("beforeend", `${message(state.messages.at(-1))}<li class="answer typing" aria-label="${esc(t("chef.thinking"))}"><span></span><span></span><span></span></li>`);
+    chat.insertAdjacentHTML("beforeend", `${message(state.messages.at(-1))}<li class="answer typing" role="status"><span class="thinking-art">${art("pot")}</span><span class="dots" aria-hidden="true"><span></span><span></span><span></span></span><span class="thinking-text">${t("chef.thinking-now")}</span></li>`);
     state.shown = state.messages.length;
     arrive(chat.lastElementChild.previousElementSibling);
-    chat.lastElementChild.scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
+    const typing = chat.lastElementChild;
+    typing.scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
+    // An AI answer can take a while: say so in the Chef's words, and only after a long wait say the server may be the slow one.
+    const label = typing.querySelector(".thinking-text");
+    const waits = [[6000, "chef.still-thinking"], [12000, "net.slow"]].map(([at, key]) => setTimeout(() => (label.textContent = t(key)), at));
+    setBusy(true);
     try {
       const reply = await api(`${base}/agent/chat`, {
         method: "POST",
         body: { message: text, conversationId: state.conversationId },
+        quiet: true,
       });
       state.conversationId = reply.conversationId;
       const foods = mentioned(reply.answer, inventory);
@@ -354,9 +379,10 @@ export async function renderChef(main, household) {
     } catch (error) {
       state.messages.push({ role: "assistant", text: error.message, runs: [] });
     }
-    // Only the new answer is added: the typing dots give way to it and it is written in from the top, the rest of the screen stays put.
-    const typing = chat.querySelector(".typing");
-    if (!typing || !document.body.contains(chat)) return;
+    waits.forEach(clearTimeout);
+    setBusy(false);
+    // Only the new answer is added: the thinking row gives way to it and it is written in from the top, the rest of the screen stays put.
+    if (!typing.isConnected) return;
     typing.outerHTML = message(state.messages.at(-1), state.messages.length - 1);
     const answer = chat.lastElementChild;
     state.shown = state.messages.length;
@@ -368,6 +394,25 @@ export async function renderChef(main, household) {
       state.followUp = null;
       say(next);
     }
+  }
+
+  // One question at a time: the send button rests while the Chef answers, and the field stays free for the next one.
+  function setBusy(on) {
+    state.busy = on;
+    const send = main.querySelector("[data-ask] [type=submit]");
+    if (!send) return;
+    send.disabled = on;
+    if (on) send.setAttribute("aria-busy", "true");
+    else send.removeAttribute("aria-busy");
+  }
+
+  // What an approved change touched: the stage and other screens hear of it, and the Chef's side shows the new stock or session.
+  async function refreshAfter(tool) {
+    window.dispatchEvent(new CustomEvent("hpc:inventory-changed"));
+    if (COOKING_TOOLS.has(tool)) return renderChef(main, household);
+    const listed = await api(`${base}/inventory`).catch(() => null);
+    const box = main.querySelector(".chef-sees");
+    if (listed && box) box.outerHTML = sees(withDays(listed));
   }
 
   // Older buttons go once the talk moves on, except a change still waiting for its yes or no.
@@ -415,6 +460,7 @@ export async function renderChef(main, household) {
           const done = reply.pending?.tool === "add_to_market" && args.food ? t("chef.offer.added", { foods: t("chef.offer.missing-item", { grams: grams(Number(args.grams) || 0), food: foodWord(args.food) }) }) : result.result;
           if (row) settle(row, done, true);
           say({ role: "assistant", text: done, runs: [], replies: followUps([{ specialist: "market" }]) });
+          refreshAfter(reply.pending?.tool);
         } catch (error) {
           say({ role: "assistant", text: error.message, runs: [] });
         }
@@ -569,6 +615,7 @@ export async function renderChef(main, household) {
       try {
         await api(`/agent/confirmations/${button.dataset.approve}/approve`, { method: "POST" });
         settle(button, t("chef.done"), true);
+        refreshAfter(button.closest("[data-pending]").dataset.tool);
       } catch (error) {
         toast(error.message);
       }

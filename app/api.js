@@ -65,8 +65,9 @@ function signedOut() {
 // How many requests are waiting and since when, told to the shell (hpc:network) so it can say the server is loading.
 const waiting = new Set();
 function tell() {
-  const since = waiting.size ? Math.min(...waiting) : 0;
-  window.dispatchEvent(new CustomEvent("hpc:network", { detail: { waiting: waiting.size, since } }));
+  const requests = [...waiting];
+  const since = requests.length ? Math.min(...requests.map((request) => request.since)) : 0;
+  window.dispatchEvent(new CustomEvent("hpc:network", { detail: { waiting: requests.length, since, quiet: requests.every((request) => request.quiet) } }));
 }
 
 async function attempt(url, init) {
@@ -81,10 +82,12 @@ async function attempt(url, init) {
 
 // A read is tried again after a timeout or a dropped connection; a write only when it never reached the server (no connection) or the
 // proxy answered for a sleeping server, so nothing is saved twice.
-export async function patiently(url, init = {}) {
+// quiet: the caller tells its own wait in words (a long AI answer is not a sleeping server), so the shell keeps to its thin line.
+export async function patiently(url, { quiet = false, ...init } = {}) {
   const read = !init.method || init.method === "GET";
   const started = Date.now();
-  waiting.add(started);
+  const request = { since: started, quiet };
+  waiting.add(request);
   tell();
   try {
     for (let pause = 1000; ; pause = Math.min(pause * 2, 8000)) {
@@ -97,7 +100,10 @@ export async function patiently(url, init = {}) {
       }
       const retry = failure ? read || failure.name !== "AbortError" : WAKING.has(response.status) && !response.headers.get("Content-Type")?.includes("problem");
       const late = Date.now() - started + pause > PATIENCE_MS;
-      if (response && (!retry || late)) return response;
+      if (response && (!retry || late)) {
+        if (!WAKING.has(response.status)) window.dispatchEvent(new Event("hpc:network-ok"));
+        return response;
+      }
       if (!retry || late) {
         window.dispatchEvent(new Event("hpc:network-failed"));
         throw new ApiError({ title: t("net.failed") }, 0);
@@ -105,7 +111,7 @@ export async function patiently(url, init = {}) {
       await new Promise((resolve) => setTimeout(resolve, pause));
     }
   } finally {
-    waiting.delete(started);
+    waiting.delete(request);
     tell();
   }
 }
@@ -147,7 +153,7 @@ export async function freshAccess() {
   return session.access;
 }
 
-async function send(path, { method = "GET", body, auth = true } = {}) {
+async function send(path, { method = "GET", body, auth = true, quiet } = {}) {
   const headers = { Accept: "application/json, application/problem+json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth) {
@@ -155,6 +161,7 @@ async function send(path, { method = "GET", body, auth = true } = {}) {
     if (access) headers.Authorization = `Bearer ${access}`;
   }
   return patiently(`/api/v1${path}`, {
+    quiet,
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
