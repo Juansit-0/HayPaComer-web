@@ -427,6 +427,13 @@ export function mountStage(element) {
   root = element;
   root.innerHTML = markup();
   if (wantsThree()) mountThree(element);
+  // A window that starts small (a phone, half a screen) and is made wide gets the 3D kitchen then, without reloading.
+  matchMedia("(min-width: 1024px)").addEventListener("change", (event) => {
+    if (!event.matches || threeReady || !wantsThree()) return;
+    mountThree(element);
+    placedSignature = null;
+    refreshStage();
+  });
   const resize = () => {
     const box = root.getBoundingClientRect();
     root.style.setProperty("--fit", Math.max(0.5, Math.min(box.width / 480, (box.height - 60) / 560, 1.5)).toFixed(3));

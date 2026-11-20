@@ -113,19 +113,28 @@ export async function renderVerify(main, token) {
 
 let demoAccount;
 
-// Reviewers get a button that fills in the shared test account; signing in stays their own click.
+// Reviewers get a button per shared test account that fills in its email and password; signing in stays their own click.
 async function offerDemo(main) {
   demoAccount ??= api("/auth/demo", { auth: false, quiet: true }).catch(() => null);
-  const account = await demoAccount;
+  const demo = await demoAccount;
   const form = main.querySelector("form");
-  if (!account || !form || form.querySelector("[data-demo]")) return;
-  form.insertAdjacentHTML("afterbegin", `<button class="chip-button demo-fill" type="button" data-demo>${t("auth.demo-fill")}</button>`);
-  form.querySelector("[data-demo]").addEventListener("click", () => {
-    form.querySelector("[name=email]").value = account.email;
-    form.querySelector("[name=password]").value = account.password;
-    form.querySelector("button[type=submit]").focus();
-    toast(t("auth.demo-filled"));
-  });
+  if (!demo || !form || form.querySelector("[data-demo]")) return;
+  const accounts = demo.accounts?.length ? demo.accounts : [{ email: demo.email, password: demo.password }];
+  form.insertAdjacentHTML(
+    "afterbegin",
+    `<div class="chips-row demo-fills">${accounts
+      .map((account, index) => `<button class="chip-button demo-fill" type="button" data-demo="${index}">${esc(account.label || t("auth.demo-fill"))}</button>`)
+      .join("")}</div>`,
+  );
+  form.querySelectorAll("[data-demo]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const account = accounts[Number(button.dataset.demo)];
+      form.querySelector("[name=email]").value = account.email;
+      form.querySelector("[name=password]").value = account.password;
+      form.querySelector("button[type=submit]").focus();
+      toast(t("auth.demo-filled"));
+    }),
+  );
 }
 
 export function renderSignIn(main, onDone, initial = "signin", notice = null) {
