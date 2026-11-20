@@ -1,6 +1,6 @@
 import { art } from "./art/drawings.js";
 import { api } from "./api.js";
-import { currentLocale, foodName, foodWord, formatMoney, locales, placeName, plural, recipeName, stepText, t, theFood } from "./i18n.js";
+import { currentLocale, foodName, foodWord, formatDay, formatMoney, formatTime, locales, placeName, plural, recipeName, stepText, t, theFood } from "./i18n.js";
 import { candidate, dishCard, kitchenRecipes } from "./now.js";
 import { highlightFoods, shapeClass } from "./stage.js";
 import { busy, daysLeft, esc, formData, grams, showError, toast, whenText } from "./ui.js";
@@ -27,7 +27,82 @@ const SPECIALISTS = { chef: "chef.specialist.chef", market: "chef.specialist.mar
 function offlineText(answer) {
   if (/^Offline answer based on measured data/.test(answer)) return t("chef.offline-answer");
   if (/^No evidence available right now/.test(answer)) return t("chef.offline-none");
-  return answer;
+  return localized(answer);
+}
+
+const G = "([\\d.]+) g";
+const gm = (value) => grams(Number(value));
+const known = (key, fallback) => (t(key) === key ? fallback : t(key));
+const when = (iso) => (iso.length > 10 ? `${formatDay(iso.slice(0, 10))} ${formatTime(iso)}` : formatDay(iso));
+const statusText = (list) => list.split(", ").map((status) => known(`status.${status.toLowerCase().replace(/_/g, "-")}`, status)).join(", ");
+const food = (name) => foodWord(name);
+
+// The agent's tools answer in English; each rule rebuilds one of their sentences in the person's language. Unknown lines pass through.
+const RULES = [
+  [new RegExp(`^Used ${G} of (.+); ${G} left$`), "chef.r.used", (m) => ({ grams: gm(m[1]), food: food(m[2]), left: gm(m[3]) })],
+  [/^Undid the last change: (.+) at (\S+)$/, "chef.r.undid", (m) => ({ what: known(`chef.r.reason.${m[1].replace(/ /g, "_")}`, m[1]), when: when(m[2]) })],
+  [new RegExp(`^Added ${G} of (.+) to the market list; ${G} pending in total$`), "chef.r.market-added-total", (m) => ({ grams: gm(m[1]), food: food(m[2]), total: gm(m[3]) })],
+  [new RegExp(`^Added ${G} of (.+) to the market list$`), "chef.r.market-added", (m) => ({ grams: gm(m[1]), food: food(m[2]) })],
+  [new RegExp(`^Removed ${G} of (.+) from the market list$`), "chef.r.market-removed", (m) => ({ grams: gm(m[1]), food: food(m[2]) })],
+  [new RegExp(`^Marked ${G} of (.+) as bought$`), "chef.r.market-bought", (m) => ({ grams: gm(m[1]), food: food(m[2]) })],
+  [new RegExp(`^Put ${G} of (.+) back on the market list$`), "chef.r.market-back", (m) => ({ grams: gm(m[1]), food: food(m[2]) })],
+  [/^Cleared (\d+) bought foods from the cart$/, "chef.r.cart-cleared", (m) => ({ n: m[1] })],
+  [/^Marked (.+) as opened; now expires (\S+)$/, "chef.r.opened-expires", (m) => ({ food: food(m[1]), date: when(m[2]) })],
+  [/^Marked (.+) as opened$/, "chef.r.opened", (m) => ({ food: food(m[1]) })],
+  [/^Monthly market budget set to (\d+)$/, "chef.r.budget-set", (m) => ({ amount: formatMoney(m[1], state.currency) })],
+  [new RegExp(`^Threw away ${G} of (.+)$`), "chef.r.threw", (m) => ({ grams: gm(m[1]), food: food(m[2]) })],
+  [new RegExp(`^Stocked ${G} of (.+) in (.+?); expires (\\S+)$`), "chef.r.stocked-expires", (m) => ({ grams: gm(m[1]), food: food(m[2]), place: placeName(m[3]), date: when(m[4]) })],
+  [new RegExp(`^Stocked ${G} of (.+) in (.+)$`), "chef.r.stocked", (m) => ({ grams: gm(m[1]), food: food(m[2]), place: placeName(m[3]) })],
+  [/^(Started )?(.+) for (\d+), ([A-Z]+)(?:, (\d+) steps; next starts step 1|, step (\d+) of (\d+): (.*?)(?: \(timer (\d+) min\))?)?$/, (m) => {
+    const head = t("chef.r.session", { recipe: recipeName(m[2]), n: m[3], phase: known(`chef.phase.${m[4]}`, m[4]) });
+    const body = m[5] ? t("chef.r.session-prepare", { head, steps: m[5] }) : m[6] ? t("chef.r.session-step", { head, step: m[6], steps: m[7], text: stepText(m[8]) }) + (m[9] ? t("chef.r.session-timer", { min: m[9] }) : "") : head;
+    return m[1] ? t("chef.r.started", { what: body }) : body;
+  }],
+  [/^Nothing was changed: (.+)$/, (m) => t("chef.r.nothing", { reason: localized(m[1]) })],
+  [/^No cooking session is active; start a recipe first$/, "chef.r.no-session-start", () => ({})],
+  [/^No cooking session is active$/, "chef.r.no-session", () => ({})],
+  [/^(.+) is not on the market list$/, "chef.r.not-on-list", (m) => ({ food: food(m[1]) })],
+  [/^(.+) is not pending on the market list$/, "chef.r.not-pending", (m) => ({ food: food(m[1]) })],
+  [/^(.+) is not in the cart$/, "chef.r.not-in-cart", (m) => ({ food: food(m[1]) })],
+  [/^The cart is already empty$/, "chef.r.cart-empty", () => ({})],
+  [/^Unknown food (.+); use a catalog name$/, "chef.r.unknown-food", (m) => ({ food: m[1] })],
+  [/^No (.+) in stock$/, "chef.r.no-stock", (m) => ({ food: food(m[1]) })],
+  [new RegExp(`^Only ${G} of (.+) in one piece; use at most that$`), "chef.r.only", (m) => ({ grams: gm(m[1]), food: food(m[2]) })],
+  [/^No saved recipe called (.+); no recipes are saved yet$/, "chef.r.no-recipe-none", (m) => ({ name: m[1] })],
+  [/^No saved recipe called (.+); saved recipes: (.+)$/, "chef.r.no-recipe-list", (m) => ({ name: m[1], list: m[2].split(", ").map(recipeName).join(", ") })],
+  [/^No recipes are saved yet; save one before planning the week$/, "chef.r.no-recipes-plan", () => ({})],
+  [/^No recipes are saved yet; save one to get suggestions$/, "chef.r.no-recipes-suggest", () => ({})],
+  [/^No recipes are saved yet$/, "chef.r.no-recipes", () => ({})],
+  [/^No plan for this week; make the weekly plan first$/, "chef.r.no-plan-make", () => ({})],
+  [/^No plan for this week$/, "chef.r.no-plan", () => ({})],
+  [/^The household has no fridge yet$/, "chef.r.no-fridge", () => ({})],
+  [/^No place called (.+); places: (.+)$/, "chef.r.no-place", (m) => ({ name: m[1], places: m[2] })],
+  [/^No saved recipe fits the stock right now$/, "chef.r.no-fit", () => ({})],
+  [/^No food found$/, "chef.r.no-food", () => ({})],
+  [/^No temperature readings yet$/, "chef.r.no-temperature", () => ({})],
+  [/^No temperature readings in the last (\d+) h$/, "chef.r.no-temperature-hours", (m) => ({ n: m[1] })],
+  [/^No monthly market budget yet$/, "chef.r.no-budget", () => ({})],
+  [/^No fridge to investigate$/, "chef.r.no-fridge-investigate", () => ({})],
+  [/^The stock at home covers the plan; nothing added$/, "chef.r.plan-covered", () => ({})],
+  [/^Nothing is missing for (.+)$/, "chef.r.nothing-missing", (m) => ({ recipe: recipeName(m[1]) })],
+  [/^No food was thrown away twice in the last (\d+) days$/, "chef.r.no-waste", (m) => ({ n: m[1] })],
+  [/^Private food \(not yours to use\)$/, "chef.r.private", () => ({})],
+  [/^\.\.\. (\d+) more$/, "chef.r.more", (m) => ({ n: m[1] })],
+  [/^(.+): (\d+) servings, (\d+) min$/, "chef.r.recipe-line", (m) => ({ recipe: recipeName(m[1]), n: m[2], min: m[3] })],
+  [/^Budget (\d+) (\w+), spent (\d+), left (-?\d+), the list in budget costs (\d+)$/, "chef.r.budget", (m) => ({ monthly: formatMoney(m[1], m[2]), spent: formatMoney(m[3], m[2]), left: formatMoney(m[4], m[2]), cost: formatMoney(m[5], m[2]) })],
+  [new RegExp(`^(.+?) ${G}(?:, expires (\\d{4}-\\d\\d-\\d\\d))?(?:, \\[([A-Z_, ]+)\\])?(, not edible)?$`), (m) => [`${foodName(m[1])} ${gm(m[2])}`, m[3] && t("chef.r.expires", { date: when(m[3]) }), m[4] && statusText(m[4]), m[5] && t("chef.r.not-edible")].filter(Boolean).join(", ")],
+];
+
+function localizedLine(line) {
+  for (const [pattern, key, params] of RULES) {
+    const match = pattern.exec(line);
+    if (match) return typeof key === "function" ? key(match) : t(key, params(match));
+  }
+  return line;
+}
+
+function localized(text) {
+  return String(text ?? "").split("\n").map(localizedLine).join("\n");
 }
 
 function spoken(answer) {
@@ -457,7 +532,7 @@ export async function renderChef(main, household) {
         try {
           const result = await api(`/agent/confirmations/${reply.id}/approve`, { method: "POST" });
           const args = reply.pending?.arguments ?? {};
-          const done = reply.pending?.tool === "add_to_market" && args.food ? t("chef.offer.added", { foods: t("chef.offer.missing-item", { grams: grams(Number(args.grams) || 0), food: foodWord(args.food) }) }) : result.result;
+          const done = reply.pending?.tool === "add_to_market" && args.food ? t("chef.offer.added", { foods: t("chef.offer.missing-item", { grams: grams(Number(args.grams) || 0), food: foodWord(args.food) }) }) : localized(result.result);
           if (row) settle(row, done, true);
           say({ role: "assistant", text: done, runs: [], replies: followUps([{ specialist: "market" }]) });
           refreshAfter(reply.pending?.tool);
