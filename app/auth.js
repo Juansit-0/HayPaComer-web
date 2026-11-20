@@ -111,6 +111,23 @@ export async function renderVerify(main, token) {
   );
 }
 
+let demoAccount;
+
+// Reviewers get a button that fills in the shared test account; signing in stays their own click.
+async function offerDemo(main) {
+  demoAccount ??= api("/auth/demo", { auth: false, quiet: true }).catch(() => null);
+  const account = await demoAccount;
+  const form = main.querySelector("form");
+  if (!account || !form || form.querySelector("[data-demo]")) return;
+  form.insertAdjacentHTML("afterbegin", `<button class="chip-button demo-fill" type="button" data-demo>${t("auth.demo-fill")}</button>`);
+  form.querySelector("[data-demo]").addEventListener("click", () => {
+    form.querySelector("[name=email]").value = account.email;
+    form.querySelector("[name=password]").value = account.password;
+    form.querySelector("button[type=submit]").focus();
+    toast(t("auth.demo-filled"));
+  });
+}
+
 export function renderSignIn(main, onDone, initial = "signin", notice = null) {
   let mode = initial;
   const draw = () => {
@@ -149,6 +166,7 @@ export function renderSignIn(main, onDone, initial = "signin", notice = null) {
         }</button>
         ${creating ? "" : `<a class="button ghost" href="#/forgot">${t("auth.forgot-link")}</a>`}
       </section>`);
+    if (!creating) offerDemo(main);
     main.querySelector("[data-reveal]").addEventListener("click", (event) => {
       const input = main.querySelector("[name=password]");
       const shown = input.type === "text";

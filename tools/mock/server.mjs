@@ -111,6 +111,7 @@ const routes = [
   [/^\/agent\/confirmations$/, () => pending],
   [/^\/notifications$/, () => notifications],
   [/^\/status$/, () => ({ state: "OK", degraded: [] })],
+  [/^\/auth\/demo$/, () => ({ email: "revisor@demo.haypacomer.test", password: "mock-password" })],
   [/^\/foods\?q=([^&]*)/, (m) => {
     const plain = (text) => String(text ?? "").toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
     const query = plain(decodeURIComponent(m[1]));
