@@ -1,5 +1,6 @@
 import * as THREE from "./vendor/three.module.min.js";
 import { RoundedBoxGeometry } from "./vendor/RoundedBoxGeometry.js";
+import { DRINK_COLORS, packagingCount, packagingOf } from "./packaging.js";
 
 export const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#cccccc";
 
@@ -1405,8 +1406,76 @@ export function sized(model) {
   return model;
 }
 
-export function foodModel(name, category, grams) {
-  const model = DETAILED[name] ? DETAILED[name](grams) : (FOODS[name] ?? BY_CATEGORY[category] ?? BY_CATEGORY.VEGETABLE)();
+// Containers drawn from the name: a can of beer, a glass bottle, a plastic bottle, a carton, a jar or a bag, tinted by the drink inside.
+function drinkCan(colors) {
+  return group(
+    mesh(lathe([[0, 0], [0.026, 0], [0.031, 0.008], [0.031, 0.108], [0.026, 0.12], [0, 0.12]], 32), paint(colors.can, { roughness: 0.3 })),
+    mesh(new THREE.CylinderGeometry(0.0315, 0.0315, 0.04, 32, 1, true), paint(colors.band), (m) => (m.position.y = 0.06)),
+    mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.004, 32), paint("#c4ccd0"), (m) => (m.position.y = 0.121)),
+    mesh(new THREE.TorusGeometry(0.025, 0.002, 6, 32), paint("#9aa0a4"), (m) => {
+      m.rotation.x = Math.PI / 2;
+      m.position.y = 0.123;
+    }),
+    mesh(new RoundedBoxGeometry(0.012, 0.002, 0.018, 1, 0.0008), paint("#aab2b6"), (m) => m.position.set(0, 0.124, 0.006)),
+  );
+}
+
+function glassBottle(colors, wine) {
+  const height = wine ? 0.3 : 0.22;
+  const neck = wine ? 0.21 : 0.15;
+  const radius = wine ? 0.036 : 0.03;
+  return group(
+    mesh(lathe([[0, 0], [radius - 0.003, 0], [radius, 0.008], [radius, neck - 0.04], [radius * 0.55, neck], [0.012, neck + 0.02], [0.012, height], [0, height]], 32), paint(colors.glass, { transparent: true, opacity: 0.9 })),
+    mesh(new THREE.CylinderGeometry(radius + 0.0005, radius + 0.0005, wine ? 0.07 : 0.055, 32, 1, true, -1.2, 2.4), paint(colors.label), (m) => (m.position.y = (neck - 0.04) * 0.5)),
+    mesh(new THREE.CylinderGeometry(0.0125, 0.0125, 0.018, 24, 1, true), paint(colors.label), (m) => (m.position.y = neck + 0.04)),
+    mesh(new THREE.CylinderGeometry(0.0135, 0.0135, wine ? 0.03 : 0.01, 16), paint(colors.cap), (m) => (m.position.y = height + (wine ? -0.008 : 0.004))),
+  );
+}
+
+function plasticBottle(colors) {
+  return group(
+    mesh(lathe([[0, 0], [0.03, 0], [0.033, 0.012], [0.03, 0.05], [0.033, 0.08], [0.033, 0.14], [0.018, 0.18], [0.012, 0.2], [0, 0.2]], 32), paint(colors.liquid, { transparent: true, opacity: 0.75 })),
+    mesh(new THREE.CylinderGeometry(0.0335, 0.0335, 0.045, 32, 1, true), paint(colors.label), (m) => (m.position.y = 0.11)),
+    mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.016, 16), paint(colors.cap), (m) => (m.position.y = 0.207)),
+  );
+}
+
+function pouch(color, band) {
+  return group(
+    mesh(lumpy(new RoundedBoxGeometry(0.08, 0.11, 0.045, 3, 0.014), 0.02), paint(color, { roughness: 0.9 }), (m) => (m.position.y = 0.055)),
+    mesh(new THREE.BoxGeometry(0.082, 0.025, 0.047), paint(band), (m) => (m.position.y = 0.05)),
+  );
+}
+
+function packageModel(pack, grams, pieceGrams) {
+  const colors = DRINK_COLORS[pack.drink] ?? DRINK_COLORS.other;
+  const make = {
+    can: () => drinkCan(colors),
+    glass: () => glassBottle(colors, pack.drink === "wine"),
+    plastic: () => plasticBottle(colors),
+    carton: () => carton(colors.can, colors.band),
+    box: () => group(mesh(new RoundedBoxGeometry(0.07, 0.12, 0.04, 2, 0.004), paint(colors.can, { roughness: 0.6 }), (m) => (m.position.y = 0.06))),
+    jar: () => jar(colors.liquid),
+    bag: () => pouch("#f4f1ea", colors.band),
+  }[pack.container];
+  const units = packagingCount(pack, grams, pieceGrams);
+  if (units === 1) return make();
+  const spacing = pack.container === "can" ? 0.068 : 0.074;
+  const columns = Math.min(units, units > 9 ? 4 : 3);
+  return group(
+    ...Array.from({ length: units }, (_, index) => {
+      const piece = make();
+      const row = Math.floor(index / columns);
+      piece.position.set((index % columns - (columns - 1) / 2) * spacing, 0, (row - (Math.ceil(units / columns) - 1) / 2) * spacing);
+      piece.rotation.y = hash(index, units, 7) * Math.PI * 2;
+      return piece;
+    }),
+  );
+}
+
+export function foodModel(name, category, grams, pieceGrams) {
+  const pack = DETAILED[name] || FOODS[name] ? null : packagingOf(name, category);
+  const model = pack ? packageModel(pack, grams, pieceGrams) : DETAILED[name] ? DETAILED[name](grams) : (FOODS[name] ?? BY_CATEGORY[category] ?? BY_CATEGORY.VEGETABLE)();
   return outline(group(model));
 }
 

@@ -1,6 +1,7 @@
 import { webgl2 } from "./quality.js";
 import { reduced } from "./motion.js";
 import { api } from "./api.js";
+import { packagingOf } from "./packaging.js";
 import { foodName, foodWord, formatNumber, placeName, sentence, t, theFood } from "./i18n.js";
 import { daysLeft, esc, grams, openSheet, toast, whenText } from "./ui.js";
 
@@ -97,8 +98,12 @@ let leader = null;
 let placedSignature = null;
 let focusRequest = null;
 
+const PACK_SHAPES = { can: "lata alta", glass: "botella vidrio", plastic: "botella plastico", carton: "jugo", box: "caja", jar: "frasco", bag: "bolsa" };
+
 export function shapeClass(name) {
-  return `food f-${(SHAPES[name] ?? "otro").split(" ").join(" f-")}`;
+  const pack = SHAPES[name] ? null : packagingOf(name);
+  const shape = pack ? `${PACK_SHAPES[pack.container]}${pack.drink ? ` bebida-${pack.drink}` : ""}` : (SHAPES[name] ?? "otro");
+  return `food f-${shape.split(" ").join(" f-")}`;
 }
 
 function food(item) {

@@ -4,6 +4,7 @@ import { reduced } from "./motion.js";
 import { closest } from "./fuzzy.js";
 import { foodName, foodWord, formatDay, formatMoney, formatNumber, placeName, plural, t, theFood } from "./i18n.js";
 import { focusFood, fullMessage, shapeClass, showTray, takeFocusRequest, undoable } from "./stage.js";
+import { unitGrams } from "./packaging.js";
 import { openFridgeShape } from "./fridge-shape.js";
 import {
   busy,
@@ -71,6 +72,42 @@ function shelfChips(fridges) {
     .join("")}</nav>`;
 }
 
+// Requests about food marked "ask first": the ones this person has to answer, and how their own asks went.
+let accessRequests = [];
+
+function askLine(item) {
+  if (item.usable || !(item.statuses ?? []).includes("ASK_FIRST")) return "";
+  const mine = accessRequests.find((request) => request.itemId === item.id && !request.toAnswer && request.status === "PENDING");
+  return `<div class="ask-line">${
+    mine
+      ? `<span class="hint">${esc(t("requests.pending", { owner: mine.ownerName ?? "" }))}</span>`
+      : `<button type="button" class="ghost" data-ask="${esc(item.id)}">${t("requests.ask")}</button>`
+  }</div>`;
+}
+
+function requestsTile() {
+  const incoming = accessRequests.filter((request) => request.toAnswer);
+  const answered = accessRequests.filter((request) => !request.toAnswer && request.status !== "PENDING");
+  if (!incoming.length && !answered.length) return "";
+  const food = (request) => theFood(request.food ?? "");
+  return `<section class="tile w-12 access-requests" aria-labelledby="requests-title">
+    <h2 id="requests-title">${t("requests.title")}</h2>
+    <ul class="list">${incoming
+      .map(
+        (request) => `<li class="member-row">
+          <span class="item-name">${esc(t("requests.incoming", { member: request.requesterName ?? "", food: food(request) }))}</span>
+          <span class="item-actions">
+            <button type="button" class="primary" data-approve="${esc(request.id)}">${t("requests.approve")}</button>
+            <button type="button" class="ghost" data-deny="${esc(request.id)}">${t("requests.deny")}</button>
+          </span>
+        </li>`,
+      )
+      .join("")}${answered
+      .map((request) => `<li class="member-row"><span class="hint">${esc(t(request.status === "APPROVED" ? "requests.approved" : "requests.denied", { owner: request.ownerName ?? "", food: food(request) }))}</span></li>`)
+      .join("")}</ul>
+  </section>`;
+}
+
 // A shelf lists its food as rows: what it is, how much, and one line about when it goes off. Choosing a row unfolds its actions.
 function foodRow(item, trays) {
   const hidden = item.name === "Private food";
@@ -82,10 +119,11 @@ function foodRow(item, trays) {
     <button class="food-row-head" type="button" ${item.usable ? `aria-expanded="false" aria-controls="${actions}"` : "disabled"}>
       <i class="${shapeClass(item.name)}" aria-hidden="true"></i>
       <span class="item-name">${esc(foodName(item.name))}</span>
-      ${hidden ? "" : `<span class="value">${grams(item.grams)}</span>`}
+      ${hidden ? "" : `<span class="value">${item.pieceGrams ? `${esc(t("fridge.units", { count: Math.round(item.grams / item.pieceGrams) }))} · ` : ""}${grams(item.grams)}</span>`}
       <span class="row-expiry ${days !== null && 1 >= days ? "attention" : ""}">${hidden ? t("fridge.private") : expiryText(item)}</span>
       ${notable.length ? statusPill(notable) : ""}
     </button>
+    ${askLine(item)}
     ${
       item.usable
         ? `<div class="row-actions" id="${actions}" inert><div><form class="card-actions" data-item="${esc(item.id)}">
@@ -177,7 +215,7 @@ function addFoodBody(catalog, trays, trayId, chosen = null) {
             <h3>${t(`category.${category}`)}</h3>
             <div class="chips">${foods
               .map(
-                (food) => `<label class="chip" data-chip="${esc(`${food.name} ${foodName(food.name)}`.toLowerCase())}"><input type="radio" name="food" value="${esc(food.name)}" required ${food.name === chosen ? "checked" : ""}><span>${esc(foodName(food.name))}</span></label>`,
+                (food) => `<label class="chip" data-chip="${esc(`${food.name} ${foodName(food.name)}`.toLowerCase())}"><input type="radio" name="food" value="${esc(food.name)}" data-piece="${esc(food.gramsPerPiece ?? unitGrams(food.name, food.category) ?? "")}" data-default-unit="${esc(food.defaultUnit ?? "")}" required ${food.name === chosen ? "checked" : ""}><span>${esc(foodName(food.name))}</span></label>`,
               )
               .join("")}</div>
           </div>`,
@@ -186,8 +224,9 @@ function addFoodBody(catalog, trays, trayId, chosen = null) {
     </fieldset>
     <fieldset class="step">
       <legend>${t("add.step.amount")}</legend>
-      ${chips("unit", t("add.unit"), [["g", t("add.unit.g")], ["ml", t("add.unit.ml")], ["l", t("add.unit.l")]], "g")}
+      ${chips("unit", t("add.unit"), [["u", t("add.unit.u")], ["g", t("add.unit.g")], ["ml", t("add.unit.ml")], ["l", t("add.unit.l")]], "g")}
       ${numberField({ name: "grams", label: t("add.amount"), unit: "g", min: 1, max: 100000, bigStep: 50, value: "" })}
+      <div data-piece-field hidden>${numberField({ name: "pieceGrams", label: t("add.piece-grams"), unit: "g", min: 1, max: 20000, bigStep: 10, value: "", required: false })}</div>
       <p class="hint" data-equiv aria-live="polite"></p>
     </fieldset>
     <fieldset class="step">
@@ -358,9 +397,21 @@ function wireAddFood(dialog, base, trays, onDone) {
   const equiv = form.querySelector("[data-equiv]");
   let density = null;
   const unit = () => form.querySelector("[name=unit]:checked").value;
-  const gramsNow = () => Math.round(Number(amount.value) * (unit() === "l" ? 1000 : 1) * (unit() === "g" ? 1 : density?.gramsPerMilliliter ?? 0));
+  // Countable things (cans, bottles, eggs) can be added by units: 4 cans are 4 times what one weighs, which comes from the
+  // catalog or the pack and can be changed.
+  const pieceBox = form.querySelector("[data-piece-field]");
+  const pieceInput = pieceBox.querySelector("input");
+  const chosenFood = () => form.querySelector("[name=food]:checked");
+  const gramsNow = () =>
+    unit() === "u"
+      ? Math.round(Number(amount.value) * Number(pieceInput.value || 0))
+      : Math.round(Number(amount.value) * (unit() === "l" ? 1000 : 1) * (unit() === "g" ? 1 : density?.gramsPerMilliliter ?? 0));
   const showEquiv = () => {
     equiv.textContent = "";
+    if (unit() === "u") {
+      if (Number(amount.value) > 0 && Number(pieceInput.value) > 0) equiv.textContent = t("add.volume-equals", { grams: grams(gramsNow()) });
+      return;
+    }
     if (unit() === "g" || !density || !(Number(amount.value) > 0)) return;
     const note = { AI: "add.volume-ai", DEFAULT: "add.volume-default" }[density.source];
     equiv.textContent = [t("add.volume-equals", { grams: grams(gramsNow()) }), note && t(note)].filter(Boolean).join(" · ");
@@ -370,12 +421,18 @@ function wireAddFood(dialog, base, trays, onDone) {
     const food = formData(form).food;
     density = null;
     const suffix = form.querySelector("[data-stepper] .unit");
-    suffix.textContent = { g: "g", ml: "ml", l: "L" }[chosen];
+    suffix.textContent = { u: t("add.unit.u-short"), g: "g", ml: "ml", l: "L" }[chosen];
     amount.step = chosen === "l" ? "0.25" : "1";
-    amount.dataset.bigStep = { g: "50", ml: "50", l: "0.25" }[chosen];
+    amount.dataset.bigStep = { u: "1", g: "50", ml: "50", l: "0.25" }[chosen];
     amount.inputMode = chosen === "l" ? "decimal" : "numeric";
     amount.min = chosen === "l" ? "0.01" : "1";
-    amount.max = chosen === "g" ? "100000" : chosen === "l" ? "100" : "100000";
+    amount.max = chosen === "u" ? "500" : chosen === "g" ? "100000" : chosen === "l" ? "100" : "100000";
+    pieceBox.hidden = chosen !== "u";
+    if (chosen === "u") {
+      if (!pieceInput.value || pieceInput.dataset.food !== food) pieceInput.value = chosenFood()?.dataset.piece ?? "";
+      pieceInput.dataset.food = food ?? "";
+      return showEquiv();
+    }
     if (chosen === "g" || !food) return showEquiv();
     if (!densities.has(food)) {
       equiv.textContent = t("add.volume-wait");
@@ -392,9 +449,16 @@ function wireAddFood(dialog, base, trays, onDone) {
     showEquiv();
   }
   form.addEventListener("change", (event) => {
+    // Foods counted in pieces start on units; the person can still switch to grams.
+    if (event.target.name === "food" && event.target.dataset.defaultUnit === "PIECE") form.querySelector("[name=unit][value=u]").checked = true;
     if (event.target.name === "unit" || event.target.name === "food") syncUnit();
   });
   amount.addEventListener("input", showEquiv);
+  pieceInput.addEventListener("input", showEquiv);
+  if (chosenFood()?.dataset.defaultUnit === "PIECE") {
+    form.querySelector("[name=unit][value=u]").checked = true;
+    syncUnit();
+  }
   const chosenTray = () => trays.find((tray) => tray.id === form.querySelector("[name=tray]:checked")?.value);
 
   async function refresh() {
@@ -452,7 +516,11 @@ function wireAddFood(dialog, base, trays, onDone) {
     event.preventDefault();
     const values = formData(form);
     const tray = chosenTray();
-    if (!values.food || !tray || !Number(values.grams) || (unit() !== "g" && !density)) {
+    if (unit() === "u" && !(Number(pieceInput.value) > 0)) {
+      showError(form, { message: t("add.piece-needed") });
+      return;
+    }
+    if (!values.food || !tray || !Number(values.grams) || (unit() !== "g" && unit() !== "u" && !density)) {
       showError(form, { message: t("add.missing") });
       return;
     }
@@ -465,6 +533,7 @@ function wireAddFood(dialog, base, trays, onDone) {
       visibility: values.visibility,
       expiresOn: null,
       expirySource: null,
+      pieceGrams: unit() === "u" ? Number(pieceInput.value) : null,
     };
     if (mode() === "known" && values.expiresOn) {
       body.expiresOn = values.expiresOn;
@@ -509,7 +578,13 @@ function reviewNote(chain, fridges) {
 
 export async function renderFridge(main, household) {
   const base = `/households/${household.id}`;
-  const [fridges, inventory, prices] = await Promise.all([api(`${base}/fridges`), api(`${base}/inventory`), api(`${base}/prices`).catch(() => ({}))]);
+  const [fridges, inventory, prices, requests] = await Promise.all([
+    api(`${base}/fridges`),
+    api(`${base}/inventory`),
+    api(`${base}/prices`).catch(() => ({})),
+    api(`${base}/access-requests`).catch(() => []),
+  ]);
+  accessRequests = requests ?? [];
   const chains = await api(`${base}/cold-chain`).catch(() => []);
   const [twins, spaces] = await Promise.all([
     Promise.all(fridges.map((fridge) => api(`${base}/fridges/${fridge.id}/twin`))),
@@ -560,9 +635,10 @@ export async function renderFridge(main, household) {
       <p class="hero-figure"><span class="data" data-total></span></p>
       <p class="lead">${t("fridge.lead", { grams: grams(total) })}</p>
       ${twins.map(twinLine).join("")}
-      ${(household.myRole ?? household.role) === "OWNER" ? `<button type="button" class="ghost" data-fridge-shape>${t("fridge-shape.open")}</button>` : ""}
+      ${(household.myRole ?? household.role) !== "GUEST" ? `<button type="button" class="ghost" data-fridge-shape>${t("fridge-shape.open")}</button>` : ""}
     </header>
     ${chains.filter((chain) => chain.phase === "UNDER_REVIEW").map((chain) => reviewNote(chain, fridges)).join("")}
+    ${requestsTile()}
     ${shelfChips(fridges)}
     <div class="bento fridge-bento">
       ${tray ? shelfTile(tray, inventory.filter((item) => item.trayId === tray.id), trays, space.get(tray.id)) : ""}
@@ -642,6 +718,23 @@ export async function renderFridge(main, household) {
   };
   window.addEventListener("hpc:live", onLive);
 
+
+  main.querySelectorAll("[data-ask], [data-approve], [data-deny]").forEach((button) => button.addEventListener("click", async () => {
+    const { ask, approve, deny } = button.dataset;
+    await busy(button, async () => {
+      try {
+        if (ask) {
+          const request = await api(`${base}/items/${ask}/access-requests`, { method: "POST" });
+          toast(t("requests.sent", { owner: request.ownerName ?? "" }));
+        } else {
+          await api(`${base}/access-requests/${approve ?? deny}/${approve ? "approve" : "deny"}`, { method: "POST" });
+        }
+        await renderFridge(main, household);
+      } catch (error) {
+        toast(errorText(error));
+      }
+    });
+  }));
 
   main.querySelectorAll("[data-item]").forEach((form) =>
     form.addEventListener("submit", async (event) => {

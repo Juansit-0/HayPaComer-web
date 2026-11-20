@@ -106,6 +106,7 @@ a { color: var(--color-primary-text); }
 :root[data-chapter="numbers"] { --chapter: var(--chapter-numbers); --chapter-ink: var(--chapter-numbers-ink); }
 :root[data-chapter="chef"] { --chapter: var(--chapter-chef); --chapter-ink: var(--chapter-chef-ink); }
 :root[data-chapter="settings"] { --chapter: var(--chapter-settings); --chapter-ink: var(--chapter-settings-ink); }
+:root[data-chapter="home"] { --chapter: var(--chapter-fridge); --chapter-ink: var(--chapter-fridge-ink); }
 
 .session {
   margin-left: auto;
@@ -125,6 +126,13 @@ main {
 }
 
 main:focus { outline: none; }
+/* Grid children never grow wider than the column, so long words and wide forms wrap instead of being cut. */
+main > * { min-width: 0; }
+.empty { min-width: 0; max-width: 100%; }
+.empty h1 { font-size: clamp(28px, 2.6vw, 56px); overflow-wrap: break-word; hyphens: manual; }
+.empty p { max-width: 100%; }
+.empty .row-form { flex-wrap: wrap; justify-content: center; max-width: 100%; }
+.empty .row-form label, .empty .row-form input { min-width: 0; max-width: 100%; }
 
 .lead { color: var(--color-text-weak); margin-top: var(--space-xs); }
 
@@ -925,6 +933,20 @@ html:has(.loader:not(.done)) { overflow: hidden; }
 .f-botella { width: 16px; height: 44px; border-radius: 7px 7px 3px 3px; background: var(--color-cilantro); }
 .f-botella.f-oscuro { background: #2b2420; }
 .f-lata { width: 24px; height: 18px; border-radius: 3px; background: #8c969c; }
+.f-lata.f-alta { width: 18px; height: 34px; border-radius: 4px 4px 3px 3px; background: #b9c2c6; box-shadow: inset 0 -12px 0 var(--pack-band, #c8432a), inset 0 3px 0 #9aa0a4; }
+.f-botella.f-vidrio { width: 14px; height: 48px; border-radius: 3px; clip-path: polygon(36% 0, 64% 0, 64% 28%, 100% 42%, 100% 100%, 0 100%, 0 42%, 36% 28%); background: var(--pack-glass, #2f7a4a); box-shadow: inset 0 -14px 0 var(--pack-label, #efe7d6); }
+.f-botella.f-plastico { width: 18px; height: 44px; border-radius: 7px 7px 4px 4px; background: var(--pack-liquid, #9ec9e0); opacity: 0.9; box-shadow: inset 0 -16px 0 var(--pack-liquid, #9ec9e0), inset 0 -26px 0 var(--pack-label, #2f7ab0); }
+.f-bebida-beer { --pack-band: #1f3f7a; --pack-glass: #6b3d10; --pack-label: #f2e3b8; --pack-liquid: #d89a2a; }
+.f-lata.f-bebida-beer { background: #c9a23a; }
+.f-bebida-wine { --pack-band: #6a1f2e; --pack-glass: #1f3a24; --pack-label: #efe6d2; --pack-liquid: #5a1424; }
+.f-bebida-wine.f-botella { height: 58px; }
+.f-bebida-soda { --pack-band: #f4f1ea; --pack-glass: #2a5a3a; --pack-label: #c8302c; --pack-liquid: #3a1a12; }
+.f-lata.f-bebida-soda { background: #c8302c; }
+.f-bebida-energy { --pack-band: #3fb0d8; --pack-label: #3fb0d8; --pack-liquid: #e8d23a; }
+.f-lata.f-bebida-energy { background: #20242a; }
+.f-bebida-water { --pack-band: #2f7ab0; --pack-glass: #9ec9e0; --pack-label: #2f7ab0; --pack-liquid: #d8ecf6; }
+.f-bebida-juice { --pack-band: #2f7a4a; --pack-label: #2f7a4a; --pack-liquid: #f39a33; }
+.f-bebida-milk { --pack-band: #3f6f8f; --pack-label: #3f6f8f; --pack-liquid: #f8f6f0; }
 .f-criolla { width: 20px; height: 20px; border-radius: 50%; background: #e4bb45; }
 .f-cebolla-larga { width: 44px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #f1ece0 45%, #b9cf8a 45% 55%, #4f8a3a 55%); }
 .f-cilantro { width: 28px; height: 22px; border-radius: 50% 50% 40% 40%; background: #3f7f3a; }
@@ -1686,7 +1708,7 @@ img.inked { opacity: 0; }
   .bar .tabs a { padding-inline: 12px; }
 }
 @media (max-width: 1023px) {
-  .bar .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-radius: 0; background: var(--sheet); box-shadow: inset 0 2px 0 var(--line); }
+  .bar .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-radius: 0; background: var(--sheet); box-shadow: inset 0 2px 0 var(--line); }
   .bar .tabs[hidden] { display: none; }
   .bar .tabs a { flex-direction: column; justify-content: center; gap: 2px; min-height: 56px; padding: 0 2px; font-size: 13px; }
   .bar .session { margin-left: auto; }
@@ -1791,6 +1813,10 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 .chips-row { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
 .row-form .grow { flex: 1 1 220px; min-width: 0; }
 .invite-link { margin-block: var(--space-xs); }
+.household-code { margin-block-start: var(--space-m, 1rem); }
+.join-code { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 1.6rem; font-weight: 700; letter-spacing: 0.18em; padding: 0.35rem 0.75rem; border-radius: 8px; background: color-mix(in oklab, currentColor 10%, transparent); color: inherit; }
+.access-requests { display: grid; gap: var(--space-xs, 0.5rem); }
+.access-requests .member-row { align-items: center; }
 .review-note { border-color: var(--color-tomate); }
 .cooking-timer { font-size: var(--size-h3); font-variant-numeric: tabular-nums; margin: 0; }
 .settings-index { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
@@ -1908,3 +1934,4 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 .legal-links { justify-content: center; padding: var(--space-l) 0 var(--space-m); }
 .legal-accept { margin: 0; font-size: 14px; line-height: 1.5; }
 .demo-fill { justify-self: start; }
+.ask-line { padding: 0 var(--space-s, 0.75rem) var(--space-xs, 0.5rem); }

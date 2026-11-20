@@ -6,6 +6,7 @@ import { chooseHousehold, householdLabel, rememberJoin, renderForgot, renderRese
 import { renderFridge } from "./fridge.js";
 import { renderAnalytics } from "./analytics.js";
 import { renderChef } from "./chef.js";
+import { renderHome } from "./home.js";
 import { renderMarket } from "./market.js";
 import { connectLive, disconnectLive } from "./live.js";
 import { renderNow } from "./now.js";
@@ -76,6 +77,7 @@ const views = {
   market: renderMarket,
   numbers: renderAnalytics,
   chef: renderChef,
+  home: renderHome,
   settings: (main, household) => renderSettings(main, household, async () => {
     const back = rememberFocus(main);
     drawLanguages();
@@ -222,7 +224,7 @@ async function paint(update) {
 }
 
 // Sections in the order of the tab bar: a change of section enters from the side it lies on.
-const SECTIONS = ["now", "fridge", "market", "numbers", "chef", "settings"];
+const SECTIONS = ["now", "fridge", "market", "numbers", "chef", "home", "settings"];
 let shownRoute = null;
 
 // Where no ink edge withdraws the panel (phones, no 3D), the new chapter's colour sweeps across its band from that side instead.
@@ -265,11 +267,12 @@ async function render({ navigate = false, refresh = false } = {}) {
     else if (route === "forgot") renderForgot(main);
     else if (route === "reset-password" && token) renderReset(main, token);
     else if (route === "verify-email" && token) await renderVerify(main, token);
-    else {
-      // A link to a screen waits behind the sign-in instead of being lost.
-      if (views[route] || route === "inbox") wanted = location.hash;
-      renderLanding(main);
-    }
+    else if (views[route] || route === "inbox") {
+      // A screen of the app asked for while signed out (an expired session, a shared link) goes to the sign-in, and waits
+      // behind it instead of being lost; only the start of the site shows the landing.
+      wanted = location.hash;
+      renderSignIn(main, render, "signin");
+    } else renderLanding(main);
     main.setAttribute("aria-busy", "false");
     return;
   }
@@ -456,7 +459,8 @@ document.querySelector("[data-signout]").addEventListener("click", async () => {
   accountMenu.hidePopover();
   const refreshToken = session.refresh;
   session.clear();
-  location.hash = "#/now";
+  // Signing out leads straight to the sign-in, not back to the landing.
+  location.hash = "#/signin";
   window.dispatchEvent(new Event("hpc:signed-out"));
   if (refreshToken) {
     await api("/auth/logout", { method: "POST", body: { refreshToken }, auth: false }).catch(() => null);

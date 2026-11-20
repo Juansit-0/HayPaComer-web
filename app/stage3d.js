@@ -556,7 +556,7 @@ export function createFridgeScene(canvas, { onPart, onDrop, labels, describe, zo
         .filter((item) => item.trayId === slot.tray.id)
         .slice(0, 12)
         .map((item) => {
-          const model = foodModel(item.name, item.category, item.grams);
+          const model = foodModel(item.name, item.category, item.grams, item.pieceGrams);
           model.traverse((child) => {
             child.userData.item = item;
             child.userData.part = "fridge";

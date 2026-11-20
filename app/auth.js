@@ -241,9 +241,29 @@ export async function chooseHousehold(main, onDone) {
         <label>${t("home.currency")}<input name="currency" required value="COP" maxlength="3" class="grams"></label>
         <button class="primary" type="submit">${t("home.create")}</button>
       </form>
+      <form data-join-home>
+        <p class="hint">${t("settings.join-hint")}</p>
+        <div class="row-form">
+          <label class="grow">${t("settings.join-code")}<input name="code" required maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH"></label>
+          <button type="submit">${t("settings.join-send")}</button>
+        </div>
+      </form>
       <button class="ghost" type="button" data-leave>${t("nav.signout")}</button>
     </section>`);
   main.querySelector("[data-leave]").addEventListener("click", () => document.querySelector("[data-signout]").click());
+  main.querySelector("[data-join-home]").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.target.querySelector("button[type=submit]");
+    button.disabled = true;
+    try {
+      const household = await api("/households/join", { method: "POST", body: { code: formData(event.target).code } });
+      session.household = household.id;
+      onDone(household);
+    } catch (error) {
+      button.disabled = false;
+      showError(event.target, error);
+    }
+  });
   main.querySelector("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const values = formData(event.target);
