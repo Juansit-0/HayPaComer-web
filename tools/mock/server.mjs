@@ -112,6 +112,12 @@ const routes = [
   [/^\/notifications$/, () => notifications],
   [/^\/status$/, () => ({ state: "OK", degraded: [] })],
   [/^\/auth\/demo$/, () => ({ email: "revisor@demo.haypacomer.test", password: "mock-password" })],
+  [/^\/households\/[^/]+\/foods\/density\?food=([^&]*)/, (m) => {
+    const food = decodeURIComponent(m[1]);
+    if (/milk|leche|yogurt/i.test(food)) return { food, gramsPerMilliliter: 1.03, source: "CATALOG" };
+    if (/oil|aceite/i.test(food)) return { food, gramsPerMilliliter: 0.92, source: "AI" };
+    return { food, gramsPerMilliliter: 1, source: "DEFAULT" };
+  }],
   [/^\/foods\?q=([^&]*)/, (m) => {
     const plain = (text) => String(text ?? "").toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
     const query = plain(decodeURIComponent(m[1]));

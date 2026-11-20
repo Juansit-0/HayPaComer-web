@@ -10,6 +10,7 @@ import {
   chips,
   daysLeft,
   portions,
+  errorText,
   esc,
   expiryText,
   formData,
@@ -185,7 +186,9 @@ function addFoodBody(catalog, trays, trayId, chosen = null) {
     </fieldset>
     <fieldset class="step">
       <legend>${t("add.step.amount")}</legend>
-      ${numberField({ name: "grams", label: t("field.grams"), unit: "g", min: 1, max: 100000, bigStep: 50, value: "" })}
+      ${chips("unit", t("add.unit"), [["g", t("add.unit.g")], ["ml", t("add.unit.ml")], ["l", t("add.unit.l")]], "g")}
+      ${numberField({ name: "grams", label: t("add.amount"), unit: "g", min: 1, max: 100000, bigStep: 50, value: "" })}
+      <p class="hint" data-equiv aria-live="polite"></p>
     </fieldset>
     <fieldset class="step">
       <legend>${t("add.step.where")}</legend>
@@ -236,6 +239,8 @@ async function readLabel(base, values, file, tray) {
   if (!response.ok) throw new Error(payload.detail || payload.title || t("error.request"));
   return payload;
 }
+
+const densities = new Map();
 
 function wireAddFood(dialog, base, trays, onDone) {
   const form = dialog.querySelector("[data-add-form]");
@@ -347,6 +352,49 @@ function wireAddFood(dialog, base, trays, onDone) {
   show(formData(form).food ? 1 : 0, false);
 
   const mode = () => form.querySelector("[name=expiryMode]:checked").value;
+
+  // Stock is always kept in grams; millilitres and litres are converted here with the food's density.
+  const amount = form.querySelector("input.grams");
+  const equiv = form.querySelector("[data-equiv]");
+  let density = null;
+  const unit = () => form.querySelector("[name=unit]:checked").value;
+  const gramsNow = () => Math.round(Number(amount.value) * (unit() === "l" ? 1000 : 1) * (unit() === "g" ? 1 : density?.gramsPerMilliliter ?? 0));
+  const showEquiv = () => {
+    equiv.textContent = "";
+    if (unit() === "g" || !density || !(Number(amount.value) > 0)) return;
+    const note = { AI: "add.volume-ai", DEFAULT: "add.volume-default" }[density.source];
+    equiv.textContent = [t("add.volume-equals", { grams: grams(gramsNow()) }), note && t(note)].filter(Boolean).join(" · ");
+  };
+  async function syncUnit() {
+    const chosen = unit();
+    const food = formData(form).food;
+    density = null;
+    const suffix = form.querySelector("[data-stepper] .unit");
+    suffix.textContent = { g: "g", ml: "ml", l: "L" }[chosen];
+    amount.step = chosen === "l" ? "0.25" : "1";
+    amount.dataset.bigStep = { g: "50", ml: "50", l: "0.25" }[chosen];
+    amount.inputMode = chosen === "l" ? "decimal" : "numeric";
+    amount.min = chosen === "l" ? "0.01" : "1";
+    amount.max = chosen === "g" ? "100000" : chosen === "l" ? "100" : "100000";
+    if (chosen === "g" || !food) return showEquiv();
+    if (!densities.has(food)) {
+      equiv.textContent = t("add.volume-wait");
+      try {
+        densities.set(food, await api(`${base}/foods/density?food=${encodeURIComponent(food)}`));
+      } catch (error) {
+        toast(errorText(error));
+        form.querySelector("[name=unit][value=g]").checked = true;
+        return syncUnit();
+      }
+    }
+    if (unit() !== chosen || formData(form).food !== food) return;
+    density = densities.get(food);
+    showEquiv();
+  }
+  form.addEventListener("change", (event) => {
+    if (event.target.name === "unit" || event.target.name === "food") syncUnit();
+  });
+  amount.addEventListener("input", showEquiv);
   const chosenTray = () => trays.find((tray) => tray.id === form.querySelector("[name=tray]:checked")?.value);
 
   async function refresh() {
@@ -404,7 +452,7 @@ function wireAddFood(dialog, base, trays, onDone) {
     event.preventDefault();
     const values = formData(form);
     const tray = chosenTray();
-    if (!values.food || !tray || !Number(values.grams)) {
+    if (!values.food || !tray || !Number(values.grams) || (unit() !== "g" && !density)) {
       showError(form, { message: t("add.missing") });
       return;
     }
@@ -412,7 +460,7 @@ function wireAddFood(dialog, base, trays, onDone) {
       fridgeId: tray.fridgeId,
       trayId: tray.id,
       food: values.food,
-      grams: Number(values.grams),
+      grams: gramsNow(),
       opened: Boolean(values.opened),
       visibility: values.visibility,
       expiresOn: null,
