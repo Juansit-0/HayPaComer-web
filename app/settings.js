@@ -4,6 +4,7 @@ import { currentLocale, formatNumber, loadLocale, locales, t } from "./i18n.js";
 import { canonicalFood, errorText, esc, formData, numberField, openSheet, rememberFocus, showError, toast, wireSteppers } from "./ui.js";
 import { reduced } from "./motion.js";
 import { openFridgeShape, shapeDrawing } from "./fridge-shape.js";
+import { legalLinks } from "./legal.js";
 
 const DIETS = ["OMNIVORE", "PESCATARIAN", "VEGETARIAN", "VEGAN"];
 const ALLERGENS = [
@@ -393,7 +394,8 @@ export async function renderSettings(main, household, rerender) {
       ${devices ? devicesTile(devices) : ""}
       ${householdTile(settings, owner)}
       ${fridges[0] ? fridgeTile(shape, owner) : ""}
-    </div>`;
+    </div>
+    <nav class="legal-links" aria-label="${esc(t("legal.nav"))}">${legalLinks()}</nav>`;
   main.querySelector("[data-fridge-shape]")?.addEventListener("click", () => openFridgeShape(household, fridges[0], rerender));
   wireSteppers(main);
   wireMembers(main, base, rerender);

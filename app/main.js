@@ -11,6 +11,7 @@ import { connectLive, disconnectLive } from "./live.js";
 import { renderNow } from "./now.js";
 import { renderSettings } from "./settings.js";
 import { renderLanding } from "./landing.js";
+import { LEGAL, renderLegal } from "./legal.js";
 import { openInbox } from "./inbox.js";
 import { mountStage, refreshStage, refreshStageSoon, showRoute } from "./stage.js";
 import { currentLocale, loadLocale, locales, plural, t, translatePage } from "./i18n.js";
@@ -250,14 +251,16 @@ async function render({ navigate = false, refresh = false } = {}) {
   const token = new URLSearchParams(query).get("token");
   if (route === "join" && token) rememberJoin(token);
   const linked = token && (route === "reset-password" || route === "verify-email");
-  if (!session.signedIn || linked) {
+  const legal = !!LEGAL[route];
+  if (!session.signedIn || linked || legal) {
     placePreferences(false);
     tabs.hidden = true;
     stageBox.hidden = true;
     sessionBar.hidden = true;
     document.documentElement.dataset.chapter = "now";
     delete document.documentElement.dataset.app;
-    if (route === "signin" || route === "register") renderSignIn(main, render, route);
+    if (legal) renderLegal(main, route, session.signedIn ? "#/settings" : "#/");
+    else if (route === "signin" || route === "register") renderSignIn(main, render, route);
     else if (route === "join") renderSignIn(main, render, "signin", t("auth.join-hint"));
     else if (route === "forgot") renderForgot(main);
     else if (route === "reset-password" && token) renderReset(main, token);

@@ -1,5 +1,6 @@
 import { formatMoney, formatNumber, t } from "./i18n.js";
 import { esc, ticker } from "./ui.js";
+import { legalLinks } from "./legal.js";
 import { animate, easing, inView, page, reduced, scroll, SPRINGS, token } from "./motion.js";
 import { mountStory, storyMarkup } from "./story.js";
 import { createInkTrail } from "./story/ink-trail.js";
@@ -135,6 +136,7 @@ export function renderLanding(main) {
 
       <footer class="chapter chapter-papa land-footer">
         <p class="land-credits">${t("landing.credits")}</p>
+        <nav class="land-legal" aria-label="${esc(t("legal.nav"))}">${legalLinks()}</nav>
         <p class="land-wordmark" aria-hidden="true" data-reveal>${[...WORDMARK].map((letter, index) => `<span style="--i:${index}">${letter}</span>`).join("")}</p>
       </footer>
       <nav class="land-float" aria-label="${esc(t("landing.float.label"))}" data-float inert>

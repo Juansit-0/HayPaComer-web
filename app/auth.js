@@ -141,6 +141,7 @@ export function renderSignIn(main, onDone, initial = "signin", notice = null) {
               <button class="ghost" type="button" data-reveal aria-pressed="false">${t("auth.show-password")}</button>
             </span>
           </label>
+          ${creating ? `<p class="legal-accept">${t("legal.accept", { terms: `<a href="#/terms">${t("legal.terms.link")}</a>`, privacy: `<a href="#/privacy">${t("legal.privacy.link")}</a>` })}</p>` : ""}
           <button class="primary" type="submit">${creating ? t("auth.create") : t("auth.signin")}</button>
         </form>
         <button class="ghost" type="button" data-switch>${
