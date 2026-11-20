@@ -226,7 +226,7 @@ function addFoodBody(catalog, trays, trayId, chosen = null) {
       <legend>${t("add.step.amount")}</legend>
       ${chips("unit", t("add.unit"), [["u", t("add.unit.u")], ["g", t("add.unit.g")], ["ml", t("add.unit.ml")], ["l", t("add.unit.l")]], "g")}
       ${numberField({ name: "grams", label: t("add.amount"), unit: "g", min: 1, max: 100000, bigStep: 50, value: "" })}
-      <div data-piece-field hidden>${numberField({ name: "pieceGrams", label: t("add.piece-grams"), unit: "g", min: 1, max: 20000, bigStep: 10, value: "", required: false })}</div>
+      <div data-piece-field hidden>${chips("pieceUnit", t("add.unit"), [["g", t("add.unit.g")], ["ml", t("add.unit.ml")], ["l", t("add.unit.l")]], "g")}${numberField({ name: "pieceGrams", label: t("add.piece-grams"), unit: "g", min: 0.01, max: 20000, bigStep: 10, value: "", required: false })}</div>
       <p class="hint" data-equiv aria-live="polite"></p>
     </fieldset>
     <fieldset class="step">
@@ -400,19 +400,26 @@ function wireAddFood(dialog, base, trays, onDone) {
   // Countable things (cans, bottles, eggs) can be added by units: 4 cans are 4 times what one weighs, which comes from the
   // catalog or the pack and can be changed.
   const pieceBox = form.querySelector("[data-piece-field]");
-  const pieceInput = pieceBox.querySelector("input");
+  const pieceInput = pieceBox.querySelector("[name=pieceGrams]");
   const chosenFood = () => form.querySelector("[name=food]:checked");
+  const pieceUnit = () => form.querySelector("[name=pieceUnit]:checked").value;
+  const toGrams = (value, chosen) => Number(value || 0) * (chosen === "l" ? 1000 : 1) * (chosen === "g" ? 1 : density?.gramsPerMilliliter ?? 0);
+  // One unit's size can be written as on the pack (a 330 ml can, a 1.5 L bottle); it is kept as grams.
+  const pieceGrams = () => Math.round(toGrams(pieceInput.value, pieceUnit()));
   const gramsNow = () =>
-    unit() === "u"
-      ? Math.round(Number(amount.value) * Number(pieceInput.value || 0))
-      : Math.round(Number(amount.value) * (unit() === "l" ? 1000 : 1) * (unit() === "g" ? 1 : density?.gramsPerMilliliter ?? 0));
+    unit() === "u" ? Math.round(Number(amount.value) * pieceGrams()) : Math.round(toGrams(amount.value, unit()));
   const showEquiv = () => {
     equiv.textContent = "";
+    const measure = unit() === "u" ? pieceUnit() : unit();
+    if (measure !== "g" && !density) return;
     if (unit() === "u") {
-      if (Number(amount.value) > 0 && Number(pieceInput.value) > 0) equiv.textContent = t("add.volume-equals", { grams: grams(gramsNow()) });
-      return;
+      if (!(Number(amount.value) > 0 && pieceGrams() > 0)) return;
+      if (measure === "g") {
+        equiv.textContent = t("add.volume-equals", { grams: grams(gramsNow()) });
+        return;
+      }
     }
-    if (unit() === "g" || !density || !(Number(amount.value) > 0)) return;
+    if (measure === "g" || !(Number(amount.value) > 0)) return;
     const note = { AI: "add.volume-ai", DEFAULT: "add.volume-default" }[density.source];
     equiv.textContent = [t("add.volume-equals", { grams: grams(gramsNow()) }), note && t(note)].filter(Boolean).join(" · ");
   };
@@ -429,29 +436,37 @@ function wireAddFood(dialog, base, trays, onDone) {
     amount.max = chosen === "u" ? "500" : chosen === "g" ? "100000" : chosen === "l" ? "100" : "100000";
     pieceBox.hidden = chosen !== "u";
     if (chosen === "u") {
-      if (!pieceInput.value || pieceInput.dataset.food !== food) pieceInput.value = chosenFood()?.dataset.piece ?? "";
+      if (pieceInput.dataset.food !== food) {
+        pieceInput.value = chosenFood()?.dataset.piece ?? "";
+        form.querySelector("[name=pieceUnit][value=g]").checked = true;
+      }
       pieceInput.dataset.food = food ?? "";
-      return showEquiv();
+      const size = pieceUnit();
+      pieceBox.querySelector("[data-stepper] .unit").textContent = { g: "g", ml: "ml", l: "L" }[size];
+      pieceInput.step = size === "l" ? "0.05" : "1";
+      pieceInput.dataset.bigStep = { g: "10", ml: "10", l: "0.25" }[size];
+      pieceInput.inputMode = size === "l" ? "decimal" : "numeric";
     }
-    if (chosen === "g" || !food) return showEquiv();
+    const measure = chosen === "u" ? pieceUnit() : chosen;
+    if (measure === "g" || !food) return showEquiv();
     if (!densities.has(food)) {
       equiv.textContent = t("add.volume-wait");
       try {
         densities.set(food, await api(`${base}/foods/density?food=${encodeURIComponent(food)}`));
       } catch (error) {
         toast(errorText(error));
-        form.querySelector("[name=unit][value=g]").checked = true;
+        form.querySelector(chosen === "u" ? "[name=pieceUnit][value=g]" : "[name=unit][value=g]").checked = true;
         return syncUnit();
       }
     }
-    if (unit() !== chosen || formData(form).food !== food) return;
+    if (unit() !== chosen || (chosen === "u" && pieceUnit() !== measure) || formData(form).food !== food) return;
     density = densities.get(food);
     showEquiv();
   }
   form.addEventListener("change", (event) => {
     // Foods counted in pieces start on units; the person can still switch to grams.
     if (event.target.name === "food" && event.target.dataset.defaultUnit === "PIECE") form.querySelector("[name=unit][value=u]").checked = true;
-    if (event.target.name === "unit" || event.target.name === "food") syncUnit();
+    if (event.target.name === "unit" || event.target.name === "pieceUnit" || event.target.name === "food") syncUnit();
   });
   amount.addEventListener("input", showEquiv);
   pieceInput.addEventListener("input", showEquiv);
@@ -516,11 +531,11 @@ function wireAddFood(dialog, base, trays, onDone) {
     event.preventDefault();
     const values = formData(form);
     const tray = chosenTray();
-    if (unit() === "u" && !(Number(pieceInput.value) > 0)) {
+    if (unit() === "u" && !(pieceGrams() > 0)) {
       showError(form, { message: t("add.piece-needed") });
       return;
     }
-    if (!values.food || !tray || !Number(values.grams) || (unit() !== "g" && unit() !== "u" && !density)) {
+    if (!values.food || !tray || !Number(values.grams) || ((unit() === "u" ? pieceUnit() : unit()) !== "g" && !density)) {
       showError(form, { message: t("add.missing") });
       return;
     }
@@ -533,7 +548,7 @@ function wireAddFood(dialog, base, trays, onDone) {
       visibility: values.visibility,
       expiresOn: null,
       expirySource: null,
-      pieceGrams: unit() === "u" ? Number(pieceInput.value) : null,
+      pieceGrams: unit() === "u" ? pieceGrams() : null,
     };
     if (mode() === "known" && values.expiresOn) {
       body.expiresOn = values.expiresOn;
