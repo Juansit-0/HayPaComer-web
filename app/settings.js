@@ -1,6 +1,6 @@
 import { api, session } from "./api.js";
 import { soundOn } from "./sound.js";
-import { currentLocale, formatNumber, loadLocale, locales, t } from "./i18n.js";
+import { currentLocale, foodName, formatNumber, loadLocale, locales, t } from "./i18n.js";
 import { canonicalFood, errorText, esc, formData, grams, numberField, openSheet, rememberFocus, showError, toast, wireSteppers } from "./ui.js";
 import { reduced } from "./motion.js";
 import { openFridgeShape, shapeDrawing } from "./fridge-shape.js";
@@ -52,12 +52,20 @@ function languageTile() {
   </section>`;
 }
 
-function profileTile(profile) {
+function profileTile(profile, me) {
   const diet = profile?.diet ?? "OMNIVORE";
   const allergies = new Set(profile?.allergies ?? []);
   return `<section class="tile w-7" aria-labelledby="profile-title">
     <h2 id="profile-title">${t("settings.profile")}</h2>
     <p class="hint">${t("settings.profile-hint")}</p>
+    ${
+      me.emailVerified
+        ? ""
+        : `<div class="row-form" data-verify>
+            <p class="hint grow">${esc(t("settings.verify-hint", { email: me.email ?? "" }))}</p>
+            <button type="button" class="ghost" data-resend-verification>${t("settings.verify-resend")}</button>
+          </div>`
+    }
     <form class="stack" data-profile-form>
       <fieldset class="chips"><legend>${t("settings.diet")}</legend>${DIETS.map(
         (value) => `<label class="chip"><input type="radio" name="diet" value="${value}" ${value === diet ? "checked" : ""}><span>${t(`diet.${value}`)}</span></label>`,
@@ -144,18 +152,28 @@ export function confirmSheet(title, text, label, action) {
 
 const DEVICE_KINDS = ["ESP32_DOOR_TEMP", "ESP32_SCALE", "SIMULATOR"];
 
+const SCALE_MODES = ["FRIDGE", "COOKING"];
+
 // Tare with the plate empty, then calibrate with something whose weight is known; both only talk to the scale endpoints.
-function scaleTools(device) {
+// In fridge mode the food resting on the plate loses stock as it gets lighter; in cooking mode readings never touch stock.
+function scaleTools(device, items) {
   return `<div class="row-form scale-tools" data-scale="${esc(device.id)}">
     <button type="button" data-scale-tare>${t("settings.scale-tare")}</button>
     <label class="grow">${t("settings.scale-known")}<input name="knownGrams" type="number" inputmode="decimal" min="1" max="20000" step="any" value="206"></label>
     <button type="button" data-scale-calibrate>${t("settings.scale-calibrate")}</button>
     <button type="button" class="ghost" data-scale-read>${t("settings.scale-read")}</button>
+    <label class="grow">${t("settings.scale-item")}<select name="itemId">${items
+      .map((item) => `<option value="${esc(item.id)}">${esc(foodName(item.name))} · ${grams(item.grams)}</option>`)
+      .join("")}</select></label>
+    <button type="button" data-scale-assign ${items.length ? "" : "disabled"}>${t("settings.scale-assign")}</button>
+    <button type="button" class="ghost" data-scale-unassign>${t("settings.scale-unassign")}</button>
+    <label>${t("settings.scale-mode")}<select name="mode">${SCALE_MODES.map((mode) => `<option value="${mode}">${t(`settings.scale-mode.${mode}`)}</option>`).join("")}</select></label>
+    <button type="button" class="ghost" data-scale-mode>${t("settings.scale-mode-set")}</button>
     <p class="hint" data-scale-status aria-live="polite"></p>
   </div>`;
 }
 
-function devicesTile(devices) {
+function devicesTile(devices, items) {
   const when = (at) => new Date(at).toLocaleString(currentLocale(), { dateStyle: "medium", timeStyle: "short" });
   return `<section class="tile w-12" aria-labelledby="devices-title">
     <h2 id="devices-title">${t("settings.devices")}</h2>
@@ -166,7 +184,7 @@ function devicesTile(devices) {
           <span class="item-name">${esc(device.name)} <small>${t(`device.kind.${device.kind}`)}</small></span>
           <span class="hint">${!device.active ? t("settings.device-off") : device.lastSeenAt ? esc(t("settings.device-seen", { when: when(device.lastSeenAt) })) : t("settings.device-never")}</span>
           <span class="item-actions">${device.active ? `<button type="button" class="ghost" data-revoke-device="${esc(device.id)}" data-name="${esc(device.name)}">${t("settings.device-revoke")}</button>` : ""}</span>
-          ${device.active && device.kind === "ESP32_SCALE" ? scaleTools(device) : ""}
+          ${device.active && device.kind === "ESP32_SCALE" ? scaleTools(device, items) : ""}
         </li>`,
       )
       .join("")}</ul>
@@ -203,6 +221,16 @@ function wireDevices(main, base, fridgeId, rerender) {
         if ("scaleTare" in button.dataset) {
           await api(`${path}/tare`, { method: "POST" });
           status.textContent = t("settings.scale-tared");
+        } else if ("scaleAssign" in button.dataset) {
+          await api(`${path}/item`, { method: "PUT", body: { itemId: box.querySelector("[name=itemId]").value } });
+          status.textContent = t("settings.scale-assigned");
+        } else if ("scaleUnassign" in button.dataset) {
+          await api(`${path}/item`, { method: "DELETE" });
+          status.textContent = t("settings.scale-unassigned");
+        } else if ("scaleMode" in button.dataset) {
+          const mode = box.querySelector("[name=mode]").value;
+          await api(`${path}/mode`, { method: "PUT", body: { mode } });
+          status.textContent = t("settings.scale-mode-done", { mode: t(`settings.scale-mode.${mode}`) });
         } else if ("scaleCalibrate" in button.dataset) {
           await api(`${path}/calibrate`, { method: "POST", body: { knownGrams: Number(box.querySelector("[name=knownGrams]").value) } });
           status.textContent = t("settings.scale-calibrated");
@@ -238,6 +266,28 @@ function wireDevices(main, base, fridgeId, rerender) {
       button.disabled = false;
     }
   });
+}
+
+// What the Chef remembers about this home; anyone can drop one note, only the owner wipes them all.
+function memoryTile(notes, creator) {
+  return `<section class="tile w-12" aria-labelledby="memory-title">
+    <h2 id="memory-title">${t("settings.memory")}</h2>
+    <p class="hint">${t("settings.memory-hint")}</p>
+    ${
+      notes.length
+        ? `<ul class="list">${notes
+            .map(
+              (note) => `<li class="member-row">
+                <span class="item-name">${esc(note.subject)}${note.value ? ` <small>${esc(note.value)}</small>` : ""}</span>
+                <span class="hint">${t(`settings.memory-topic.${note.topic}`)}</span>
+                <span class="item-actions"><button type="button" class="ghost" data-forget="${esc(note.topic)}" data-subject="${esc(note.subject)}">${t("settings.memory-forget")}</button></span>
+              </li>`,
+            )
+            .join("")}</ul>
+          ${creator ? `<button type="button" class="ghost danger" data-forget-all>${t("settings.memory-clear")}</button>` : ""}`
+        : `<p class="hint">${t("settings.memory-none")}</p>`
+    }
+  </section>`;
 }
 
 function saved(form, text = t("settings.saved")) {
@@ -276,6 +326,8 @@ export async function renderSettings(main, household, rerender) {
   const profile = profiles.find((candidate) => candidate.memberId === membership?.memberId);
   const owner = detail.myRole !== "GUEST";
   const devices = owner && fridges[0] ? await api(`${base}/devices`).catch(() => []) : null;
+  const scaleItems = devices?.some((device) => device.active && device.kind === "ESP32_SCALE") ? await api(`${base}/inventory`).catch(() => []) : [];
+  const notes = await api(`${base}/agent/memory`).catch(() => null);
 
   if (main.dataset.route !== "settings") return;
   main.innerHTML = `
@@ -288,18 +340,20 @@ export async function renderSettings(main, household, rerender) {
       ["language-title", "settings.language"],
       ["alerts-title", "settings.alerts"],
       ...(devices ? [["devices-title", "settings.devices"]] : []),
+      ...(notes ? [["memory-title", "settings.memory"]] : []),
       ["household-settings-title", "settings.household"],
       ...(fridges[0] ? [["fridge-shape-title", "fridge-shape.title"]] : []),
     ]
       .map(([target, key]) => `<button type="button" class="chip-button" data-goto="${target}">${t(key)}</button>`)
       .join("")}</nav>
     <div class="bento">
-      ${profileTile(profile)}
+      ${profileTile(profile, me)}
       <div class="w-5 stack">
         ${languageTile()}
         ${notificationsTile(preferences)}
       </div>
-      ${devices ? devicesTile(devices) : ""}
+      ${devices ? devicesTile(devices, scaleItems.filter((item) => item.usable)) : ""}
+      ${notes ? memoryTile(notes, detail.myRole === "OWNER") : ""}
       ${householdTile(settings, owner)}
       ${fridges[0] ? fridgeTile(shape, owner) : ""}
     </div>
@@ -319,6 +373,37 @@ export async function renderSettings(main, household, rerender) {
     await api("/me/locale", { method: "PUT", body: { locale: currentLocale() } }).catch(() => null);
     toast(t("settings.toast-language"));
     rerender();
+  });
+
+  main.querySelector("[data-resend-verification]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await api("/me/email-verification", { method: "POST" });
+      toast(t("settings.verify-sent"));
+    } catch (error) {
+      toast(errorText(error));
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  main.querySelector("#memory-title")?.closest("section").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-forget], [data-forget-all]");
+    if (!button) return;
+    const forget = async () => {
+      await api(`${base}/agent/memory`, button.dataset.forget ? { method: "PATCH", body: { forget: [{ topic: button.dataset.forget, subject: button.dataset.subject }] } } : { method: "DELETE" });
+      rerender();
+    };
+    if (button.dataset.forget) {
+      button.disabled = true;
+      await forget().catch((error) => {
+        button.disabled = false;
+        toast(errorText(error));
+      });
+    } else {
+      confirmSheet(t("settings.memory-clear"), t("settings.memory-clear-ask"), t("settings.memory-clear"), forget);
+    }
   });
 
   const profileForm = main.querySelector("[data-profile-form]");

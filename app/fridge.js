@@ -108,6 +108,67 @@ function requestsTile() {
   </section>`;
 }
 
+// Only whoever stocked a food decides who may use it: everyone, ask first, or only them, plus one member at a time.
+async function openPrivacy(base, item) {
+  const [me, detail] = await Promise.all([api("/me"), api(base)]);
+  const statuses = item.statuses ?? [];
+  const current = statuses.includes("PRIVATE") ? "PRIVATE" : statuses.includes("ASK_FIRST") ? "ASK_FIRST" : "SHARED";
+  const others = detail.members.filter((member) => member.userId !== me.id);
+  const body = `<div class="stack">
+    <p class="hint">${t("privacy.hint")}</p>
+    <form class="stack" data-visibility>
+      ${chips("visibility", t("add.visibility"), ["SHARED", "ASK_FIRST", "PRIVATE"].map((value) => [value, t(`add.visibility.${value}`)]), current)}
+      <button class="primary" type="submit">${t("privacy.save")}</button>
+    </form>
+    ${
+      others.length
+        ? `<h3>${t("privacy.members")}</h3>
+          <ul class="list">${others
+            .map(
+              (member) => `<li class="member-row">
+                <span class="item-name">${esc(member.name ?? t("settings.member-unknown"))}</span>
+                <span class="item-actions">
+                  <button type="button" data-grant="${esc(member.userId)}">${t("privacy.grant")}</button>
+                  <button type="button" class="ghost" data-revoke="${esc(member.userId)}">${t("privacy.revoke")}</button>
+                </span>
+              </li>`,
+            )
+            .join("")}</ul>`
+        : ""
+    }
+  </div>`;
+  openSheet(theFood(item.name), body, (dialog) => {
+    const food = theFood(item.name);
+    dialog.querySelector("[data-visibility]").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.target;
+      await busy(form.querySelector("button"), async () => {
+        try {
+          await api(`${base}/items/${item.id}/visibility`, { method: "PUT", body: { visibility: formData(form).visibility } });
+          toast(t("privacy.saved", { food }));
+          dialog.close();
+        } catch (error) {
+          showError(form, error);
+        }
+      });
+    });
+    dialog.querySelectorAll("[data-grant], [data-revoke]").forEach((button) =>
+      button.addEventListener("click", () =>
+        busy(button, async () => {
+          const { grant, revoke } = button.dataset;
+          const name = detail.members.find((member) => member.userId === (grant ?? revoke))?.name ?? "";
+          try {
+            await api(grant ? `${base}/items/${item.id}/grants` : `${base}/items/${item.id}/grants/${revoke}`, grant ? { method: "POST", body: { userId: grant } } : { method: "DELETE" });
+            toast(t(grant ? "privacy.granted" : "privacy.revoked", { member: name, food }));
+          } catch (error) {
+            toast(errorText(error));
+          }
+        }),
+      ),
+    );
+  });
+}
+
 // A shelf lists its food as rows: what it is, how much, and one line about when it goes off. Choosing a row unfolds its actions.
 function foodRow(item, trays) {
   const hidden = item.name === "Private food";
@@ -133,6 +194,7 @@ function foodRow(item, trays) {
             <button type="submit" name="action" value="consume">${t("fridge.use")}</button>
             ${item.openedOn ? "" : `<button class="ghost" type="submit" name="action" value="open" formnovalidate>${t("fridge.opened")}</button>`}
             <button class="ghost danger" type="submit" name="action" value="discard" formnovalidate data-hold aria-describedby="hold-hint">${t("fridge.discard")}</button>
+            <button class="ghost" type="button" data-privacy="${esc(item.id)}">${t("privacy.open")}</button>
             ${
               elsewhere.length
                 ? `<span class="move-to"><label for="move-${esc(item.id)}">${t("fridge.move-to")}</label>
@@ -790,6 +852,10 @@ export async function renderFridge(main, household) {
         showError(form, error);
       }
     }),
+  );
+
+  main.querySelectorAll("[data-privacy]").forEach((button) =>
+    button.addEventListener("click", () => busy(button, () => openPrivacy(base, inventory.find((entry) => entry.id === button.dataset.privacy)).catch((error) => toast(errorText(error))))),
   );
 
   main.querySelector("[data-add-food]")?.addEventListener("click", async () => {
