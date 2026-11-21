@@ -6,6 +6,7 @@ import { chooseHousehold, householdLabel, rememberJoin, renderForgot, renderRese
 import { renderFridge } from "./fridge.js";
 import { renderAnalytics } from "./analytics.js";
 import { renderChef } from "./chef.js";
+import { renderRecipes } from "./recipes.js";
 import { renderHome } from "./home.js";
 import { renderMarket } from "./market.js";
 import { connectLive, disconnectLive } from "./live.js";
@@ -77,6 +78,7 @@ const views = {
   market: renderMarket,
   numbers: renderAnalytics,
   chef: renderChef,
+  recipes: renderRecipes,
   home: renderHome,
   settings: (main, household) => renderSettings(main, household, async () => {
     const back = rememberFocus(main);
@@ -224,7 +226,7 @@ async function paint(update) {
 }
 
 // Sections in the order of the tab bar: a change of section enters from the side it lies on.
-const SECTIONS = ["now", "fridge", "market", "numbers", "chef", "home", "settings"];
+const SECTIONS = ["now", "fridge", "market", "numbers", "chef", "recipes", "home", "settings"];
 let shownRoute = null;
 
 // Where no ink edge withdraws the panel (phones, no 3D), the new chapter's colour sweeps across its band from that side instead.
@@ -390,7 +392,7 @@ main.addEventListener("pointermove", (event) => {
   }
   swipe.dx = dx;
   const index = SECTIONS.indexOf(current());
-  const edge = (dx > 0 && index === 0) || (0 > dx && index === 4) || index > 4;
+  const edge = (dx > 0 && index === 0) || (0 > dx && index === 5) || index > 5;
   if (!reduced()) main.style.translate = `${dx * (edge ? 0.15 : 0.6)}px 0`;
 });
 const endSwipe = (event) => {
@@ -401,7 +403,7 @@ const endSwipe = (event) => {
   const index = SECTIONS.indexOf(current());
   const next = SECTIONS[index + (dx > 0 ? -1 : 1)];
   const far = Math.abs(dx) > innerWidth * 0.25 || Math.abs(dx) / (performance.now() - at) > 0.5;
-  if (event.type === "pointerup" && far && next && next !== "settings" && index !== -1 && 5 > index) {
+  if (event.type === "pointerup" && far && next && next !== "settings" && index !== -1 && 6 > index) {
     main.style.translate = "";
     location.hash = `#/${next}`;
     return;

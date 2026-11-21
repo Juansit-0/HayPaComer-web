@@ -105,6 +105,7 @@ a { color: var(--color-primary-text); }
 :root[data-chapter="market"] { --chapter: var(--chapter-market); --chapter-ink: var(--chapter-market-ink); }
 :root[data-chapter="numbers"] { --chapter: var(--chapter-numbers); --chapter-ink: var(--chapter-numbers-ink); }
 :root[data-chapter="chef"] { --chapter: var(--chapter-chef); --chapter-ink: var(--chapter-chef-ink); }
+:root[data-chapter="recipes"] { --chapter: var(--chapter-chef); --chapter-ink: var(--chapter-chef-ink); }
 :root[data-chapter="settings"] { --chapter: var(--chapter-settings); --chapter-ink: var(--chapter-settings-ink); }
 :root[data-chapter="home"] { --chapter: var(--chapter-fridge); --chapter-ink: var(--chapter-fridge-ink); }
 
@@ -1708,7 +1709,7 @@ img.inked { opacity: 0; }
   .bar .tabs a { padding-inline: 12px; }
 }
 @media (max-width: 1023px) {
-  .bar .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-radius: 0; background: var(--sheet); box-shadow: inset 0 2px 0 var(--line); }
+  .bar .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-radius: 0; background: var(--sheet); box-shadow: inset 0 2px 0 var(--line); }
   .bar .tabs[hidden] { display: none; }
   .bar .tabs a { flex-direction: column; justify-content: center; gap: 2px; min-height: 56px; padding: 0 2px; font-size: 13px; }
   .bar .session { margin-left: auto; }
@@ -1937,3 +1938,15 @@ button.danger[data-hold]::after { background: var(--color-tomate); opacity: 0.9;
 .ask-line { padding: 0 var(--space-s, 0.75rem) var(--space-xs, 0.5rem); }
 .scale-tools { grid-column: 1 / -1; flex-basis: 100%; width: 100%; align-items: end; flex-wrap: wrap; }
 .scale-tools [data-scale-status] { flex-basis: 100%; margin: 0; }
+
+/* Recipes: the photo picker is a label styled as a button, ingredient rows wrap on phones */
+label.button { display: inline-flex; align-items: center; justify-content: center; min-height: var(--control-height-large); cursor: pointer; }
+label.button:focus-within { outline: 2px solid var(--line); outline-offset: 2px; }
+.recipes-hero .row-form { margin-top: var(--space-s); }
+.plan-day + .plan-day { margin-top: var(--space-s); }
+.plan-day h3 { margin: 0; }
+.plan-day h3::first-letter { text-transform: uppercase; }
+.list > li.recipe-row { grid-template-columns: minmax(0, 1fr); }
+.recipe-row .item-actions { justify-content: start; }
+.plan-tile .list > li { grid-template-columns: minmax(0, 1fr) auto; padding: var(--space-xs) 0; }
+.draft-steps { margin: 0; padding-left: 1.25em; display: grid; gap: var(--space-xs); }

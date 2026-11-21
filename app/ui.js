@@ -409,6 +409,8 @@ const LAYOUTS = {
     ${tile("", 260)}`,
   chef: () => `<section class="chef-sees skel-tile" style="--h:150px">${block()}</section>
     <section class="chef-tile tile skel-tile" style="--h:300px">${rows(2, "chat-row")}</section>`,
+  recipes: () => `<div class="bento"><div class="tile w-7 skel-tile" style="--h:420px">${line("big")}${rows(4, "list-row")}</div>
+    <div class="w-5 stack">${tile("", 240)}${tile("", 200)}</div></div>`,
   settings: () => `<div class="bento"><div class="tile w-7 skel-tile" style="--h:340px">${line("big")}${rows(3, "list-row")}</div>
     <div class="w-5 stack">${tile("", 160)}${tile("", 160)}</div>${tile("w-12", 160)}</div>`,
 };
@@ -416,7 +418,7 @@ const LAYOUTS = {
 const HEADERS = { numbers: "numbers-head", now: "now-hero", fridge: "fridge-hero", market: "market-hero" };
 // The figure and the status pills that head the Fridge and Market bands, so the band keeps its height.
 const HEAD_EXTRAS = { fridge: `${'<span class="skel-line figure"></span>'}<span class="skel-pills"><i></i><i></i></span>`, market: '<span class="skel-line figure"></span>' };
-const ART = { now: "plate", fridge: "shelf", market: "basket", numbers: "scale", chef: "pot", settings: "plug" };
+const ART = { now: "plate", fridge: "shelf", market: "basket", numbers: "scale", chef: "pot", recipes: "pot", settings: "plug" };
 
 export function skeleton(route, title) {
   const heading = `<h1>${esc(title)}</h1><p class="loading-note">${art(ART[route] ?? "plate")}<span data-loading-caption>${esc(t(`loading.${route}.1`))}</span></p>${HEAD_EXTRAS[route] ?? ""}`;

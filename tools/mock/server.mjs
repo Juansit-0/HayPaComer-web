@@ -67,6 +67,27 @@ const pending = [];
 const requirement = (food, grams) => ({ food, grams, verdict: "ENOUGH", availableGrams: grams, shortfallGrams: 0, substitute: null });
 const recipe = (name, minutes, foods) => ({ id: name, name, servings: 2, minutes, requirements: foods.map(([food, grams]) => ({ food, grams, optional: false })), steps: [{ instruction: "Cook", timerSeconds: null, weighFood: null, weighGrams: null }] });
 const recipes = [recipe("Scrambled eggs with tomato", 10, [["Egg", 120], ["Tomato", 100]]), recipe("Pasta con tomate", 25, [["Tomato", 200], ["Cheese", 50]]), recipe("Arroz con pollo", 35, [["Chicken breast", 300], ["Carrot", 100]])];
+const templates = [recipe("Lentejas guisadas", 40, [["Carrot", 100], ["Potato", 200]]), recipe("Ensalada de aguacate", 10, [["Avocado", 200], ["Tomato", 150], ["Lime", 30]])].map((entry) => ({ ...entry, id: `tpl-${entry.id}` }));
+const planFor = (weekStart, id = "w1") => ({ id, weekStart, weekEnd: new Date(Date.parse(weekStart) + 6 * 86400000).toISOString().slice(0, 10), clonedFrom: null,
+  entries: Array.from({ length: 14 }, (_, index) => { const pick = recipes[index % recipes.length]; return { id: `e${index + 1}`, day: index >> 1, date: new Date(Date.parse(weekStart) + (index >> 1) * 86400000).toISOString().slice(0, 10), meal: index % 2 ? "DINNER" : "LUNCH", recipeId: pick.id, recipe: pick.name, servings: 2, needsShopping: pick.name === "Arroz con pollo" }; }) });
+let plan = process.env.NO_PLAN ? null : planFor(day(0));
+const have = (food) => inventory.filter((entry) => entry.name === food).reduce((total, entry) => total + entry.grams, 0);
+const evaluate = (body) => {
+  const scale = body.targetServings / body.servings;
+  const requirements = body.requirements.map((entry) => {
+    const requiredGrams = Math.round(entry.grams * scale);
+    const availableGrams = have(entry.food);
+    const shortfallGrams = Math.max(0, requiredGrams - availableGrams);
+    const substitute = shortfallGrams && body.strategy === "RESCUE" && entry.food === "Carrot" ? "Squash" : null;
+    const verdict = !shortfallGrams ? "ENOUGH" : substitute ? "SUBSTITUTE" : body.strategy === "FLEXIBLE" && shortfallGrams <= requiredGrams / 4 ? "REDUCE" : "MISSING";
+    return { food: entry.food, requiredGrams, availableGrams, shortfallGrams, verdict, substitute, substituteGrams: substitute ? shortfallGrams : null, optional: Boolean(entry.optional) };
+  });
+  const worst = ["MISSING", "SUBSTITUTE", "REDUCE"].find((verdict) => requirements.some((entry) => !entry.optional && entry.verdict === verdict)) ?? "ENOUGH";
+  return { verdict: worst, requestedServings: body.targetServings, achievableServings: worst === "MISSING" ? Math.max(0, body.targetServings - 1) : body.targetServings, requirements, conflicts: [] };
+};
+const photoDraft = { name: "Sudado de pollo", servings: 4, minutes: 45, confidence: 0.82, source: "AI", verified: false, saved: false,
+  ingredients: [{ readFood: "pechuga", readQuantity: "500 g", catalogFood: "Chicken breast", grams: 500, verified: true, problem: null }, { readFood: "papa criolla", readQuantity: "1 libra", catalogFood: "Potato", grams: 500, verified: true, problem: null }, { readFood: "guascas", readQuantity: "al gusto", catalogFood: null, grams: null, verified: false, problem: "Unknown food" }],
+  steps: ["Sofreír la cebolla y el tomate", "Agregar el pollo y la papa", "Cocinar tapado 30 minutos"] };
 const tally = (consumed, rescued, discarded) => ({ consumedGrams: consumed, rescuedGrams: rescued, discardedGrams: discarded, wasteRate: discarded / Math.max(1, consumed + discarded) });
 const notifications = [
   { id: "n1", type: "DOOR_LEFT_OPEN", title: "Puerta abierta", body: "La puerta de la nevera lleva 2 minutos abierta.", at: new Date(Date.now() - 3600000).toISOString(), readAt: null },
@@ -85,7 +106,16 @@ const routes = [
   [/^\/i18n\/(.+)$/, (m) => texts[decodeURIComponent(m[1])] ?? {}],
   [/^\/me$/, () => ({ id: "u1", email: "juan@example.test", displayName: "Juan", locale: "es-CO" })],
   [/^\/households$/, () => [{ id: H, name: "Casa", currency: "COP", timezone: "America/Bogota", role: "OWNER", myRole: "OWNER" }]],
-  [/^\/households\/[^/]+$/, () => ({ id: H, name: "Casa", currency: "COP", timezone: "America/Bogota", myRole: "OWNER", members: [{ userId: "u1", name: "Juan", role: "OWNER" }] })],
+  [/^\/households\/[^/]+$/, () => ({ id: H, name: "Casa", currency: "COP", timezone: "America/Bogota", myRole: "OWNER", members: [{ userId: "u1", name: "Juan", role: "OWNER" }, { userId: "u2", name: "Jenifer", role: "MEMBER" }] })],
+  [/^\/households\/[^/]+\/join-code$/, () => ({ code: "ABCD-EFGH", role: "MEMBER", expiresAt: new Date(Date.now() + 6 * 86400000).toISOString() })],
+  [/^\/households\/[^/]+\/invitations$/, () => [{ id: "v1", email: "ana@example.test", role: "GUEST", expiresAt: new Date(Date.now() + 5 * 86400000).toISOString(), link: null }]],
+  [/^\/households\/[^/]+\/activity/, () => [
+    { actor: "u1", action: "CONSUME_FOOD", entity: "FOOD_ITEM", entityId: "i3", detail: { grams: "192" }, at: new Date(Date.now() - 1800000).toISOString() },
+    { actor: "u2", action: "STOCK_FOOD", entity: "FOOD_ITEM", entityId: "i9", detail: { grams: "400" }, at: new Date(Date.now() - 7200000).toISOString() },
+    { actor: "u1", action: "UNDO_DISCARD_FOOD", entity: "SNAPSHOT", entityId: "s0", detail: {}, at: new Date(Date.now() - 86400000).toISOString() },
+  ]],
+  [/^\/households\/[^/]+\/snapshots$/, () => [{ id: "sn1", kind: "MANUAL", reason: "Antes del mercado", fridges: 1, items: 17, at: new Date(Date.now() - 3 * 86400000).toISOString() }]],
+  [/^\/households\/[^/]+\/agent\/memory$/, () => [{ topic: "PREFERENCE", subject: "cilantro", value: "no le gusta a Jenifer" }, { topic: "USUAL_QUANTITY", subject: "arroz", value: "200 g por persona" }]],
   [/^\/households\/[^/]+\/fridges$/, fridges],
   [/^\/households\/[^/]+\/fridges\/[^/]+\/shape$/, () => shape],
   [/^\/households\/[^/]+\/fridges\/[^/]+\/space$/, () => rooms()],
@@ -94,7 +124,8 @@ const routes = [
   [/^\/households\/[^/]+\/inventory/, () => inventory],
   [/^\/households\/[^/]+\/kitchen$/, () => ({ totalGrams: inventory.reduce((t, e) => t + e.grams, 0), items: inventory.length, atRisk: 3, expired: 0 })],
   [/^\/households\/[^/]+\/recipes$/, () => recipes],
-  [/^\/recipe-templates$/, () => []],
+  [/^\/recipe-templates$/, () => templates],
+  [/^\/households\/[^/]+\/weekly-plans\/current$/, () => plan],
   [/^\/households\/[^/]+\/suggestions$/, () => ({ suggestions: recipes.map((entry) => ({ recipe: entry.name, minutes: entry.minutes, rescuedFoods: ["Tomato"], score: 1, reason: "", evaluation: { requestedServings: 2, verdict: entry.name === "Arroz con pollo" ? "MISSING" : "ENOUGH", requirements: entry.requirements.map((r) => (entry.name === "Arroz con pollo" && r.food === "Carrot" ? { ...requirement(r.food, r.grams), verdict: "MISSING", availableGrams: 0, shortfallGrams: r.grams } : requirement(r.food, r.grams))) } })) })],
   [/^\/households\/[^/]+\/analytics\?/, () => ({ from: day(-29), to: day(0), currency: "COP", moneySaved: 6225, moneyWasted: 1760, unpriced: [], total: tally(520, 270, 80),
     days: Array.from({ length: 30 }, (_, index) => ({ day: day(index - 29), tally: tally(index % 4 ? 0 : 60, index % 6 ? 0 : 40, index === 20 ? 80 : 0) })),
@@ -188,6 +219,44 @@ createServer((request, response) => {
         inventory.push(added);
         response.writeHead(201, { "content-type": "application/json" });
         response.end(JSON.stringify(added));
+      });
+      return;
+    }
+    // The Recipes screen: save, copy, check against the fridge, read a photo, and the weekly plan.
+    const cookbook = request.method !== "GET" && path.match(/^\/households\/[^/]+\/(recipes|recipes\/evaluate|recipes\/from-photo|recipes\/([^/]+)\/clone|weekly-plans|weekly-plans\/[^/]+\/clone|plan-entries\/([^/]+)|market-list\/from-plan)$/);
+    if (cookbook) {
+      const chunks = [];
+      request.on("data", (chunk) => chunks.push(chunk));
+      request.on("end", () => {
+        const raw = Buffer.concat(chunks).toString();
+        const body = cookbook[1] === "recipes/from-photo" ? {} : JSON.parse(raw || "{}");
+        const answer = (status, value) => {
+          response.writeHead(status, { "content-type": "application/json" });
+          response.end(JSON.stringify(value));
+        };
+        if (cookbook[1] === "recipes") {
+          const saved = { ...body, id: `r${recipes.length + 1}`, steps: (body.steps ?? []).map((step, index) => ({ position: index + 1, instruction: step.instruction, timerSeconds: null, weighFood: null, weighGrams: null })), clonedFrom: null };
+          recipes.push(saved);
+          return answer(201, saved);
+        }
+        if (cookbook[1] === "recipes/evaluate") return answer(200, evaluate(body));
+        if (cookbook[1] === "recipes/from-photo") return setTimeout(() => answer(200, photoDraft), 600);
+        if (cookbook[2]) {
+          const source = [...recipes, ...templates].find((entry) => entry.id === decodeURIComponent(cookbook[2]));
+          const copy = { ...source, id: `r${recipes.length + 1}`, clonedFrom: source.id };
+          recipes.push(copy);
+          return answer(201, copy);
+        }
+        if (cookbook[1] === "weekly-plans") return answer(201, (plan = planFor(day(0))));
+        if (cookbook[1].endsWith("/clone")) return answer(201, planFor(new Date(Date.parse(body.weekStart)).toISOString().slice(0, 10), "w2"));
+        if (cookbook[3]) {
+          const entry = plan.entries.find((candidate) => candidate.id === cookbook[3]);
+          const chosen = recipes.find((candidate) => candidate.id === body.recipeId);
+          Object.assign(entry, { recipeId: chosen.id, recipe: chosen.name, servings: body.servings });
+          return answer(200, entry);
+        }
+        if (!plan) return answer(404, { title: "Weekly plan not found" });
+        return answer(200, [{ food: "Carrot", neededGrams: 300, availableGrams: 500, addedGrams: 0, pendingGrams: 0 }, { food: "Chicken breast", neededGrams: 900, availableGrams: 400, addedGrams: 500, pendingGrams: 500 }]);
       });
       return;
     }

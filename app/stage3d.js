@@ -62,6 +62,7 @@ const VIEWS = {
   market: { position: [2.2, 1.35, 1.3], target: [2.3, 1.0, -0.1], door: 0, freezer: 0 },
   numbers: { position: [0.88, 1.62, 1.05], target: [0.87, 1.64, -0.3], door: 0, freezer: 0 },
   chef: { position: [1.68, 1.45, 1.25], target: [1.55, 0.98, -0.05], door: 0, freezer: 0 },
+  recipes: { position: [1.68, 1.45, 1.25], target: [1.55, 0.98, -0.05], door: 0, freezer: 0 },
   settings: { position: [1.05, 1.6, 3.7], target: [1.05, 1.0, -0.1], door: 0, freezer: 0 },
 };
 
