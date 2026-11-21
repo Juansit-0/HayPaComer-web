@@ -2,6 +2,7 @@ import { api, freshAccess, patiently } from "./api.js";
 import { foodName, formatDay, plural, recipeName, stepText, t } from "./i18n.js";
 import { page } from "./motion.js";
 import { candidate } from "./now.js";
+import { confirmSheet } from "./settings.js";
 import { busy, canonicalFood, chips, esc, foodOptions, formData, grams, numberField, openSheet, showError, swap, toast, wireFoodSearch, wireSteppers } from "./ui.js";
 
 const mealName = (meal) => (meal === "LUNCH" ? t("recipes.lunch") : t("recipes.dinner"));
@@ -22,6 +23,7 @@ function recipeRow(recipe, template) {
     <span class="item-actions">
       <button type="button" data-evaluate="${esc(recipe.id)}">${t("recipes.evaluate")}</button>
       <button type="button" class="ghost" data-clone="${esc(recipe.id)}">${template ? t("recipes.use-template") : t("recipes.clone")}</button>
+      ${template ? "" : `<button type="button" class="ghost" data-delete="${esc(recipe.id)}">${t("recipes.delete")}</button>`}
     </span>
   </li>`;
 }
@@ -359,6 +361,13 @@ export async function renderRecipes(main, household) {
       else if (button.dataset.change) {
         if (!recipes.length) return toast(t("recipes.empty-hint"));
         openChange(base, plan.entries.find((entry) => entry.id === button.dataset.change), recipes, refresh);
+      } else if (button.dataset.delete) {
+        const name = recipeName(find(button.dataset.delete).name);
+        confirmSheet(t("recipes.delete-title"), t("recipes.delete-ask", { recipe: name }), t("recipes.delete"), async () => {
+          await api(`${base}/recipes/${button.dataset.delete}`, { method: "DELETE" });
+          toast(t("recipes.toast-deleted", { recipe: name }));
+          refresh();
+        });
       } else if (button.dataset.clone)
         busy(button, async () => {
           try {

@@ -25,8 +25,8 @@ const SPECIALISTS = { chef: "chef.specialist.chef", market: "chef.specialist.mar
 
 // With no AI the agent only reads, and its answer is a raw list of what it read: that list stays under "checked", and the person gets this.
 function offlineText(answer) {
-  if (/^Offline answer based on measured data/.test(answer)) return t("chef.offline-answer");
-  if (/^No evidence available right now/.test(answer)) return t("chef.offline-none");
+  if (/^(Offline answer based on measured data|Respuesta sin IA con los datos medidos)/.test(answer)) return t("chef.offline-answer");
+  if (/^(No evidence available right now|Ahora no hay datos disponibles)/.test(answer)) return t("chef.offline-none");
   return localized(answer);
 }
 
@@ -37,7 +37,7 @@ const when = (iso) => (iso.length > 10 ? `${formatDay(iso.slice(0, 10))} ${forma
 const statusText = (list) => list.split(", ").map((status) => known(`status.${status.toLowerCase().replace(/_/g, "-")}`, status)).join(", ");
 const food = (name) => foodWord(name);
 
-// The agent's tools answer in English; each rule rebuilds one of their sentences in the person's language. Unknown lines pass through.
+// The agent's tools answer in English unless the server already translated them; each rule rebuilds one English sentence in the person's language. Unknown lines pass through.
 const RULES = [
   [new RegExp(`^Used ${G} of (.+); ${G} left$`), "chef.r.used", (m) => ({ grams: gm(m[1]), food: food(m[2]), left: gm(m[3]) })],
   [/^Undid the last change: (.+) at (\S+)$/, "chef.r.undid", (m) => ({ what: known(`chef.r.reason.${m[1].replace(/ /g, "_")}`, m[1]), when: when(m[2]) })],
@@ -106,7 +106,7 @@ function localized(text) {
 }
 
 function spoken(answer) {
-  return answer.replace(/^Offline answer based on measured data:\s*/i, "").replace(/\b[a-z_]+: /g, "");
+  return answer.replace(/^(Offline answer based on measured data|Respuesta sin IA con los datos medidos):\s*/i, "").replace(/\b[a-z_]+: /g, "");
 }
 
 function formatted(text) {
@@ -439,7 +439,7 @@ export async function renderChef(main, household) {
       const dishes = cooking ? await dishesWith(foods) : [];
       // A run that only proposes a change answers with its English summary; say it in the person's language instead.
       const pending = reply.confirmation;
-      const said = pending && /^Waiting for your confirmation/.test(reply.answer) ? t("chef.confirm.ask", { what: confirmationText(pending) }) : offlineText(reply.answer);
+      const said = pending && /^(Waiting for your confirmation|Esperando tu confirmación)/.test(reply.answer) ? t("chef.confirm.ask", { what: confirmationText(pending) }) : offlineText(reply.answer);
       const options = pending
         ? [
             { label: t("chef.confirm.yes"), action: "approve", id: pending.id, pending, main: true },

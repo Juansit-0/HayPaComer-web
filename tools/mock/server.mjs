@@ -222,6 +222,21 @@ createServer((request, response) => {
       });
       return;
     }
+    // A saved recipe can go only while no meal of the plan uses it, as the backend refuses with 409.
+    const dropped = request.method === "DELETE" && path.match(/^\/households\/[^/]+\/recipes\/([^/]+)$/);
+    if (dropped) {
+      const id = decodeURIComponent(dropped[1]);
+      if (plan?.entries.some((entry) => entry.recipeId === id)) {
+        response.writeHead(409, { "content-type": "application/problem+json" });
+        response.end(JSON.stringify({ title: "Conflict", status: 409, detail: "Esta receta está en un plan semanal; cambia esas comidas antes de borrarla" }));
+        return;
+      }
+      const index = recipes.findIndex((entry) => entry.id === id);
+      if (index >= 0) recipes.splice(index, 1);
+      response.writeHead(index >= 0 ? 204 : 404);
+      response.end();
+      return;
+    }
     // The Recipes screen: save, copy, check against the fridge, read a photo, and the weekly plan.
     const cookbook = request.method !== "GET" && path.match(/^\/households\/[^/]+\/(recipes|recipes\/evaluate|recipes\/from-photo|recipes\/([^/]+)\/clone|weekly-plans|weekly-plans\/[^/]+\/clone|plan-entries\/([^/]+)|market-list\/from-plan)$/);
     if (cookbook) {
